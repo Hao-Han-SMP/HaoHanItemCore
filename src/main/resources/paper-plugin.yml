@@ -1,0 +1,17 @@
+name: HaoHanItemManager
+version: '${project.version}'
+main: vn.haohan.itemmanager.HaoHanItemManagerPlugin
+description: Centralized Custom Item and Recipe Management Engine for HaoHan SMP
+api-version: '1.21'
+author: HaoHan
+website: https://github.com/Hao-Han-SMP/HaoHanItemManage
+
+permissions:
+  haohanitemmanager.use:
+    description: Allows basic HaoHanItemManager commands (items, item, recipes, recipe, search, browse)
+    default: true
+  haohanitemmanager.admin:
+    description: Allows admin HaoHanItemManager commands (give, reload)
+    default: op
+    children:
+      haohanitemmanager.use: true

@@ -1,0 +1,79 @@
+# ═══════════════════════════════════════════════════
+# HaoHanItemManager — Example Items
+# ═══════════════════════════════════════════════════
+# 
+# Mỗi top-level key là namespace.
+# Sub-keys là item key.
+# ID cuối cùng = namespace:item_key
+#
+# Ví dụ: example:fire_crystal → ID = "example:fire_crystal"
+#
+# Các field hỗ trợ:
+#   material:         (bắt buộc) Bukkit Material name
+#   display-name:     (tùy chọn) Tên hiển thị, hỗ trợ § color codes
+#   lore:             (tùy chọn) Danh sách các dòng lore
+#   custom-model-data:(tùy chọn) Custom model data number
+#   max-stack-size:   (tùy chọn) Số lượng tối đa trong 1 stack (mặc định 64)
+#   type:             (tùy chọn) MATERIAL, TOOL, WEAPON, ARMOR, FOOD,
+#                                MACHINE_COMPONENT, CURRENCY, SPECIAL
+#   properties:       (tùy chọn) Map các property tùy ý
+# ═══════════════════════════════════════════════════
+
+example:
+  fire_crystal:
+    material: EMERALD
+    display-name: "§cFire Crystal"
+    lore:
+      - "§7A crystal containing"
+      - "§7unstable fire energy."
+    custom-model-data: 1001
+    max-stack-size: 16
+    type: MATERIAL
+    properties:
+      element: fire
+      tier: 1
+
+  mana_shard:
+    material: PRISMARINE_SHARD
+    display-name: "§bMana Shard"
+    lore:
+      - "§7A shard infused with"
+      - "§7pure mana energy."
+    custom-model-data: 1002
+    max-stack-size: 64
+    type: MATERIAL
+    properties:
+      element: mana
+
+  mana_crystal:
+    material: DIAMOND
+    display-name: "§9Mana Crystal"
+    lore:
+      - "§7A powerful crystal"
+      - "§7condensed from mana shards."
+    custom-model-data: 1003
+    max-stack-size: 16
+    type: MATERIAL
+    properties:
+      element: mana
+      tier: 2
+
+  steel_core:
+    material: IRON_NUGGET
+    display-name: "§7Steel Core"
+    lore:
+      - "§7A dense core made from"
+      - "§7compressed iron."
+    custom-model-data: 2001
+    max-stack-size: 64
+    type: MACHINE_COMPONENT
+
+  steel_plate:
+    material: IRON_INGOT
+    display-name: "§fSteel Plate"
+    lore:
+      - "§7A reinforced plate"
+      - "§7used in machine construction."
+    custom-model-data: 2002
+    max-stack-size: 64
+    type: MACHINE_COMPONENT

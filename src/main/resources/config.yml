@@ -1,0 +1,11 @@
+# HaoHanItemManager Configuration
+# Plugin nền tảng quản lý Custom Item & Recipe
+
+# Bật debug logging
+debug: false
+
+# Tự động load items từ thư mục items/
+auto-discover-items: true
+
+# Tự động load recipes từ thư mục recipes/
+auto-discover-recipes: true

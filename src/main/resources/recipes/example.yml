@@ -1,0 +1,81 @@
+# ═══════════════════════════════════════════════════
+# HaoHanItemManager — Example Recipes
+# ═══════════════════════════════════════════════════
+#
+# Mỗi recipe có thể nằm trong file riêng hoặc gộp chung.
+# Nếu file chứa field "id" ở top level → đó là một recipe.
+# Nếu không → mỗi section con là một recipe.
+#
+# Recipe types: SHAPED, SHAPELESS, SMELTING, BLASTING,
+#               SMOKING, CAMPFIRE, STONECUTTING, SMITHING, MACHINE
+#
+# Ingredient types:
+#   - item: Dùng namespaced ID (custom hoặc minecraft:xxx)
+#   - material: Dùng Bukkit Material trực tiếp
+#   - tag: Dùng tag (chưa hỗ trợ hoàn toàn)
+# ═══════════════════════════════════════════════════
+
+# --- Shaped Recipe: Mana Crystal ---
+mana_crystal:
+  id: example:mana_crystal
+  type: SHAPED
+  pattern:
+    - " S "
+    - "SBS"
+    - " S "
+  ingredients:
+    S:
+      item: "example:mana_shard"
+      amount: 1
+    B:
+      item: "minecraft:blaze_rod"
+      amount: 1
+  result:
+    item: "example:mana_crystal"
+    amount: 1
+
+# --- Shaped Recipe: Steel Plate ---
+steel_plate:
+  id: example:steel_plate
+  type: SHAPED
+  pattern:
+    - "III"
+    - "ICI"
+    - "III"
+  ingredients:
+    I:
+      item: "minecraft:iron_ingot"
+      amount: 1
+    C:
+      item: "example:steel_core"
+      amount: 1
+  result:
+    item: "example:steel_plate"
+    amount: 1
+
+# --- Shapeless Recipe: Fire Crystal ---
+fire_crystal:
+  id: example:fire_crystal
+  type: SHAPELESS
+  ingredients:
+    1:
+      item: "minecraft:blaze_powder"
+      amount: 1
+    2:
+      item: "minecraft:emerald"
+      amount: 1
+  result:
+    item: "example:fire_crystal"
+    amount: 2
+
+# --- Smelting Recipe: Steel Core ---
+steel_core_smelting:
+  id: example:steel_core_smelting
+  type: SMELTING
+  input:
+    item: "minecraft:iron_nugget"
+  result:
+    item: "example:steel_core"
+    amount: 1
+  experience: 0.5
+  cooking-time: 100
