@@ -119,7 +119,7 @@ public final class ItemDefinition {
         private final String id;
         private Material material = Material.PAPER;
         private String displayName;
-        private int maxStackSize = 64;
+        private int maxStackSize = 1;
         private List<String> lore = new ArrayList<>();
         private Integer customModelData = null;
         private String model = null;

@@ -73,26 +73,32 @@ public final class ItemConfigLoader {
         // Top-level keys = namespaces
         for (String namespace : config.getKeys(false)) {
             ConfigurationSection namespaceSection = config.getConfigurationSection(namespace);
-            if (namespaceSection == null) continue;
-
-            // Sub-keys = item keys
-            for (String itemKey : namespaceSection.getKeys(false)) {
-                ConfigurationSection itemSection = namespaceSection.getConfigurationSection(itemKey);
-                if (itemSection == null) continue;
-
-                try {
-                    ItemDefinition definition = parseItem(namespace, itemKey, itemSection);
-                    registry.register(definition);
-                    count++;
-                } catch (Exception e) {
-                    logger.warning("[ItemConfigLoader] Failed to load item: " +
-                            namespace + ":" + itemKey + " from " + file.getName());
-                    logger.warning("  Reason: " + e.getMessage());
-                }
+            if (namespaceSection != null) {
+                count += loadNamespace(namespace, namespaceSection, file.getName(), registry);
             }
         }
 
         logger.info("[ItemConfigLoader] Loaded " + count + " items from " + file.getName());
+        return count;
+    }
+
+    private int loadNamespace(String namespace, ConfigurationSection namespaceSection, String fileName, ItemRegistry registry) {
+        int count = 0;
+        // Sub-keys = item keys
+        for (String itemKey : namespaceSection.getKeys(false)) {
+            ConfigurationSection itemSection = namespaceSection.getConfigurationSection(itemKey);
+            if (itemSection == null) continue;
+
+            try {
+                ItemDefinition definition = parseItem(namespace, itemKey, itemSection);
+                registry.register(definition);
+                count++;
+            } catch (Exception e) {
+                logger.warning("[ItemConfigLoader] Failed to load item: " +
+                        namespace + ":" + itemKey + " from " + fileName);
+                logger.warning("  Reason: " + e.getMessage());
+            }
+        }
         return count;
     }
 

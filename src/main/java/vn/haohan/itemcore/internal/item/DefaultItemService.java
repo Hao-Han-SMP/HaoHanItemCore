@@ -103,13 +103,7 @@ public final class DefaultItemService implements ItemService {
         ItemDefinition definition = registry.get(id);
         if (definition == null) return item;
 
-        ItemMeta meta = item.getItemMeta();
-        if (meta == null) return item;
-
-        boolean modified = DefaultItemFactory.applyComponents(meta, definition, item, plugin);
-        if (modified) {
-            item.setItemMeta(meta);
-        }
+        item = DefaultItemFactory.applyComponents(item, definition, plugin);
         return item;
     }
 }
