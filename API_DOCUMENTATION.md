@@ -1,4 +1,4 @@
-# Tài liệu API HaoHanItemCore
+# Tài Liệu API Chi Tiết: HaoHanItemCore
 
 Tài liệu này cung cấp chi tiết toàn diện về các lớp (classes), giao diện (interfaces), các thành phần mở rộng (components), và các phương thức (methods) trong API của **HaoHanItemCore**.
 
@@ -45,33 +45,16 @@ import vn.haohan.itemcore.api.HaoHanItemCore;
 HaoHanItemCore core = HaoHanItemCore.get();
 ```
 
-### Danh Sách Phương Thức trong `HaoHanItemCore`
+### Bảng Phương Thức trong `HaoHanItemCore`
 
-#### `static HaoHanItemCore get()`
-* **Tác dụng:** Lấy instance duy nhất của `HaoHanItemCore`.
-* **Tham số:** Không có.
-* **Trả về:** `HaoHanItemCore` — Instance đang hoạt động.
-* **Lưu ý:** Ném `IllegalStateException` nếu plugin chưa hoàn tất giai đoạn `onLoad()`.
-
-#### `ItemRegistry getItemRegistry()`
-* **Tác dụng:** Truy cập registry lưu trữ danh sách định nghĩa item (`ItemDefinition`).
-* **Trả về:** `ItemRegistry`
-
-#### `ItemFactory getItemFactory()`
-* **Tác dụng:** Truy cập factory khởi tạo `ItemStack` từ định nghĩa.
-* **Trả về:** `ItemFactory`
-
-#### `ItemService getItemService()`
-* **Tác dụng:** Truy cập service tổng hợp (Facade). Đây là lựa chọn **khuyến nghị** cho các plugin bên ngoài.
-* **Trả về:** `ItemService`
-
-#### `RecipeRegistry getRecipeRegistry()`
-* **Tác dụng:** Truy cập registry quản lý công thức chế tạo (`RecipeDefinition`).
-* **Trả về:** `RecipeRegistry`
-
-#### `RecipeService getRecipeService()`
-* **Tác dụng:** Truy cập service tra cứu và tìm kiếm công thức chế tạo.
-* **Trả về:** `RecipeService`
+| Tên phương thức | Kiểu dữ liệu trả về | Tham số | Mô tả / Tác dụng |
+| :--- | :--- | :--- | :--- |
+| `get()` | `static HaoHanItemCore` | *Không có* | Lấy instance duy nhất của `HaoHanItemCore`. Ném `IllegalStateException` nếu plugin chưa khởi tạo. |
+| `getItemRegistry()` | `ItemRegistry` | *Không có* | Truy cập registry lưu trữ danh sách định nghĩa item (`ItemDefinition`). |
+| `getItemFactory()` | `ItemFactory` | *Không có* | Truy cập factory khởi tạo `ItemStack` từ định nghĩa. |
+| `getItemService()` | `ItemService` | *Không có* | Truy cập service tổng hợp (Facade khuyến nghị dùng cho plugin ngoài). |
+| `getRecipeRegistry()` | `RecipeRegistry` | *Không có* | Truy cập registry quản lý công thức chế tạo (`RecipeDefinition`). |
+| `getRecipeService()` | `RecipeService` | *Không có* | Truy cập service tra cứu và tìm kiếm công thức chế tạo. |
 
 ---
 
@@ -96,24 +79,24 @@ Phân loại chức năng chính của vập phẩm custom:
 
 #### Bảng Phương Thức Getter của `ItemDefinition`
 
-| Phương thức | Tác dụng | Giá trị trả về |
-| :--- | :--- | :--- |
-| `String getId()` | Lấy ID đầy đủ dạng `namespace:key` | `String` (VD: `"lunar:anorthosite_pickaxe"`) |
-| `String getNamespace()` | Lấy phần namespace (trước `:`) | `String` (VD: `"lunar"`) |
-| `String getKey()` | Lấy phần key (sau `:`) | `String` (VD: `"anorthosite_pickaxe"`) |
-| `Material getMaterial()` | Material Minecraft gốc của item | `Material` (VD: `Material.DIAMOND_PICKAXE`) |
-| `String getDisplayName()` | Tên hiển thị (hỗ trợ mã màu `§` hoặc `&`) | `String` |
-| `int getMaxStackSize()` | Số lượng xếp chồng tối đa (1 - 99) | `int` |
-| `List<String> getLore()` | Danh sách các dòng mô tả cơ bản | `List<String>` |
-| `Integer getCustomModelData()`| Giá trị CustomModelData (nếu dùng resourcepack cũ) | `Integer` (có thể `null`) |
-| `String getItemModel()` | Mô hình 1.21.4+ (`NamespacedKey` dạng String) | `String` (có thể `null`) |
-| `Map<String, Object> getProperties()` | Map các thuộc tính tùy biến | `Map<String, Object>` |
-| `ItemType getType()` | Thể loại vập phẩm | `ItemType` |
-| `ItemBehavior getBehavior()` | Đối tượng lắng nghe hành vi custom | `ItemBehavior` (có thể `null`) |
-| `List<ItemComponent> getComponents()` | Các component chức năng tùy biến | `List<ItemComponent>` |
-| `List<ItemInfoSection> getInfoSections()` | Danh sách các mục lore định hình sẵn | `List<ItemInfoSection>` |
-| `boolean hasBehavior()` | Kiểm tra vật phẩm có hành vi custom không | `boolean` |
-| `static boolean isValidId(String id)` | Kiểm tra định dạng ID đúng dạng `namespace:key` | `boolean` |
+| Tên phương thức | Kiểu dữ liệu trả về | Tham số | Tác dụng |
+| :--- | :--- | :--- | :--- |
+| `getId()` | `String` | *Không có* | Lấy ID đầy đủ dạng `namespace:key` (VD: `"lunar:anorthosite_pickaxe"`). |
+| `getNamespace()` | `String` | *Không có* | Lấy phần namespace trước dấu `:` (VD: `"lunar"`). |
+| `getKey()` | `String` | *Không có* | Lấy phần key sau dấu `:` (VD: `"anorthosite_pickaxe"`). |
+| `getMaterial()` | `Material` | *Không có* | Material Minecraft gốc của vật phẩm (VD: `Material.DIAMOND_PICKAXE`). |
+| `getDisplayName()` | `String` | *Không có* | Tên hiển thị (hỗ trợ mã màu `§` hoặc `&`). |
+| `getMaxStackSize()` | `int` | *Không có* | Số lượng xếp chồng tối đa (1 đến 99). |
+| `getLore()` | `List<String>` | *Không có* | Danh sách các dòng mô tả cơ bản của vập phẩm. |
+| `getCustomModelData()`| `Integer` | *Không có* | Giá trị CustomModelData (trả về `null` nếu không dùng). |
+| `getItemModel()` | `String` | *Không có* | Mô hình 1.21.4+ (`NamespacedKey` dạng String, có thể `null`). |
+| `getProperties()` | `Map<String, Object>` | *Không có* | Map các thuộc tính tùy biến đi kèm định nghĩa. |
+| `getType()` | `ItemType` | *Không có* | Thể loại phân loại vập phẩm. |
+| `getBehavior()` | `ItemBehavior` | *Không có* | Đối tượng xử lý hành vi custom (trả về `null` nếu không có). |
+| `getComponents()` | `List<ItemComponent>` | *Không có* | Danh sách các component chức năng tùy biến. |
+| `getInfoSections()` | `List<ItemInfoSection>` | *Không có* | Danh sách các mục lore định hình sẵn theo nhóm. |
+| `hasBehavior()` | `boolean` | *Không có* | Kiểm tra vật phẩm có gắn đối tượng hành vi custom không. |
+| `isValidId(id)` | `static boolean` | `String id` | Kiểm tra định dạng String ID có đúng dạng `namespace:key`. |
 
 #### Xây Dựng `ItemDefinition` Bằng Builder Pattern
 
@@ -137,7 +120,7 @@ ItemDefinition customPickaxe = ItemDefinition.builder("lunar:anorthosite_pickaxe
 
 #### Các Property Keys Tự Động Xử Lý (Built-in Properties)
 
-| Property Key | Kiểu Dữ Liệu | Tác Dụng |
+| Property Key | Kiểu dữ liệu | Tác dụng |
 | :--- | :--- | :--- |
 | `max_damage` | `int` | Thiết lập độ bền tối đa của item (chỉ áp dụng cho `Damageable`). |
 | `jukebox_playable` | `String` (Key) | Đăng ký đĩa nhạc jukebox custom (VD: `"haohan:space_theme"`). |
@@ -234,14 +217,14 @@ Hiển thị cấp độ vập phẩm trên lore.
 
 Khác với `ItemDefinition` (là thuộc tính chung định sẵn), `ItemInstanceData` quản lý **trạng thái động riêng biệt của từng vật phẩm cụ thể** lưu giữ trong `PersistentDataContainer` (PDC).
 
-#### Phương Thức trong `ItemInstanceData`
+#### Bảng Phương Thức trong `ItemInstanceData`
 
-| Phương thức | Tác dụng | Tham số | Giá trị trả về |
+| Tên phương thức | Kiểu dữ liệu trả về | Tham số | Tác dụng |
 | :--- | :--- | :--- | :--- |
-| `durability(ItemStack item, int defaultValue)` | Đọc độ bền còn lại của vật phẩm | `ItemStack`, `int default` | `int` |
-| `setDurability(ItemStack item, int value)` | Ghi độ bền mới cho vật phẩm | `ItemStack`, `int value` | `void` |
-| `upgradeLevel(ItemStack item)` | Đọc cấp độ cường hóa/nâng cấp | `ItemStack` | `int` |
-| `setUpgradeLevel(ItemStack item, int level)` | Ghi cấp độ cường hóa/nâng cấp mới | `ItemStack`, `int level` | `void` |
+| `durability(item, defaultVal)` | `int` | `ItemStack item`, `int defaultValue` | Đọc độ bền custom còn lại của vật phẩm. |
+| `setDurability(item, value)` | `void` | `ItemStack item`, `int value` | Ghi độ bền custom mới vào PDC của vật phẩm. |
+| `upgradeLevel(item)` | `int` | `ItemStack item` | Đọc cấp độ cường hóa/nâng cấp của vật phẩm (mặc định 0). |
+| `setUpgradeLevel(item, level)`| `void` | `ItemStack item`, `int level` | Ghi cấp độ cường hóa/nâng cấp mới vào PDC. |
 
 #### Code Mẫu Thao Tác Trạng Thái Động
 
@@ -265,24 +248,20 @@ instanceData.setUpgradeLevel(itemStack, currentLevel + 1);
 
 Nơi lưu trữ và tra cứu toàn bộ `ItemDefinition`.
 
-```java
-public interface ItemRegistry {
-    void register(ItemDefinition definition);
-    ItemDefinition get(String id);
-    ItemDefinition require(String id);
-    boolean exists(String id);
-    void unregister(String id);
-    Collection<ItemDefinition> all();
-    List<ItemDefinition> getByNamespace(String namespace);
-    List<ItemDefinition> search(String keyword);
-    int size();
-    void clear();
-}
-```
+#### Bảng Phương Thức trong `ItemRegistry`
 
-* **`register(ItemDefinition def)`**: Đăng ký item. Trống ném `IllegalArgumentException` nếu ID đã tồn tại.
-* **`require(String id)`**: Giống `get(id)` nhưng ném exception nếu không tìm thấy item.
-* **`getByNamespace(String ns)`**: Lấy danh sách tất cả item của một plugin/hệ thống (VD: `"lunar"`).
+| Tên phương thức | Kiểu dữ liệu trả về | Tham số | Mô tả / Tác dụng |
+| :--- | :--- | :--- | :--- |
+| `register(definition)` | `void` | `ItemDefinition definition` | Đăng ký item mới vào hệ thống. Lỗi nếu ID trùng. |
+| `get(id)` | `ItemDefinition` | `String id` | Tìm ItemDefinition theo ID, trả về `null` nếu không tìm thấy. |
+| `require(id)` | `ItemDefinition` | `String id` | Tìm theo ID, ném `IllegalArgumentException` nếu không thấy. |
+| `exists(id)` | `boolean` | `String id` | Kiểm tra ID đã đăng ký trong registry chưa. |
+| `unregister(id)` | `void` | `String id` | Hủy đăng ký một item khỏi registry. |
+| `all()` | `Collection<ItemDefinition>` | *Không có* | Lấy tất cả ItemDefinition đã được đăng ký. |
+| `getByNamespace(ns)` | `List<ItemDefinition>` | `String namespace` | Lấy danh sách item thuộc một namespace cụ thể. |
+| `search(keyword)` | `List<ItemDefinition>` | `String keyword` | Tìm kiếm item theo từ khóa trong ID hoặc Display Name. |
+| `size()` | `int` | *Không có* | Lấy tổng số lượng item đang có trong registry. |
+| `clear()` | `void` | *Không có* | Xóa sạch toàn bộ danh sách item đã đăng ký. |
 
 ---
 
@@ -290,14 +269,14 @@ public interface ItemRegistry {
 
 Chịu trách nhiệm khởi tạo `ItemStack` chuẩn từ `ItemDefinition` hoặc `id`.
 
-```java
-public interface ItemFactory {
-    ItemStack create(String id);
-    ItemStack create(String id, int amount);
-    ItemStack create(ItemDefinition definition);
-    ItemStack create(ItemDefinition definition, int amount);
-}
-```
+#### Bảng Phương Thức trong `ItemFactory`
+
+| Tên phương thức | Kiểu dữ liệu trả về | Tham số | Mô tả / Tác dụng |
+| :--- | :--- | :--- | :--- |
+| `create(id)` | `ItemStack` | `String id` | Tạo `ItemStack` số lượng 1 từ Custom ID. |
+| `create(id, amount)` | `ItemStack` | `String id`, `int amount` | Tạo `ItemStack` với số lượng chỉ định từ Custom ID. |
+| `create(definition)` | `ItemStack` | `ItemDefinition definition` | Tạo `ItemStack` số lượng 1 từ đối tượng định nghĩa. |
+| `create(definition, amount)` | `ItemStack` | `ItemDefinition def`, `int amount` | Tạo `ItemStack` với số lượng chỉ định từ định nghĩa. |
 
 ---
 
@@ -305,22 +284,20 @@ public interface ItemFactory {
 
 Đây là interface **quan trọng nhất và tiện lợi nhất** cho các plugin khác tích hợp.
 
-#### Danh Sách Phương Thức trong `ItemService`
+#### Bảng Phương Thức trong `ItemService`
 
-```java
-public interface ItemService {
-    ItemStack create(String id);
-    ItemStack create(String id, int amount);
-    boolean isItem(ItemStack item, String id);
-    boolean isCustomItem(ItemStack item);
-    String getId(ItemStack item);
-    ItemDefinition getDefinition(String id);
-    boolean exists(String id);
-    Map<String, Object> getProperties(ItemStack item);
-    ItemInstanceData getInstanceData();
-    ItemStack validateAndUpdate(ItemStack item);
-}
-```
+| Tên phương thức | Kiểu dữ liệu trả về | Tham số | Mô tả / Tác dụng |
+| :--- | :--- | :--- | :--- |
+| `create(id)` | `ItemStack` | `String id` | Tạo `ItemStack` số lượng 1 với đầy đủ metadata. |
+| `create(id, amount)` | `ItemStack` | `String id`, `int amount` | Tạo `ItemStack` với số lượng cụ thể. |
+| `isItem(item, id)` | `boolean` | `ItemStack item`, `String id` | Kiểm tra `ItemStack` có đúng là custom item với ID chỉ định. |
+| `isCustomItem(item)` | `boolean` | `ItemStack item` | Kiểm tra `ItemStack` có phải là bất kỳ custom item nào không. |
+| `getId(item)` | `String` | `ItemStack item` | Lấy Custom Item ID từ PDC của item, `null` nếu là vanilla. |
+| `getDefinition(id)` | `ItemDefinition` | `String id` | Lấy `ItemDefinition` theo ID chỉ định. |
+| `exists(id)` | `boolean` | `String id` | Kiểm tra xem ID item có tồn tại trong hệ thống không. |
+| `getProperties(item)` | `Map<String, Object>` | `ItemStack item` | Lấy Map thuộc tính từ định nghĩa của item đó. |
+| `getInstanceData()` | `ItemInstanceData` | *Không có* | Lấy helper truy vấn dữ liệu độ bền / cấp độ cường hóa. |
+| `validateAndUpdate(item)` | `ItemStack` | `ItemStack item` | Kiểm tra & đồng bộ các component theo config mới nhất. |
 
 #### Chi Tiết Phương Thức Quan Trọng:
 
@@ -354,19 +331,17 @@ Chứa đầy đủ ngữ cảnh khi một sự kiện xảy ra:
 - `definition()`: `ItemDefinition` tương ứng.
 - `event()`: Sự kiện Bukkit gốc (`PlayerInteractEvent`, `BlockBreakEvent`, v.v.).
 
-### Interface `ItemBehavior`
+### Bảng Phương Thức trong `ItemBehavior`
 
-```java
-public interface ItemBehavior {
-    default void onUse(ItemContext context) {}             // Chuột phải (AIR / BLOCK)
-    default void onInteract(ItemContext context) {}        // Chuột trái
-    default void onBreak(ItemContext context) {}           // Phá khối thành công
-    default void onCraft(ItemContext context) {}           // Chế tạo thành công
-    default void onInventoryClick(ItemContext context) {}   // Click trong GUI/Hòm đồ
-    default void onDrop(ItemContext context) {}            // Vứt item ra đất
-    default void onPickup(ItemContext context) {}          // Nhặt item từ đất
-}
-```
+| Tên phương thức | Kiểu dữ liệu trả về | Tham số | Sự kiện Bukkit kích hoạt |
+| :--- | :--- | :--- | :--- |
+| `onUse(context)` | `default void` | `ItemContext context` | Chuột phải vật phẩm (`AIR` / `BLOCK`). |
+| `onInteract(context)` | `default void` | `ItemContext context` | Chuột trái tương tác vật phẩm. |
+| `onBreak(context)` | `default void` | `ItemContext context` | Khi player phá khối bằng vật phẩm này. |
+| `onCraft(context)` | `default void` | `ItemContext context` | Khi vật phẩm được chế tạo thành công. |
+| `onInventoryClick(context)` | `default void` | `ItemContext context` | Khi player click vật phẩm trong GUI / hòm đồ. |
+| `onDrop(context)` | `default void` | `ItemContext context` | Khi player vứt vật phẩm ra đất. |
+| `onPickup(context)` | `default void` | `ItemContext context` | Khi player nhặt vật phẩm từ dưới đất lên. |
 
 ### Code Mẫu Tạo Class Behavior Custom
 
@@ -448,18 +423,18 @@ ShapedRecipeDefinition shapedRecipe = new ShapedRecipeDefinition(
 
 Đăng ký và quản lý tất cả các công thức chế tạo trong hệ thống.
 
-```java
-public interface RecipeRegistry {
-    void register(RecipeDefinition recipe);
-    RecipeDefinition get(String id);
-    RecipeDefinition require(String id);
-    boolean exists(String id);
-    void unregister(String id);
-    Collection<RecipeDefinition> all();
-    int size();
-    void clear();
-}
-```
+#### Bảng Phương Thức trong `RecipeRegistry`
+
+| Tên phương thức | Kiểu dữ liệu trả về | Tham số | Mô tả / Tác dụng |
+| :--- | :--- | :--- | :--- |
+| `register(recipe)` | `void` | `RecipeDefinition recipe` | Đăng ký công thức chế tạo mới vào registry. |
+| `get(id)` | `RecipeDefinition` | `String id` | Lấy RecipeDefinition theo ID, `null` nếu không tìm thấy. |
+| `require(id)` | `RecipeDefinition` | `String id` | Lấy công thức theo ID, ném Exception nếu không tồn tại. |
+| `exists(id)` | `boolean` | `String id` | Kiểm tra công thức ID đã được đăng ký chưa. |
+| `unregister(id)` | `void` | `String id` | Xóa đăng ký của một công thức chế tạo. |
+| `all()` | `Collection<RecipeDefinition>` | *Không có* | Lấy danh sách tất cả công thức chế tạo đã đăng ký. |
+| `size()` | `int` | *Không có* | Lấy tổng số lượng công thức chế tạo có trên server. |
+| `clear()` | `void` | *Không có* | Xóa toàn bộ công thức chế tạo khỏi registry. |
 
 ---
 
@@ -467,15 +442,15 @@ public interface RecipeRegistry {
 
 Service hỗ trợ tra cứu công thức chế tạo cho GUI hoặc hệ thống máy móc.
 
-```java
-public interface RecipeService {
-    List<RecipeDefinition> findByResult(String itemId);      // Tìm các công thức chế tạo ra item này
-    List<RecipeDefinition> findByIngredient(String itemId);  // Tìm các công thức sử dụng item này làm nguyên liệu
-    List<RecipeDefinition> findByType(RecipeType type);       // Tìm công thức theo loại
-    Collection<RecipeDefinition> all();
-    List<RecipeDefinition> search(String keyword);            // Tìm kiếm theo từ khóa
-}
-```
+#### Bảng Phương Thức trong `RecipeService`
+
+| Tên phương thức | Kiểu dữ liệu trả về | Tham số | Mô tả / Tác dụng |
+| :--- | :--- | :--- | :--- |
+| `findByResult(itemId)` | `List<RecipeDefinition>` | `String itemId` | Tìm tất cả công thức tạo ra item ID chỉ định. |
+| `findByIngredient(itemId)`| `List<RecipeDefinition>` | `String itemId` | Tìm các công thức sử dụng item ID này làm nguyên liệu. |
+| `findByType(type)` | `List<RecipeDefinition>` | `RecipeType type` | Tìm danh sách các công thức thuộc loại chỉ định. |
+| `all()` | `Collection<RecipeDefinition>` | *Không có* | Lấy toàn bộ danh sách công thức chế tạo. |
+| `search(keyword)` | `List<RecipeDefinition>` | `String keyword` | Tìm kiếm công thức theo từ khóa tên hoặc ID. |
 
 ---
 
