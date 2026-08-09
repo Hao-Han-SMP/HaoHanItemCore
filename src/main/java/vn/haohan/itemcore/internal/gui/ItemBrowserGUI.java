@@ -88,6 +88,7 @@ public final class ItemBrowserGUI implements Listener {
             if (itemIndex < session.items.size()) {
                 ItemDefinition def = session.items.get(itemIndex);
                 ItemStack display = itemService.create(def.getId());
+                clearInferredModel(display, def);
                 gui.setItem(i, display);
             }
         }
@@ -120,6 +121,14 @@ public final class ItemBrowserGUI implements Listener {
 
         // Close
         gui.setItem(CLOSE_SLOT, createCloseItem());
+    }
+
+    private static void clearInferredModel(ItemStack item, ItemDefinition definition) {
+        if (definition.getItemModel() != null || definition.getCustomModelData() == null) return;
+        ItemMeta meta = item.getItemMeta();
+        if (meta == null) return;
+        meta.setItemModel(null);
+        item.setItemMeta(meta);
     }
 
     private ItemStack createBorderItem() {
@@ -186,6 +195,7 @@ public final class ItemBrowserGUI implements Listener {
         if (clicked != null && clicked.getType() != Material.AIR) {
             String itemId = itemService.getId(clicked);
             if (itemId != null) {
+                if (!recipeViewer.hasRecipes(itemId)) return;
                 recipeViewer.open(player, itemId);
             }
         }

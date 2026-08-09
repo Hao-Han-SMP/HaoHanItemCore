@@ -75,6 +75,10 @@ public final class RecipeViewerGUI implements Listener {
         player.openInventory(gui);
     }
 
+    public boolean hasRecipes(String itemId) {
+        return !recipeService.findByResult(itemId).isEmpty();
+    }
+
     /**
      * Mở Recipe Viewer cho một RecipeDefinition cụ thể.
      */
@@ -187,7 +191,17 @@ public final class RecipeViewerGUI implements Listener {
     private ItemStack createDisplayItem(String itemId, int amount) {
         // Custom item
         if (itemRegistry.exists(itemId)) {
-            return itemService.create(itemId, Math.max(1, amount));
+            ItemStack display = itemService.create(itemId, Math.max(1, amount));
+            ItemDefinition definition = itemRegistry.get(itemId);
+            if (definition != null && definition.getItemModel() == null
+                    && definition.getCustomModelData() != null) {
+                ItemMeta meta = display.getItemMeta();
+                if (meta != null) {
+                    meta.setItemModel(null);
+                    display.setItemMeta(meta);
+                }
+            }
+            return display;
         }
 
         // Vanilla item
