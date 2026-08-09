@@ -1,6 +1,6 @@
 <div align="center">
 
-# HaoHanItemManager
+# HaoHanItemCore
 
 Plugin engine quản lý tập trung Custom Item và Recipe cho Minecraft Paper Server, cung cấp API infrastructure cho các plugin khác.
 
@@ -15,7 +15,7 @@ Ngôn ngữ: Tiếng Việt | [Wiki Hướng Dẫn Chi Tiết](WIKI.md)
 
 ## Tổng quan
 
-`HaoHanItemManager` là plugin Minecraft dành cho HaoHan SMP. Plugin cung cấp hệ thống quản lý custom item và recipe tập trung, xử lý nhận diện vật phẩm qua `PersistentDataContainer`, tự động đăng ký công thức rèn/chế tạo và cung cấp giao diện GUI xem công thức và danh sách vật phẩm.
+`HaoHanItemCore` là plugin Minecraft dành cho HaoHan SMP. Plugin cung cấp hệ thống quản lý custom item và recipe tập trung, xử lý nhận diện vật phẩm qua `PersistentDataContainer`, tự động đăng ký công thức rèn/chế tạo và cung cấp giao diện GUI xem công thức và danh sách vật phẩm.
 
 ### Mục tiêu chính
 
@@ -23,7 +23,7 @@ Ngôn ngữ: Tiếng Việt | [Wiki Hướng Dẫn Chi Tiết](WIKI.md)
 - Nhận diện item chính xác qua `PersistentDataContainer` (namespaced ID) thay vì display name.
 - Đăng ký công thức tự động với Bukkit server (hỗ trợ Shaped, Shapeless, Smelting, Blasting, Smoking, Campfire, Stonecutting, Machine).
 - Cung cấp GUI duyệt item (Item Browser) và xem công thức (Recipe Viewer) tương tác trực quan.
-- Cung cấp Java API đơn giản, mạnh mẽ và linh hoạt cho các plugin khác tích hợp (`vn.haohan.itemmanager`).
+- Cung cấp Java API đơn giản, mạnh mẽ và linh hoạt cho các plugin khác tích hợp (`vn.haohan.itemcore`).
 
 ## Công nghệ sử dụng
 
@@ -39,7 +39,7 @@ Ngôn ngữ: Tiếng Việt | [Wiki Hướng Dẫn Chi Tiết](WIKI.md)
 
 | Thành phần | Mô tả |
 | --- | --- |
-| `HaoHanItemManager` | Plugin server, xử lý Item Registry, Factory, Recipe Registry, Event Routing, GUI và Command. |
+| `HaoHanItemCore` | Plugin server, xử lý Item Registry, Factory, Recipe Registry, Event Routing, GUI và Command. |
 | `WIKI.md` | Bộ tài liệu hướng dẫn chi tiết từ A-Z về cấu hình YAML, hệ thống Event/Behavior, API và FAQ. |
 
 ## Yêu cầu
@@ -50,10 +50,10 @@ Ngôn ngữ: Tiếng Việt | [Wiki Hướng Dẫn Chi Tiết](WIKI.md)
 
 ## Cài đặt
 
-1. Build hoặc tải file `HaoHanItemManager-1.0.0.jar`.
+1. Build hoặc tải file `HaoHanItemCore-1.0.0.jar`.
 2. Copy file `.jar` vào thư mục `plugins/` của server.
 3. Khởi động server.
-4. Plugin sẽ tự động tạo thư mục cấu hình `plugins/HaoHanItemManager/` chứa file `config.yml`, `items/example.yml` và `recipes/example.yml`.
+4. Plugin sẽ tự động tạo thư mục cấu hình `plugins/HaoHanItemCore/` chứa file `config.yml`, `items/example.yml` và `recipes/example.yml`.
 
 ## Build từ mã nguồn
 
@@ -63,38 +63,38 @@ Chạy lệnh sau tại thư mục gốc của dự án:
 mvn clean package
 ```
 
-File `.jar` sau khi build nằm trong thư mục `target/HaoHanItemManager-1.0.0.jar`.
+File `.jar` sau khi build nằm trong thư mục `target/HaoHanItemCore-1.0.0.jar`.
 
 ## Lệnh
 
-Các lệnh quản trị dùng permission `haohanitemmanager.admin`. Người chơi OP có permission này theo mặc định. All player có permission `haohanitemmanager.use` theo mặc định.
+Các lệnh quản trị dùng permission `haohanitemcore.admin`. Người chơi OP có permission này theo mặc định. All player có permission `haohanitemcore.use` theo mặc định.
 
 | Lệnh | Mô tả | Permission |
 | --- | --- | --- |
-| `/im items` | Hiển thị danh sách tất cả custom items theo namespace. | `haohanitemmanager.use` |
-| `/im item <id>` | Xem thông tin chi tiết của một item theo ID. | `haohanitemmanager.use` |
-| `/im give <player> <id> [amount]` | Trao custom item cho người chơi. | `haohanitemmanager.admin` |
-| `/im recipes` | Liệt kê tất cả công thức chế tạo đã đăng ký. | `haohanitemmanager.use` |
-| `/im recipe <id>` | Mở GUI xem công thức chế tạo của item/recipe. | `haohanitemmanager.use` |
-| `/im search <keyword>` | Tìm kiếm item hoặc recipe theo từ khóa. | `haohanitemmanager.use` |
-| `/im browse` | Mở GUI duyệt danh sách tất cả custom items (phân trang). | `haohanitemmanager.use` |
-| `/im reload` | Nạp lại toàn bộ file cấu hình items và recipes từ đĩa. | `haohanitemmanager.admin` |
+| `/im items` | Hiển thị danh sách tất cả custom items theo namespace. | `haohanitemcore.use` |
+| `/im item <id>` | Xem thông tin chi tiết của một item theo ID. | `haohanitemcore.use` |
+| `/im give <player> <id> [amount]` | Trao custom item cho người chơi. | `haohanitemcore.admin` |
+| `/im recipes` | Liệt kê tất cả công thức chế tạo đã đăng ký. | `haohanitemcore.use` |
+| `/im recipe <id>` | Mở GUI xem công thức chế tạo của item/recipe. | `haohanitemcore.use` |
+| `/im search <keyword>` | Tìm kiếm item hoặc recipe theo từ khóa. | `haohanitemcore.use` |
+| `/im browse` | Mở GUI duyệt danh sách tất cả custom items (phân trang). | `haohanitemcore.use` |
+| `/im reload` | Nạp lại toàn bộ file cấu hình items và recipes từ đĩa. | `haohanitemcore.admin` |
 
-Alias của lệnh chính: `/itemmanager`, `/haohanitemmanage`.
+Alias của lệnh chính: `/itemcore`, `/haohanitemmanage`.
 
 ## Permission
 
 | Permission | Mặc định | Mô tả |
 | --- | --- | --- |
-| `haohanitemmanager.admin` | OP | Cho phép sử dụng các lệnh quản trị (`give`, `reload`). |
-| `haohanitemmanager.use` | Tất cả người chơi | Cho phép xem danh sách, tra cứu, xem GUI recipe và browse item. |
+| `haohanitemcore.admin` | OP | Cho phép sử dụng các lệnh quản trị (`give`, `reload`). |
+| `haohanitemcore.use` | Tất cả người chơi | Cho phép xem danh sách, tra cứu, xem GUI recipe và browse item. |
 
 ## Cấu trúc dữ liệu & Cấu hình
 
 Các file cấu hình YAML được quản lý trong thư mục data của plugin:
 
 ```text
-plugins/HaoHanItemManager/
+plugins/HaoHanItemCore/
 ├── config.yml
 ├── items/
 │   └── example.yml
@@ -144,13 +144,13 @@ result:
 
 ## Tích hợp API (Cho Developer)
 
-Thêm `HaoHanItemManager` vào dependency của plugin:
+Thêm `HaoHanItemCore` vào dependency của plugin:
 
 ```yaml
 # paper-plugin.yml
 dependencies:
   server:
-    HaoHanItemManager:
+    HaoHanItemCore:
       load: BEFORE
       required: true
 ```
@@ -158,14 +158,14 @@ dependencies:
 ### Lấy API Instance & Sử dụng:
 
 ```java
-import vn.haohan.itemmanager.api.HaoHanItemManager;
-import vn.haohan.itemmanager.api.item.ItemDefinition;
+import vn.haohan.itemcore.api.HaoHanItemCore;
+import vn.haohan.itemcore.api.item.ItemDefinition;
 
 // Tạo ItemStack từ ID
-ItemStack crystal = HaoHanItemManager.get().getItemService().create("example:fire_crystal", 4);
+ItemStack crystal = HaoHanItemCore.get().getItemService().create("example:fire_crystal", 4);
 
 // Kiểm tra ItemStack có phải là custom item cụ thể
-boolean isCrystal = HaoHanItemManager.get().getItemService().isItem(item, "example:fire_crystal");
+boolean isCrystal = HaoHanItemCore.get().getItemService().isItem(item, "example:fire_crystal");
 
 // Đăng ký Item mới qua Code
 ItemDefinition customItem = ItemDefinition.builder("magic:wand")
@@ -174,7 +174,7 @@ ItemDefinition customItem = ItemDefinition.builder("magic:wand")
     .behavior(new WandBehavior())
     .build();
 
-HaoHanItemManager.get().getItemRegistry().register(customItem);
+HaoHanItemCore.get().getItemRegistry().register(customItem);
 ```
 
 Chi tiết đầy đủ về API và hướng dẫn phát triển plugin phụ thuộc có tại **[WIKI.md](WIKI.md)**.

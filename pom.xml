@@ -5,11 +5,11 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>vn.haohan</groupId>
-    <artifactId>HaoHanItemManager</artifactId>
+    <artifactId>HaoHanItemCore</artifactId>
     <version>1.0.0</version>
     <packaging>jar</packaging>
 
-    <name>HaoHanItemManager</name>
+    <name>HaoHanItemCore</name>
     <description>Centralized Custom Item and Recipe Management Engine for HaoHan SMP</description>
 
     <properties>

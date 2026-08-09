@@ -1,23 +1,23 @@
-# Hướng dẫn & Tài liệu API: HaoHanItemManager
+# Hướng dẫn & Tài liệu API: HaoHanItemCore
 
-Tài liệu này cung cấp chi tiết về cấu trúc lớp (class structure), giao diện (interfaces), và các phương thức (methods) trong API của **HaoHanItemManager**. Đây là hệ thống cốt lõi quản lý Custom Items và Custom Recipes cho HaoHan SMP, giúp các plugin vệ tinh dễ dàng tích hợp và mở rộng.
+Tài liệu này cung cấp chi tiết về cấu trúc lớp (class structure), giao diện (interfaces), và các phương thức (methods) trong API của **HaoHanItemCore**. Đây là hệ thống cốt lõi quản lý Custom Items và Custom Recipes cho HaoHan SMP, giúp các plugin vệ tinh dễ dàng tích hợp và mở rộng.
 
 ---
 
 ## 1. Điểm Khởi Đầu (API Entrypoint)
 
-### Class `HaoHanItemManager`
+### Class `HaoHanItemCore`
 
 Là lớp Singleton chính để truy cập tất cả các hệ thống con trong API.
 
 * **Lấy instance:**
   ```java
-  HaoHanItemManager api = HaoHanItemManager.get();
+  HaoHanItemCore api = HaoHanItemCore.get();
   ```
 * **Các phương thức:**
   | Kiểu trả về | Tên phương thức | Mô tả |
   | :--- | :--- | :--- |
-  | `static HaoHanItemManager` | `get()` | Lấy instance Singleton. Ném `IllegalStateException` nếu plugin chưa load xong. |
+  | `static HaoHanItemCore` | `get()` | Lấy instance Singleton. Ném `IllegalStateException` nếu plugin chưa load xong. |
   | `ItemRegistry` | `getItemRegistry()` | Registry quản lý `ItemDefinition`. |
   | `ItemFactory` | `getItemFactory()` | Factory tạo `ItemStack` từ định nghĩa. |
   | `ItemService` | `getItemService()` | Facade kết hợp các tính năng Item (khuyến nghị dùng từ plugin ngoài). |
@@ -245,7 +245,7 @@ new ShapedRecipeDefinition(
 | `EntityPickupItemEvent` | ItemStack vừa nhặt | LOWEST |
 | `PrepareItemCraftEvent` | Item kết quả craft | LOWEST |
 
-Engine bỏ qua item vanilla (không có PersistentData `haohanitemmanager:item_id`).
+Engine bỏ qua item vanilla (không có PersistentData `haohanitemcore:item_id`).
 
 ---
 
@@ -319,7 +319,7 @@ EquipmentSlot slot = DefaultItemFactory.getEquipmentSlotFromMaterial(Material.NE
 public class LunarItems {
 
     public static void register() {
-        var registry = HaoHanItemManager.get().getItemRegistry();
+        var registry = HaoHanItemCore.get().getItemRegistry();
         var oxygenBehavior = new OxygenTankBehavior();
 
         // Armor với model 3D custom
@@ -367,7 +367,7 @@ public class OxygenListener implements Listener {
         if (!(event.getEntity() instanceof Player player)) return;
         if (!player.getWorld().getName().contains("lunar")) return;
 
-        ItemService items = HaoHanItemManager.get().getItemService();
+        ItemService items = HaoHanItemCore.get().getItemService();
         ItemStack offhand = player.getInventory().getItemInOffHand();
 
         // Kiểm tra đang cầm bình oxy
@@ -389,7 +389,7 @@ public class OxygenListener implements Listener {
 public void onArmorEquip(PlayerArmorChangeEvent event) {
     ItemStack newArmor = event.getNewItem();
     if (newArmor != null) {
-        HaoHanItemManager.get().getItemService().validateAndUpdate(newArmor);
+        HaoHanItemCore.get().getItemService().validateAndUpdate(newArmor);
     }
 }
 ```
@@ -400,8 +400,8 @@ public void onArmorEquip(PlayerArmorChangeEvent event) {
 
 ```mermaid
 classDiagram
-    class HaoHanItemManager {
-        +get() HaoHanItemManager
+    class HaoHanItemCore {
+        +get() HaoHanItemCore
         +getItemRegistry() ItemRegistry
         +getItemFactory() ItemFactory
         +getItemService() ItemService
@@ -450,9 +450,9 @@ classDiagram
         +onDrop(ItemContext)
         +onPickup(ItemContext)
     }
-    HaoHanItemManager --> ItemRegistry
-    HaoHanItemManager --> ItemService
-    HaoHanItemManager --> DefaultItemFactory
+    HaoHanItemCore --> ItemRegistry
+    HaoHanItemCore --> ItemService
+    HaoHanItemCore --> DefaultItemFactory
     ItemRegistry --> ItemDefinition
     ItemDefinition --> ItemBehavior
     ItemService ..> DefaultItemFactory : uses

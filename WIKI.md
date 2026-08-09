@@ -1,7 +1,7 @@
-# HaoHanItemManager — Wiki & Hướng dẫn sử dụng
+# HaoHanItemCore — Wiki & Hướng dẫn sử dụng
 
-> **HaoHanItemManager** là plugin nền tảng quản lý tập trung Custom Item & Recipe cho Minecraft Paper Server.
-> Tất cả plugin gameplay (Magic, Weapon, Machine, Quest...) chỉ cần phụ thuộc HaoHanItemManager thay vì tự xử lý item/recipe.
+> **HaoHanItemCore** là plugin nền tảng quản lý tập trung Custom Item & Recipe cho Minecraft Paper Server.
+> Tất cả plugin gameplay (Magic, Weapon, Machine, Quest...) chỉ cần phụ thuộc HaoHanItemCore thay vì tự xử lý item/recipe.
 
 ---
 
@@ -37,15 +37,15 @@
 ### Cài đặt
 
 1. Build plugin: `mvn clean package`
-2. Copy file `target/HaoHanItemManager-1.0.0.jar` vào thư mục `plugins/` của server
+2. Copy file `target/HaoHanItemCore-1.0.0.jar` vào thư mục `plugins/` của server
 3. Khởi động server
-4. HaoHanItemManager sẽ tự tạo thư mục `plugins/HaoHanItemManager/` với các file config mẫu
+4. HaoHanItemCore sẽ tự tạo thư mục `plugins/HaoHanItemCore/` với các file config mẫu
 
 ### Cấu trúc sau khi cài đặt
 
 ```
 plugins/
-└── HaoHanItemManager/
+└── HaoHanItemCore/
     ├── config.yml
     ├── items/
     │   └── example.yml
@@ -58,7 +58,7 @@ plugins/
 ## 2. Cấu trúc thư mục
 
 ```
-plugins/HaoHanItemManager/
+plugins/HaoHanItemCore/
 │
 ├── config.yml              ← Cấu hình chung
 │
@@ -163,7 +163,7 @@ result:
 | `/im browse` | Mở Item Browser GUI | `baseengine.use` |
 | `/im reload` | Reload config | `baseengine.admin` |
 
-**Aliases:** `/im` = `/itemmanager` = `/haohanitemmanage`
+**Aliases:** `/im` = `/itemcore` = `/haohanitemmanage`
 
 ---
 
@@ -191,7 +191,7 @@ result:
 # paper-plugin.yml
 dependencies:
   server:
-    HaoHanItemManager:
+    HaoHanItemCore:
       load: BEFORE
       required: true
 ```
@@ -201,7 +201,7 @@ dependencies:
 ```xml
 <dependency>
     <groupId>vn.haohan</groupId>
-    <artifactId>HaoHanItemManager</artifactId>
+    <artifactId>HaoHanItemCore</artifactId>
     <version>1.0.0</version>
     <scope>provided</scope>
 </dependency>
@@ -210,7 +210,7 @@ dependencies:
 ### Quick API Reference
 
 ```java
-HaoHanItemManager api = HaoHanItemManager.get();
+HaoHanItemCore api = HaoHanItemCore.get();
 
 // Tạo item
 ItemStack item = api.getItemService().create("magic:fire_crystal");
@@ -399,7 +399,7 @@ Engine tự động **validate và upgrade** components cho custom items tại:
 ### Upgrade thủ công
 
 ```java
-HaoHanItemManager.get().getItemService().validateAndUpdate(itemStack);
+HaoHanItemCore.get().getItemService().validateAndUpdate(itemStack);
 ```
 
 ### Những gì được đồng bộ
@@ -425,7 +425,7 @@ main: com.example.magic.MagicPlugin
 api-version: '1.21'
 dependencies:
   server:
-    HaoHanItemManager:
+    HaoHanItemCore:
       load: BEFORE
       required: true
 ```
@@ -447,7 +447,7 @@ public class MagicPlugin extends JavaPlugin {
 ```java
 public class ModItems {
     public static void register() {
-        ItemRegistry registry = HaoHanItemManager.get().getItemRegistry();
+        ItemRegistry registry = HaoHanItemCore.get().getItemRegistry();
 
         registry.register(ItemDefinition.builder("magic:fire_crystal")
             .material(Material.EMERALD)
