@@ -7,7 +7,7 @@ Plugin engine quản lý tập trung Custom Item và Recipe cho Minecraft Paper 
 [![Minecraft](https://img.shields.io/badge/Minecraft-1.21.11-62B47A?style=for-the-badge&logo=minecraft&logoColor=white)](https://www.minecraft.net/)
 [![Paper](https://img.shields.io/badge/Paper-API-222222?style=for-the-badge&logo=paper&logoColor=white)](https://papermc.io/)
 [![Java](https://img.shields.io/badge/Java-21-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)](https://openjdk.org/)
-[![Maven](https://img.shields.io/badge/Maven-Build-C71A36?style=for-the-badge&logo=apachemaven&logoColor=white)](https://maven.apache.org/)
+[![Gradle](https://img.shields.io/badge/Gradle-Build-02303A?style=for-the-badge&logo=gradle&logoColor=white)](https://gradle.org/)
 
 Ngôn ngữ: Tiếng Việt | [Wiki Hướng Dẫn Chi Tiết](WIKI.md)
 
@@ -31,7 +31,7 @@ Ngôn ngữ: Tiếng Việt | [Wiki Hướng Dẫn Chi Tiết](WIKI.md)
 | --- | --- |
 | Paper API (1.21.11) | Nền tảng API chính để phát triển Paper plugin (sử dụng format `paper-plugin.yml`). |
 | Java 21 | Ngôn ngữ và runtime chính của plugin (tận dụng Records, Pattern Matching, Sealed Types). |
-| Maven | Quản lý dependency và build file `.jar`. |
+| Gradle | Quản lý dependency và build file `.jar`. |
 | Adventure API | Xử lý Text Component, formatting và UI messaging hiện đại. |
 | Bukkit Recipe API | Đăng ký công thức chế tạo tùy chỉnh trực tiếp vào hệ thống vanilla Minecraft. |
 
@@ -46,7 +46,7 @@ Ngôn ngữ: Tiếng Việt | [Wiki Hướng Dẫn Chi Tiết](WIKI.md)
 
 - Minecraft server chạy Paper hoặc Purpur 1.21.11.
 - Java 21 trở lên.
-- Maven 3.9 trở lên nếu cần build từ mã nguồn.
+- Project đi kèm Gradle Wrapper, không cần cài Gradle riêng.
 
 ## Cài đặt
 
@@ -60,7 +60,7 @@ Ngôn ngữ: Tiếng Việt | [Wiki Hướng Dẫn Chi Tiết](WIKI.md)
 Chạy lệnh sau tại thư mục gốc của dự án:
 
 ```bash
-mvn clean package
+./gradlew clean build
 ```
 
 File `.jar` sau khi build nằm trong thư mục `target/HaoHanItemCore-1.0.0.jar`.
@@ -80,7 +80,7 @@ Các lệnh quản trị dùng permission `haohanitemcore.admin`. Người chơi
 | `/im browse` | Mở GUI duyệt danh sách tất cả custom items (phân trang). | `haohanitemcore.use` |
 | `/im reload` | Nạp lại toàn bộ file cấu hình items và recipes từ đĩa. | `haohanitemcore.admin` |
 
-Alias của lệnh chính: `/itemcore`, `/haohanitemmanage`.
+Alias của lệnh chính: `/itemcore`, `/haohanitemcore`.
 
 ## Permission
 

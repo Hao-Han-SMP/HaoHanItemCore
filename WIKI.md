@@ -163,7 +163,7 @@ result:
 | `/im browse` | Mở Item Browser GUI | `baseengine.use` |
 | `/im reload` | Reload config | `baseengine.admin` |
 
-**Aliases:** `/im` = `/itemcore` = `/haohanitemmanage`
+**Aliases:** `/im` = `/itemcore` = `/haohanitemcore`
 
 ---
 
@@ -196,7 +196,7 @@ dependencies:
       required: true
 ```
 
-### Maven
+### Gradle
 
 ```xml
 <dependency>

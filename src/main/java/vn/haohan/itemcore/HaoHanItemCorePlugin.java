@@ -96,7 +96,7 @@ public final class HaoHanItemCorePlugin extends JavaPlugin {
         registerCommand(
                 "im",
                 "HaoHanItemCore command",
-                List.of("itemcore", "haohanitemmanage"),
+                List.of("itemcore", "haohanitemcore"),
                 commandHandler
         );
 

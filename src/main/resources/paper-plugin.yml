@@ -4,7 +4,7 @@ main: vn.haohan.itemcore.HaoHanItemCorePlugin
 description: Centralized Custom Item and Recipe Management Engine for HaoHan SMP
 api-version: '1.21'
 author: HaoHan
-website: https://github.com/Hao-Han-SMP/HaoHanItemManage
+website: https://github.com/Hao-Han-SMP/HaoHanItemCore
 
 permissions:
   haohanitemcore.use:
