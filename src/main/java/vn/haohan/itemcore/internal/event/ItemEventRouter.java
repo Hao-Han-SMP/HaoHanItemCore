@@ -1,6 +1,10 @@
 package vn.haohan.itemcore.internal.event;
 
 import vn.haohan.itemcore.api.item.*;
+import vn.haohan.itemcore.api.HaoHanItemCore;
+import vn.haohan.itemcore.api.recipe.Ingredient;
+import vn.haohan.itemcore.api.recipe.RecipeDefinition;
+import vn.haohan.itemcore.api.recipe.RecipeType;
 import vn.haohan.itemcore.internal.item.DefaultItemFactory;
 
 import org.bukkit.NamespacedKey;
@@ -25,8 +29,6 @@ import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.inventory.PrepareSmithingEvent;
 import org.bukkit.inventory.SmithingInventory;
-import vn.haohan.itemmanager.api.recipe.RecipeDefinition;
-import vn.haohan.itemmanager.api.recipe.Ingredient;
 import org.bukkit.block.Block;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -387,14 +389,14 @@ public final class ItemEventRouter implements Listener {
         RecipeDefinition matchedRecipe = findSmithingRecipe(template, base, addition);
 
         if (matchedRecipe != null) {
-            ItemStack resultStack = vn.haohan.itemmanager.api.HaoHanItemManager.get().getItemFactory().create(
+            ItemStack resultStack = HaoHanItemCore.get().getItemFactory().create(
                     matchedRecipe.getResult().item(),
                     matchedRecipe.getResult().amount()
             );
             event.setResult(resultStack);
         } else {
             ItemStack currentResult = event.getResult();
-            if (currentResult != null && vn.haohan.itemmanager.api.HaoHanItemManager.get().getItemService().isCustomItem(currentResult)) {
+            if (currentResult != null && HaoHanItemCore.get().getItemService().isCustomItem(currentResult)) {
                 event.setResult(null);
             }
         }
@@ -409,7 +411,7 @@ public final class ItemEventRouter implements Listener {
                 String matName = itemIng.id().substring("minecraft:".length()).toUpperCase();
                 return item.getType().name().equals(matName);
             } else {
-                return vn.haohan.itemmanager.api.HaoHanItemManager.get().getItemService().isItem(item, itemIng.id());
+                return HaoHanItemCore.get().getItemService().isItem(item, itemIng.id());
             }
         } else if (ingredient instanceof Ingredient.MaterialIngredient matIng) {
             return item.getType() == matIng.material();
@@ -476,7 +478,7 @@ public final class ItemEventRouter implements Listener {
             }
         }
 
-        ItemStack dropItem = vn.haohan.itemmanager.api.HaoHanItemManager.get().getItemService().create(dropId);
+        ItemStack dropItem = HaoHanItemCore.get().getItemService().create(dropId);
         if (dropItem != null) {
             // Only copy block state PDC if we are dropping the block itself
             if (dropId.equals(itemId)) {
@@ -502,7 +504,7 @@ public final class ItemEventRouter implements Listener {
         removeBlockPDC(block);
 
         // Recreate and drop custom item
-        ItemStack dropItem = vn.haohan.itemmanager.api.HaoHanItemManager.get().getItemService().create(id);
+        ItemStack dropItem = HaoHanItemCore.get().getItemService().create(id);
         if (dropItem != null) {
             ItemMeta meta = dropItem.getItemMeta();
             if (meta != null) {
@@ -517,11 +519,11 @@ public final class ItemEventRouter implements Listener {
     }
 
     private RecipeDefinition findSmithingRecipe(ItemStack template, ItemStack base, ItemStack addition) {
-        var recipeService = vn.haohan.itemmanager.api.HaoHanItemManager.get().getRecipeService();
+        var recipeService = HaoHanItemCore.get().getRecipeService();
         if (recipeService == null) return null;
 
         for (RecipeDefinition recipe : recipeService.all()) {
-            if (recipe.getType() != vn.haohan.itemmanager.api.recipe.RecipeType.SMITHING) {
+            if (recipe.getType() != RecipeType.SMITHING) {
                 continue;
             }
             List<Ingredient> ingredients = recipe.getIngredients();

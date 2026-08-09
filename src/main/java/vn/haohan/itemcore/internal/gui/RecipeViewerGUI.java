@@ -13,9 +13,11 @@ import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -265,7 +267,7 @@ public final class RecipeViewerGUI implements Listener {
         return item;
     }
 
-    @EventHandler
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onInventoryClick(InventoryClickEvent event) {
         if (!(event.getWhoClicked() instanceof Player player)) return;
 
@@ -275,12 +277,30 @@ public final class RecipeViewerGUI implements Listener {
         event.setCancelled(true);
 
         int slot = event.getRawSlot();
+        int topSize = event.getView().getTopInventory().getSize();
+
+        // The player inventory is never part of the viewer.  Return before
+        // any navigation/ingredient handling so shift-click, number keys,
+        // double-click and drag-like actions cannot move items through it.
+        if (slot < 0 || slot >= topSize) {
+            return;
+        }
 
         if (handleNavigationClick(slot, player, session)) {
             return;
         }
 
         handleIngredientClick(event.getCurrentItem(), player, session);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onInventoryDrag(InventoryDragEvent event) {
+        if (!(event.getWhoClicked() instanceof Player player)) return;
+        if (!activeSessions.containsKey(player.getUniqueId())) return;
+        int topSize = event.getView().getTopInventory().getSize();
+        if (event.getRawSlots().stream().anyMatch(slot -> slot < topSize)) {
+            event.setCancelled(true);
+        }
     }
 
     private boolean handleNavigationClick(int slot, Player player, ViewerSession session) {

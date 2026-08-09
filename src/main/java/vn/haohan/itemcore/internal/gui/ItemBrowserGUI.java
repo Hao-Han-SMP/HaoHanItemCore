@@ -15,6 +15,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.event.inventory.ClickType;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -114,7 +115,9 @@ public final class ItemBrowserGUI implements Listener {
                 NamedTextColor.GOLD));
         infoMeta.lore(List.of(
                 Component.text("Total items: " + session.items.size(), NamedTextColor.GRAY),
-                Component.text("Click an item to view recipes", NamedTextColor.YELLOW)
+                Component.text("Left click: Take item", NamedTextColor.YELLOW),
+                Component.text("Right click: View recipe", NamedTextColor.YELLOW),
+                Component.text("Shift + left click: Take a stack", NamedTextColor.YELLOW)
         ));
         info.setItemMeta(infoMeta);
         gui.setItem(INFO_SLOT, info);
@@ -171,7 +174,7 @@ public final class ItemBrowserGUI implements Listener {
         }
 
         if (slot >= 0 && slot < ITEMS_PER_PAGE) {
-            handleItemClick(slot, player, session, event.getCurrentItem());
+            handleItemClick(slot, player, session, event.getCurrentItem(), event.getClick());
         }
     }
 
@@ -191,12 +194,20 @@ public final class ItemBrowserGUI implements Listener {
         return false;
     }
 
-    private void handleItemClick(int slot, Player player, BrowserSession session, ItemStack clicked) {
+    private void handleItemClick(int slot, Player player, BrowserSession session,
+                                 ItemStack clicked, ClickType click) {
         if (clicked != null && clicked.getType() != Material.AIR) {
             String itemId = itemService.getId(clicked);
             if (itemId != null) {
-                if (!recipeViewer.hasRecipes(itemId)) return;
-                recipeViewer.open(player, itemId);
+                if (click.isRightClick()) {
+                    if (!recipeViewer.hasRecipes(itemId)) return;
+                    recipeViewer.open(player, itemId);
+                } else if (click.isLeftClick()) {
+                    int amount = click.isShiftClick()
+                            ? Math.max(1, Math.min(64, itemRegistry.get(itemId).getMaxStackSize()))
+                            : 1;
+                    player.getInventory().addItem(itemService.create(itemId, amount));
+                }
             }
         }
     }
