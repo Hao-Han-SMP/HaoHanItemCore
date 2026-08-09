@@ -89,8 +89,6 @@ public final class RecipeViewerGUI implements Listener {
 
     private Inventory createGUI(ViewerSession session) {
         RecipeDefinition recipe = session.currentRecipe();
-        String title = "§8Recipe: §f" + recipe.getResult().item();
-
         Inventory gui = Bukkit.createInventory(null, GUI_SIZE,
                 Component.text("Recipe: " + recipe.getResult().item()));
 
@@ -100,6 +98,13 @@ public final class RecipeViewerGUI implements Listener {
             gui.setItem(i, border);
         }
 
+        populateRecipeGrid(gui, recipe);
+        populateNavigation(gui, session);
+
+        return gui;
+    }
+
+    private void populateRecipeGrid(Inventory gui, RecipeDefinition recipe) {
         // Clear crafting area and result area
         for (int slot : CRAFTING_SLOTS) {
             gui.setItem(slot, null);
@@ -119,7 +124,9 @@ public final class RecipeViewerGUI implements Listener {
 
         // Result
         gui.setItem(RESULT_SLOT, createDisplayItem(recipe.getResult().item(), recipe.getResult().amount()));
+    }
 
+    private void populateNavigation(Inventory gui, ViewerSession session) {
         // Navigation
         if (session.recipes.size() > 1) {
             gui.setItem(PREV_SLOT, createNavItem("§a◀ Previous", session.index > 0));
@@ -129,8 +136,6 @@ public final class RecipeViewerGUI implements Listener {
 
         // Back button
         gui.setItem(BACK_SLOT, createBackItem());
-
-        return gui;
     }
 
     private void placeShapedRecipe(Inventory gui, ShapedRecipeDefinition recipe) {
@@ -257,28 +262,32 @@ public final class RecipeViewerGUI implements Listener {
 
         int slot = event.getRawSlot();
 
-        // Previous
+        if (handleNavigationClick(slot, player, session)) {
+            return;
+        }
+
+        handleIngredientClick(event.getCurrentItem(), player, session);
+    }
+
+    private boolean handleNavigationClick(int slot, Player player, ViewerSession session) {
         if (slot == PREV_SLOT && session.index > 0) {
             session.index--;
             player.openInventory(createGUI(session));
-            return;
+            return true;
         }
-
-        // Next
         if (slot == NEXT_SLOT && session.index < session.recipes.size() - 1) {
             session.index++;
             player.openInventory(createGUI(session));
-            return;
+            return true;
         }
-
-        // Back/Close
         if (slot == BACK_SLOT) {
             player.closeInventory();
-            return;
+            return true;
         }
+        return false;
+    }
 
-        // Click on ingredient → navigate to that item's recipes
-        ItemStack clicked = event.getCurrentItem();
+    private void handleIngredientClick(ItemStack clicked, Player player, ViewerSession session) {
         if (clicked != null && clicked.getType() != Material.AIR) {
             String clickedId = itemService.getId(clicked);
             if (clickedId != null && !clickedId.equals(session.itemId)) {

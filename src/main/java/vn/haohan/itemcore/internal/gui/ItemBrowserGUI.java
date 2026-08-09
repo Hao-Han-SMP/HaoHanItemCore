@@ -75,7 +75,13 @@ public final class ItemBrowserGUI implements Listener {
         Inventory gui = Bukkit.createInventory(null, GUI_SIZE,
                 Component.text("Item Browser", NamedTextColor.DARK_PURPLE));
 
-        // Place items
+        populateItems(gui, session);
+        populateNavigation(gui, session);
+
+        return gui;
+    }
+
+    private void populateItems(Inventory gui, BrowserSession session) {
         int startIndex = session.page * ITEMS_PER_PAGE;
         for (int i = 0; i < ITEMS_PER_PAGE; i++) {
             int itemIndex = startIndex + i;
@@ -85,7 +91,9 @@ public final class ItemBrowserGUI implements Listener {
                 gui.setItem(i, display);
             }
         }
+    }
 
+    private void populateNavigation(Inventory gui, BrowserSession session) {
         // Navigation bar (bottom row)
         ItemStack border = createBorderItem();
         for (int i = ITEMS_PER_PAGE; i < GUI_SIZE; i++) {
@@ -112,8 +120,6 @@ public final class ItemBrowserGUI implements Listener {
 
         // Close
         gui.setItem(CLOSE_SLOT, createCloseItem());
-
-        return gui;
     }
 
     private ItemStack createBorderItem() {
@@ -151,32 +157,36 @@ public final class ItemBrowserGUI implements Listener {
 
         int slot = event.getRawSlot();
 
-        // Previous page
+        if (handleNavigationClick(slot, player, session)) {
+            return;
+        }
+
+        if (slot >= 0 && slot < ITEMS_PER_PAGE) {
+            handleItemClick(slot, player, session, event.getCurrentItem());
+        }
+    }
+
+    private boolean handleNavigationClick(int slot, Player player, BrowserSession session) {
         if (slot == PREV_SLOT && session.page > 0) {
             open(player, session.page - 1);
-            return;
+            return true;
         }
-
-        // Next page
         if (slot == NEXT_SLOT && session.page < session.totalPages - 1) {
             open(player, session.page + 1);
-            return;
+            return true;
         }
-
-        // Close
         if (slot == CLOSE_SLOT) {
             player.closeInventory();
-            return;
+            return true;
         }
+        return false;
+    }
 
-        // Click on item → view recipes
-        if (slot >= 0 && slot < ITEMS_PER_PAGE) {
-            ItemStack clicked = event.getCurrentItem();
-            if (clicked != null && clicked.getType() != Material.AIR) {
-                String itemId = itemService.getId(clicked);
-                if (itemId != null) {
-                    recipeViewer.open(player, itemId);
-                }
+    private void handleItemClick(int slot, Player player, BrowserSession session, ItemStack clicked) {
+        if (clicked != null && clicked.getType() != Material.AIR) {
+            String itemId = itemService.getId(clicked);
+            if (itemId != null) {
+                recipeViewer.open(player, itemId);
             }
         }
     }
