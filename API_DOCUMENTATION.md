@@ -115,14 +115,15 @@ ItemDefinition.builder("magic:fire_crystal")
 | `ItemDefinition` | `getDefinition(String id)` | Lấy `ItemDefinition` theo ID. |
 | `boolean` | `exists(String id)` | Kiểm tra item tồn tại trong registry. |
 | `Map<String, Object>` | `getProperties(ItemStack)` | Lấy properties từ definition của item. |
-| `void` | `validateAndUpdate(ItemStack)` | Đồng bộ/upgrade components theo definition hiện tại. Bỏ qua item vanilla. |
+| `ItemStack` | `validateAndUpdate(ItemStack)` | Đồng bộ/upgrade các component của custom item theo definition hiện tại. Bỏ qua item vanilla. |
 
 **`validateAndUpdate()` đồng bộ:**
 - Item Model (NamespacedKey theo ID)
-- Max Stack Size
+- Max Stack Size (Mặc định là 1 nếu không cấu hình)
+- Unique UUID tag (Nếu Max Stack Size là 1, tự động gán random UUID tag `uuid` vào PDC để ngăn chặn việc Minecraft/Spigot tự động stack các custom items độc lập. Nếu Max Stack Size > 1, tự động xóa tag `uuid` để cho phép stack)
 - Max Damage (nếu có property `max_damage`)
 - Jukebox Playable (nếu có property `jukebox_playable`)
-- Equippable Component (nếu có property `equippable_asset_id` và chưa được gắn)
+- Equippable Component (nếu có property `equippable_asset_id` và chưa được gắn hoặc asset_id bị sai lệch so với config)
 
 ---
 
@@ -284,21 +285,19 @@ Mô hình giáp khi mặc dùng component `minecraft:equippable` thay vì Custom
 
 ### 6.2 `DefaultItemFactory.applyComponents()` (static, public)
 
-Phương thức này có thể được gọi từ plugin con để đồng bộ components vào `ItemMeta`/`ItemStack` hiện có:
+Phương thức này có thể được gọi từ plugin con để đồng bộ components vào `ItemStack` hiện có:
 
 ```java
-boolean modified = DefaultItemFactory.applyComponents(meta, definition, itemStack, plugin);
-if (modified) {
-    itemStack.setItemMeta(meta);
-}
+boolean modified = DefaultItemFactory.applyComponents(itemStack, definition, plugin);
 ```
 
 **Xử lý (theo thứ tự):**
 1. Item Model (NamespacedKey)
-2. Max Stack Size
+2. Max Stack Size (Mặc định là 1 nếu không cấu hình)
 3. Max Damage (`max_damage` property)
 4. Jukebox Playable (`jukebox_playable` property)
-5. Equippable Component (`equippable_asset_id` property)
+5. Unique UUID tag (`uuid` property trong PersistentDataContainer để tránh tự động stack khi Max Stack Size là 1)
+6. Equippable Component (`equippable_asset_id` property - tự động so sánh và cập nhật lại nếu bị sai lệch so với config)
 
 ### 6.3 `DefaultItemFactory.getEquipmentSlotFromMaterial()` (static, public)
 
@@ -396,7 +395,35 @@ public void onArmorEquip(PlayerArmorChangeEvent event) {
 
 ---
 
-## 8. Tóm tắt Class Diagram
+## 8. Chi tiết các Hàm Xử lý Phân tách (Refactored Sub-methods)
+
+Để đảm bảo tính modular, dễ bảo trì và hạn chế tối đa việc lồng hàm (nested functions), hệ thống đã phân rã các phương thức cồng kềnh thành các phương thức con chịu trách nhiệm đơn nhất:
+
+### 8.1 Hệ thống sự kiện (`ItemEventRouter`)
+* `findSmithingRecipe(ItemStack template, ItemStack base, ItemStack addition)`: Tìm kiếm và so khớp công thức rèn (Smithing) từ ba ô nguyên liệu gốc.
+* `findMatchingCustomBlockData(NoteBlock noteBlock)`: Tìm kiếm cấu hình khối tùy chỉnh (`custom_block_data`) khớp với note và instrument của NoteBlock hiện tại.
+* `applyCustomBlockData(Block block, ItemDefinition definition, Player player)`: Thực hiện áp dụng BlockData tùy chỉnh của định nghĩa vật phẩm lên khối vừa đặt.
+* `applyBlockStateMeta(Block block, ItemMeta meta, Player player, String itemId)`: Áp dụng BlockStateMeta đi kèm từ item stack (cơ chế dự phòng).
+* `dropCustomBlockItem(Block block, String itemId, PersistentDataContainer blockPDC)`: Tạo và rơi vật phẩm tùy chỉnh khi khối tùy chỉnh bị phá hủy, đồng thời bảo toàn dữ liệu PDC của khối sang PDC của item rớt ra.
+* `processExplodedBlock(Block block)`: Xử lý gỡ bỏ metadata khối bị nổ, đổi kiểu khối về AIR và tạo rơi vật phẩm tùy chỉnh tương ứng.
+
+### 8.2 Bộ tải cấu hình (`ItemConfigLoader` & `RecipeConfigLoader`)
+* `loadNamespace(String namespace, ConfigurationSection namespaceSection, String fileName, ItemRegistry registry)`: Đọc và đăng ký toàn bộ vật phẩm thuộc một namespace nhất định.
+* `loadSingleRecipe(ConfigurationSection config, List<RecipeDefinition> recipes)`: Xử lý tải công thức đơn lẻ (khi file YAML định nghĩa duy nhất một công thức ở lớp ngoài cùng).
+* `loadMultipleRecipes(YamlConfiguration config, String fileName, List<RecipeDefinition> recipes)`: Lặp và tải danh sách nhiều công thức nằm trong cùng một file YAML cấu hình.
+* `parseCookingRecipe(String id, RecipeType type, ConfigurationSection config, ItemResult result)`: Trích xuất và cấu tạo công thức nấu (Smelting, Blasting, Smoking, Campfire, Stonecutting).
+* `parseSmithingRecipe(String id, ConfigurationSection config, ItemResult result)`: Trích xuất nguyên liệu template, base, addition và cấu tạo công thức Smithing nâng cấp vật phẩm.
+* `parseShapelessOrMachineRecipe(String id, RecipeType type, ConfigurationSection config, ItemResult result)`: Trích xuất danh sách nguyên liệu không định hình và cấu tạo công thức Shapeless hoặc Machine.
+
+### 8.3 Thành phần Giao diện (`ItemBrowserGUI` & `RecipeViewerGUI`)
+* `populateItems(Inventory gui, BrowserSession session)`: Điền danh sách vật phẩm tương ứng với trang hiện tại vào ô giao diện hiển thị.
+* `populateNavigation(Inventory gui, BrowserSession/ViewerSession session)`: Tạo và bố trí các nút điều hướng (Trang trước, Trang sau, Thông tin trang, Đóng/Quay lại) vào thanh công cụ bên dưới.
+* `handleNavigationClick(int slot, Player player, BrowserSession/ViewerSession session)`: Nhận diện và xử lý sự kiện click chuột vào nút điều hướng.
+* `handleItemClick / handleIngredientClick`: Thực hiện logic khi người chơi click chọn vật phẩm/nguyên liệu (chuyển trang xem công thức chi tiết).
+
+---
+
+## 9. Tóm tắt Class Diagram
 
 ```mermaid
 classDiagram

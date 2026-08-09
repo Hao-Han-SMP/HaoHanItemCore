@@ -405,10 +405,11 @@ HaoHanItemCore.get().getItemService().validateAndUpdate(itemStack);
 ### Những gì được đồng bộ
 
 - **Item Model** → theo ID của item
-- **Max Stack Size** → theo definition
+- **Max Stack Size** → theo definition (mặc định là 1 nếu không cấu hình)
+- **Unique UUID** → tự động gắn UUID nếu stack size là 1 để tránh tự động stack, hoặc gỡ bỏ UUID nếu stack size > 1.
 - **Max Damage** → nếu có property `max_damage`
 - **Jukebox Playable** → nếu có property `jukebox_playable`
-- **Equippable Component** → nếu có property `equippable_asset_id` và chưa được gắn
+- **Equippable Component** → nếu có property `equippable_asset_id` (tự động cập nhật nếu chưa gắn hoặc bị sai lệch)
 
 > Item vanilla (không có PersistentData của engine) được bỏ qua hoàn toàn.
 
