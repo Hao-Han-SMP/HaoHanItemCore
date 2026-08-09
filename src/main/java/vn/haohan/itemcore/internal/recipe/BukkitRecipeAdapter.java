@@ -1,6 +1,7 @@
 package vn.haohan.itemcore.internal.recipe;
 
 import vn.haohan.itemcore.api.item.ItemRegistry;
+import vn.haohan.itemcore.api.item.ItemDefinition;
 import vn.haohan.itemcore.api.recipe.*;
 import vn.haohan.itemcore.internal.item.DefaultItemFactory;
 
@@ -79,8 +80,35 @@ public final class BukkitRecipeAdapter {
             case SMOKING -> toSmokingRecipe(recipe);
             case CAMPFIRE -> toCampfireRecipe(recipe);
             case STONECUTTING -> toStonecuttingRecipe(recipe);
-            case SMITHING, MACHINE -> null; // Plugin tự xử lý
+            case SMITHING -> toSmithingRecipe(recipe);
+            case MACHINE -> null; // Plugin tự xử lý
         };
+    }
+
+    private org.bukkit.inventory.SmithingTransformRecipe toSmithingRecipe(RecipeDefinition recipe) {
+        NamespacedKey key = createKey(recipe);
+        ItemStack result = createResultItem(recipe.getResult());
+        List<Ingredient> ingredients = recipe.getIngredients();
+        if (ingredients.size() < 3) {
+            throw new IllegalArgumentException("Smithing recipe requires 3 ingredients (template, base, addition): " + recipe.getId());
+        }
+        RecipeChoice template = toSmithingRecipeChoice(ingredients.get(0));
+        RecipeChoice base = toSmithingRecipeChoice(ingredients.get(1));
+        RecipeChoice addition = toSmithingRecipeChoice(ingredients.get(2));
+
+        return new org.bukkit.inventory.SmithingTransformRecipe(key, result, template, base, addition);
+    }
+
+    private RecipeChoice toSmithingRecipeChoice(Ingredient ingredient) {
+        if (ingredient instanceof Ingredient.ItemIngredient item) {
+            if (itemRegistry.exists(item.id())) {
+                ItemDefinition def = itemRegistry.get(item.id());
+                if (def != null) {
+                    return new RecipeChoice.MaterialChoice(def.getMaterial());
+                }
+            }
+        }
+        return toRecipeChoice(ingredient);
     }
 
     private org.bukkit.inventory.ShapedRecipe toShapedRecipe(ShapedRecipeDefinition recipe) {

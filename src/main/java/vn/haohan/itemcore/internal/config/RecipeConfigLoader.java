@@ -97,32 +97,40 @@ public final class RecipeConfigLoader {
         try {
             // Kiểm tra nếu file chứa trực tiếp một recipe (có field "id" ở top level)
             if (config.contains("id")) {
-                RecipeDefinition recipe = parseRecipe(config);
-                if (recipe != null) {
-                    validateRecipe(recipe);
-                    recipes.add(recipe);
-                }
+                loadSingleRecipe(config, recipes);
             } else {
-                // File chứa nhiều recipes dưới dạng sections
-                for (String key : config.getKeys(false)) {
-                    ConfigurationSection section = config.getConfigurationSection(key);
-                    if (section == null) continue;
-
-                    try {
-                        RecipeDefinition recipe = parseRecipeSection(section);
-                        if (recipe != null) {
-                            validateRecipe(recipe);
-                            recipes.add(recipe);
-                        }
-                    } catch (Exception e) {
-                        logger.warning("[RecipeConfigLoader] Failed to load recipe '" + key +
-                                "' from " + file.getName() + ": " + e.getMessage());
-                    }
-                }
+                loadMultipleRecipes(config, file.getName(), recipes);
             }
         } catch (Exception e) {
             logger.warning("[RecipeConfigLoader] Failed to load recipe from " +
                     file.getName() + ": " + e.getMessage());
+        }
+    }
+
+    private void loadSingleRecipe(ConfigurationSection config, List<RecipeDefinition> recipes) {
+        RecipeDefinition recipe = parseRecipe(config);
+        if (recipe != null) {
+            validateRecipe(recipe);
+            recipes.add(recipe);
+        }
+    }
+
+    private void loadMultipleRecipes(YamlConfiguration config, String fileName, List<RecipeDefinition> recipes) {
+        // File chứa nhiều recipes dưới dạng sections
+        for (String key : config.getKeys(false)) {
+            ConfigurationSection section = config.getConfigurationSection(key);
+            if (section == null) continue;
+
+            try {
+                RecipeDefinition recipe = parseRecipeSection(section);
+                if (recipe != null) {
+                    validateRecipe(recipe);
+                    recipes.add(recipe);
+                }
+            } catch (Exception e) {
+                logger.warning("[RecipeConfigLoader] Failed to load recipe '" + key +
+                        "' from " + fileName + ": " + e.getMessage());
+            }
         }
     }
 
@@ -181,40 +189,72 @@ public final class RecipeConfigLoader {
 
     private RecipeDefinition parseNonShapedRecipe(String id, RecipeType type, ConfigurationSection config,
                                                    ItemResult result) {
-        List<Ingredient> ingredients = new ArrayList<>();
-
-        // For smelting/blasting/smoking/campfire/stonecutting: single input
         if (type == RecipeType.SMELTING || type == RecipeType.BLASTING ||
             type == RecipeType.SMOKING || type == RecipeType.CAMPFIRE ||
             type == RecipeType.STONECUTTING) {
+            return parseCookingRecipe(id, type, config, result);
+        }
 
-            ConfigurationSection inputSection = config.getConfigurationSection("input");
-            if (inputSection == null) {
-                // Fallback: check ingredients list
-                inputSection = config.getConfigurationSection("ingredients");
-            }
-            if (inputSection != null) {
-                // Kiểm tra nếu input trực tiếp có "item" field
-                if (inputSection.contains("item")) {
-                    ingredients.add(parseIngredient(inputSection));
-                } else {
-                    // Multiple ingredients sections
-                    for (String key : inputSection.getKeys(false)) {
-                        ConfigurationSection sub = inputSection.getConfigurationSection(key);
-                        if (sub != null) {
-                            ingredients.add(parseIngredient(sub));
-                        }
+        if (type == RecipeType.SMITHING) {
+            return parseSmithingRecipe(id, config, result);
+        }
+
+        return parseShapelessOrMachineRecipe(id, type, config, result);
+    }
+
+    private RecipeDefinition parseCookingRecipe(String id, RecipeType type, ConfigurationSection config, ItemResult result) {
+        List<Ingredient> ingredients = new ArrayList<>();
+        ConfigurationSection inputSection = config.getConfigurationSection("input");
+        if (inputSection == null) {
+            // Fallback: check ingredients list
+            inputSection = config.getConfigurationSection("ingredients");
+        }
+        if (inputSection != null) {
+            // Kiểm tra nếu input trực tiếp có "item" field
+            if (inputSection.contains("item")) {
+                ingredients.add(parseIngredient(inputSection));
+            } else {
+                // Multiple ingredients sections
+                for (String key : inputSection.getKeys(false)) {
+                    ConfigurationSection sub = inputSection.getConfigurationSection(key);
+                    if (sub != null) {
+                        ingredients.add(parseIngredient(sub));
                     }
                 }
             }
-
-            float experience = (float) config.getDouble("experience", 0);
-            int cookingTime = config.getInt("cooking-time", 200);
-
-            return new RecipeDefinition(id, type, ingredients, result, experience, cookingTime);
         }
 
-        // For shapeless/machine: ingredient list
+        float experience = (float) config.getDouble("experience", 0);
+        int cookingTime = config.getInt("cooking-time", 200);
+
+        return new RecipeDefinition(id, type, ingredients, result, experience, cookingTime);
+    }
+
+    private RecipeDefinition parseSmithingRecipe(String id, ConfigurationSection config, ItemResult result) {
+        List<Ingredient> ingredients = new ArrayList<>();
+        ConfigurationSection templateSec = config.getConfigurationSection("template");
+        ConfigurationSection baseSec = config.getConfigurationSection("base");
+        ConfigurationSection additionSec = config.getConfigurationSection("addition");
+        if (templateSec != null && baseSec != null && additionSec != null) {
+            ingredients.add(parseIngredient(templateSec));
+            ingredients.add(parseIngredient(baseSec));
+            ingredients.add(parseIngredient(additionSec));
+        } else {
+            ConfigurationSection ingredientsSection = config.getConfigurationSection("ingredients");
+            if (ingredientsSection != null) {
+                for (String key : ingredientsSection.getKeys(false)) {
+                    ConfigurationSection sub = ingredientsSection.getConfigurationSection(key);
+                    if (sub != null) {
+                        ingredients.add(parseIngredient(sub));
+                    }
+                }
+            }
+        }
+        return new RecipeDefinition(id, RecipeType.SMITHING, ingredients, result);
+    }
+
+    private RecipeDefinition parseShapelessOrMachineRecipe(String id, RecipeType type, ConfigurationSection config, ItemResult result) {
+        List<Ingredient> ingredients = new ArrayList<>();
         ConfigurationSection ingredientsSection = config.getConfigurationSection("ingredients");
         if (ingredientsSection != null) {
             for (String key : ingredientsSection.getKeys(false)) {
@@ -224,7 +264,6 @@ public final class RecipeConfigLoader {
                 }
             }
         }
-
         return new RecipeDefinition(id, type, ingredients, result);
     }
 
