@@ -23,6 +23,10 @@ import org.bukkit.event.inventory.CraftItemEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.inventory.PrepareSmithingEvent;
+import org.bukkit.inventory.SmithingInventory;
+import vn.haohan.itemmanager.api.recipe.RecipeDefinition;
+import vn.haohan.itemmanager.api.recipe.Ingredient;
 import org.bukkit.block.Block;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -201,31 +205,12 @@ public final class ItemEventRouter implements Listener {
         // Apply custom block data if configured or present on the item
         ItemDefinition definition = registry.get(id);
         Block block = event.getBlockPlaced();
-        boolean blockDataApplied = false;
 
-        if (definition != null) {
-            Object customBlockData = definition.getProperties().get("custom_block_data");
-            if (customBlockData instanceof String blockDataStr) {
-                try {
-                    block.setBlockData(org.bukkit.Bukkit.createBlockData(blockDataStr), false);
-                    blockDataApplied = true;
-                    // Correct the client immediately to prevent visual texture flashing
-                    event.getPlayer().sendBlockChange(block.getLocation(), block.getBlockData());
-                } catch (Exception e) {
-                    logger.warning("Failed to apply custom block data for item " + id + ": " + e.getMessage());
-                }
-            }
-        }
+        boolean blockDataApplied = applyCustomBlockData(block, definition, event.getPlayer());
 
         // Fallback to BlockStateMeta block state from the item stack
-        if (!blockDataApplied && meta instanceof BlockStateMeta bsm && bsm.hasBlockState()) {
-            try {
-                block.setBlockData(bsm.getBlockState().getBlockData(), false);
-                // Correct the client immediately to prevent visual texture flashing
-                event.getPlayer().sendBlockChange(block.getLocation(), block.getBlockData());
-            } catch (Exception e) {
-                logger.warning("Failed to apply BlockStateMeta block data for item " + id + ": " + e.getMessage());
-            }
+        if (!blockDataApplied) {
+            applyBlockStateMeta(block, meta, event.getPlayer(), id);
         }
     }
 
@@ -237,20 +222,14 @@ public final class ItemEventRouter implements Listener {
         Block block = event.getClickedBlock();
         if (block == null || block.getType() != org.bukkit.Material.NOTE_BLOCK) return;
 
-        PersistentDataContainer blockPDC = getBlockPDC(block);
-        if (blockPDC != null && blockPDC.has(itemIdKey, PersistentDataType.STRING)) {
-            String id = blockPDC.get(itemIdKey, PersistentDataType.STRING);
-            ItemDefinition definition = registry.get(id);
-            if (definition != null) {
-                Object customBlockData = definition.getProperties().get("custom_block_data");
-                if (customBlockData instanceof String blockDataStr) {
-                    org.bukkit.block.data.BlockData customData = org.bukkit.Bukkit.createBlockData(blockDataStr);
-                    org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
-                        if (block.getType() == org.bukkit.Material.NOTE_BLOCK) {
-                            block.setBlockData(customData, false);
-                        }
-                    });
-                }
+        if (block.getBlockData() instanceof org.bukkit.block.data.type.NoteBlock noteBlock) {
+            org.bukkit.block.data.BlockData customData = findMatchingCustomBlockData(noteBlock);
+            if (customData != null) {
+                org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
+                    if (block.getType() == org.bukkit.Material.NOTE_BLOCK) {
+                        block.setBlockData(customData, false);
+                    }
+                });
             }
         }
     }
@@ -266,24 +245,14 @@ public final class ItemEventRouter implements Listener {
         Block block = event.getBlock();
         if (block.getType() != org.bukkit.Material.NOTE_BLOCK) return;
 
-        // Instead of cancelling the physics event (which causes neighbor block placement to fail/disappear),
-        // we check if this is a custom block and restore its state 0 ticks later if it has changed.
-        PersistentDataContainer blockPDC = getBlockPDC(block);
-        if (blockPDC != null && blockPDC.has(itemIdKey, PersistentDataType.STRING)) {
-            String id = blockPDC.get(itemIdKey, PersistentDataType.STRING);
-            ItemDefinition definition = registry.get(id);
-            if (definition != null) {
-                Object customBlockData = definition.getProperties().get("custom_block_data");
-                if (customBlockData instanceof String blockDataStr) {
-                    org.bukkit.block.data.BlockData customData = org.bukkit.Bukkit.createBlockData(blockDataStr);
-                    if (!block.getBlockData().getAsString().equals(customData.getAsString())) {
-                        org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
-                            if (block.getType() == org.bukkit.Material.NOTE_BLOCK) {
-                                block.setBlockData(customData, false);
-                            }
-                        });
+        if (block.getBlockData() instanceof org.bukkit.block.data.type.NoteBlock noteBlock) {
+            org.bukkit.block.data.BlockData customData = findMatchingCustomBlockData(noteBlock);
+            if (customData != null && !block.getBlockData().getAsString().equals(customData.getAsString())) {
+                org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
+                    if (block.getType() == org.bukkit.Material.NOTE_BLOCK) {
+                        block.setBlockData(customData, false);
                     }
-                }
+                });
             }
         }
     }
@@ -310,17 +279,8 @@ public final class ItemEventRouter implements Listener {
             return;
         }
 
-        // Recreate and drop the custom item with original PDC restored
-        ItemStack dropItem = vn.haohan.itemcore.api.HaoHanItemCore.get().getItemService().create(id);
-        if (dropItem != null) {
-            ItemMeta meta = dropItem.getItemMeta();
-            if (meta != null) {
-                PersistentDataContainer itemPDC = meta.getPersistentDataContainer();
-                blockPDC.copyTo(itemPDC, true);
-                dropItem.setItemMeta(meta);
-            }
-            block.getWorld().dropItemNaturally(block.getLocation(), dropItem);
-        }
+        // Recreate and drop the custom item
+        dropCustomBlockItem(block, id, blockPDC);
     }
 
     // --- Explosion Events ---
@@ -339,29 +299,8 @@ public final class ItemEventRouter implements Listener {
         java.util.Iterator<Block> iterator = blocks.iterator();
         while (iterator.hasNext()) {
             Block block = iterator.next();
-            PersistentDataContainer blockPDC = getBlockPDC(block);
-            if (blockPDC == null) continue;
-
-            String id = blockPDC.get(itemIdKey, PersistentDataType.STRING);
-            if (id == null) continue;
-
-            // Remove metadata
-            removeBlockPDC(block);
-
-            // Remove block from vanilla explosion blocks list to prevent vanilla drops
-            iterator.remove();
-
-            // Recreate and drop custom item
-            ItemStack dropItem = vn.haohan.itemcore.api.HaoHanItemCore.get().getItemService().create(id);
-            if (dropItem != null) {
-                ItemMeta meta = dropItem.getItemMeta();
-                if (meta != null) {
-                    PersistentDataContainer itemPDC = meta.getPersistentDataContainer();
-                    blockPDC.copyTo(itemPDC, true);
-                    dropItem.setItemMeta(meta);
-                }
-                block.setType(org.bukkit.Material.AIR);
-                block.getWorld().dropItemNaturally(block.getLocation(), dropItem);
+            if (processExplodedBlock(block)) {
+                iterator.remove();
             }
         }
     }
@@ -436,5 +375,164 @@ public final class ItemEventRouter implements Listener {
         if (result != null) {
             vn.haohan.itemcore.api.HaoHanItemCore.get().getItemService().validateAndUpdate(result);
         }
+    }
+
+    @EventHandler(priority = EventPriority.NORMAL)
+    public void onPrepareSmithing(PrepareSmithingEvent event) {
+        SmithingInventory inventory = event.getInventory();
+        ItemStack template = inventory.getItem(0); // Template slot
+        ItemStack base = inventory.getItem(1);     // Base item slot
+        ItemStack addition = inventory.getItem(2); // Addition ingredient slot
+
+        RecipeDefinition matchedRecipe = findSmithingRecipe(template, base, addition);
+
+        if (matchedRecipe != null) {
+            ItemStack resultStack = vn.haohan.itemmanager.api.HaoHanItemManager.get().getItemFactory().create(
+                    matchedRecipe.getResult().item(),
+                    matchedRecipe.getResult().amount()
+            );
+            event.setResult(resultStack);
+        } else {
+            ItemStack currentResult = event.getResult();
+            if (currentResult != null && vn.haohan.itemmanager.api.HaoHanItemManager.get().getItemService().isCustomItem(currentResult)) {
+                event.setResult(null);
+            }
+        }
+    }
+
+    private boolean matchIngredient(Ingredient ingredient, ItemStack item) {
+        if (item == null || item.getType() == org.bukkit.Material.AIR) {
+            return false;
+        }
+        if (ingredient instanceof Ingredient.ItemIngredient itemIng) {
+            if (itemIng.id().startsWith("minecraft:")) {
+                String matName = itemIng.id().substring("minecraft:".length()).toUpperCase();
+                return item.getType().name().equals(matName);
+            } else {
+                return vn.haohan.itemmanager.api.HaoHanItemManager.get().getItemService().isItem(item, itemIng.id());
+            }
+        } else if (ingredient instanceof Ingredient.MaterialIngredient matIng) {
+            return item.getType() == matIng.material();
+        }
+        return false;
+    }
+
+    private boolean applyCustomBlockData(Block block, ItemDefinition definition, Player player) {
+        if (definition != null) {
+            Object customBlockData = definition.getProperties().get("custom_block_data");
+            if (customBlockData instanceof String blockDataStr) {
+                try {
+                    block.setBlockData(org.bukkit.Bukkit.createBlockData(blockDataStr), false);
+                    // Correct the client immediately to prevent visual texture flashing
+                    player.sendBlockChange(block.getLocation(), block.getBlockData());
+                    return true;
+                } catch (Exception e) {
+                    logger.warning("Failed to apply custom block data for item " + definition.getId() + ": " + e.getMessage());
+                }
+            }
+        }
+        return false;
+    }
+
+    private boolean applyBlockStateMeta(Block block, ItemMeta meta, Player player, String itemId) {
+        if (meta instanceof BlockStateMeta bsm && bsm.hasBlockState()) {
+            try {
+                block.setBlockData(bsm.getBlockState().getBlockData(), false);
+                // Correct the client immediately to prevent visual texture flashing
+                player.sendBlockChange(block.getLocation(), block.getBlockData());
+                return true;
+            } catch (Exception e) {
+                logger.warning("Failed to apply BlockStateMeta block data for item " + itemId + ": " + e.getMessage());
+            }
+        }
+        return false;
+    }
+
+    private org.bukkit.block.data.BlockData findMatchingCustomBlockData(org.bukkit.block.data.type.NoteBlock noteBlock) {
+        for (ItemDefinition def : registry.all()) {
+            Object customBlockData = def.getProperties().get("custom_block_data");
+            if (customBlockData instanceof String blockDataStr) {
+                try {
+                    org.bukkit.block.data.BlockData customData = org.bukkit.Bukkit.createBlockData(blockDataStr);
+                    if (customData instanceof org.bukkit.block.data.type.NoteBlock defNoteBlock) {
+                        if (noteBlock.getInstrument() == defNoteBlock.getInstrument() &&
+                                noteBlock.getNote().getId() == defNoteBlock.getNote().getId()) {
+                            return customData;
+                        }
+                    }
+                } catch (Exception ignored) {}
+            }
+        }
+        return null;
+    }
+
+    private void dropCustomBlockItem(Block block, String itemId, PersistentDataContainer blockPDC) {
+        String dropId = itemId;
+        ItemDefinition definition = registry.get(itemId);
+        if (definition != null) {
+            Object customDrop = definition.getProperties().get("custom_block_drop");
+            if (customDrop instanceof String dropStr) {
+                dropId = dropStr;
+            }
+        }
+
+        ItemStack dropItem = vn.haohan.itemmanager.api.HaoHanItemManager.get().getItemService().create(dropId);
+        if (dropItem != null) {
+            // Only copy block state PDC if we are dropping the block itself
+            if (dropId.equals(itemId)) {
+                ItemMeta meta = dropItem.getItemMeta();
+                if (meta != null) {
+                    PersistentDataContainer itemPDC = meta.getPersistentDataContainer();
+                    blockPDC.copyTo(itemPDC, true);
+                    dropItem.setItemMeta(meta);
+                }
+            }
+            block.getWorld().dropItemNaturally(block.getLocation(), dropItem);
+        }
+    }
+
+    private boolean processExplodedBlock(Block block) {
+        PersistentDataContainer blockPDC = getBlockPDC(block);
+        if (blockPDC == null) return false;
+
+        String id = blockPDC.get(itemIdKey, PersistentDataType.STRING);
+        if (id == null) return false;
+
+        // Remove metadata
+        removeBlockPDC(block);
+
+        // Recreate and drop custom item
+        ItemStack dropItem = vn.haohan.itemmanager.api.HaoHanItemManager.get().getItemService().create(id);
+        if (dropItem != null) {
+            ItemMeta meta = dropItem.getItemMeta();
+            if (meta != null) {
+                PersistentDataContainer itemPDC = meta.getPersistentDataContainer();
+                blockPDC.copyTo(itemPDC, true);
+                dropItem.setItemMeta(meta);
+            }
+            block.setType(org.bukkit.Material.AIR);
+            block.getWorld().dropItemNaturally(block.getLocation(), dropItem);
+        }
+        return true;
+    }
+
+    private RecipeDefinition findSmithingRecipe(ItemStack template, ItemStack base, ItemStack addition) {
+        var recipeService = vn.haohan.itemmanager.api.HaoHanItemManager.get().getRecipeService();
+        if (recipeService == null) return null;
+
+        for (RecipeDefinition recipe : recipeService.all()) {
+            if (recipe.getType() != vn.haohan.itemmanager.api.recipe.RecipeType.SMITHING) {
+                continue;
+            }
+            List<Ingredient> ingredients = recipe.getIngredients();
+            if (ingredients.size() < 3) continue;
+
+            if (matchIngredient(ingredients.get(0), template) &&
+                matchIngredient(ingredients.get(1), base) &&
+                matchIngredient(ingredients.get(2), addition)) {
+                return recipe;
+            }
+        }
+        return null;
     }
 }
