@@ -1,486 +1,569 @@
-# Hướng dẫn & Tài liệu API: HaoHanItemCore
+# Tài liệu API HaoHanItemCore
 
-Tài liệu này cung cấp chi tiết về cấu trúc lớp (class structure), giao diện (interfaces), và các phương thức (methods) trong API của **HaoHanItemCore**. Đây là hệ thống cốt lõi quản lý Custom Items và Custom Recipes cho HaoHan SMP, giúp các plugin vệ tinh dễ dàng tích hợp và mở rộng.
+Tài liệu này cung cấp chi tiết toàn diện về các lớp (classes), giao diện (interfaces), các thành phần mở rộng (components), và các phương thức (methods) trong API của **HaoHanItemCore**.
 
----
-
-## 1. Điểm Khởi Đầu (API Entrypoint)
-
-### Class `HaoHanItemCore`
-
-Là lớp Singleton chính để truy cập tất cả các hệ thống con trong API.
-
-* **Lấy instance:**
-  ```java
-  HaoHanItemCore api = HaoHanItemCore.get();
-  ```
-* **Các phương thức:**
-  | Kiểu trả về | Tên phương thức | Mô tả |
-  | :--- | :--- | :--- |
-  | `static HaoHanItemCore` | `get()` | Lấy instance Singleton. Ném `IllegalStateException` nếu plugin chưa load xong. |
-  | `ItemRegistry` | `getItemRegistry()` | Registry quản lý `ItemDefinition`. |
-  | `ItemFactory` | `getItemFactory()` | Factory tạo `ItemStack` từ định nghĩa. |
-  | `ItemService` | `getItemService()` | Facade kết hợp các tính năng Item (khuyến nghị dùng từ plugin ngoài). |
-  | `RecipeRegistry` | `getRecipeRegistry()` | Registry quản lý `RecipeDefinition`. |
-  | `RecipeService` | `getRecipeService()` | Service tìm kiếm/tra cứu Recipes. |
+**HaoHanItemCore** là hệ thống cốt lõi quản lý Custom Items và Custom Recipes cho **HaoHan SMP**, giúp các plugin vệ tinh (như Lunar, Magic, Tech, Quest, Armor, Tools, v.v.) dễ dàng tích hợp, tra cứu và mở rộng tính năng.
 
 ---
 
-## 2. Hệ Thống Custom Items
+## 📋 Mục Lục API
 
-### 2.1 Định nghĩa Item (`ItemDefinition` & `ItemType`)
+1. [Điểm Khởi Đầu (API Entrypoint) — `HaoHanItemCore`](#1-điểm-khởi-đầu-api-entrypoint--haohanitemcore)
+2. [Hệ Thống Định Nghĩa Custom Item](#2-hệ-thống-định-nghĩa-custom-item)
+   - [2.1 Enum `ItemType`](#21-enum-itemtype)
+   - [2.2 Class `ItemDefinition` & Builder](#22-class-itemdefinition--builder)
+   - [2.3 Các Thành Phần Lập Trình (`ItemComponent`)](#23-các-thành-phần-lập-trình-itemcomponent)
+     - [`AbilityComponent`](#abilitycomponent)
+     - [`AttributeComponent`](#attributecomponent)
+     - [`DurabilityComponent`](#durabilitycomponent)
+     - [`MiningComponent`](#miningcomponent)
+     - [`TierComponent`](#tiercomponent)
+   - [2.4 Cấu Trúc Lore Nâng Cao (`ItemInfoSection`)](#24-cấu-trúc-lore-nâng-cao-iteminfosection)
+   - [2.5 Dữ Liệu Từng Vật Phẩm (`ItemInstanceData`)](#25-dữ-liệu-từng-vật-phẩm-iteminstancedata)
+3. [Registry & Services Quản Lý Item](#3-registry--services-quản-lý-item)
+   - [3.1 `ItemRegistry`](#31-itemregistry)
+   - [3.2 `ItemFactory`](#32-itemfactory)
+   - [3.3 `ItemService` (Facade Chính)](#33-itemservice-facade-chính)
+4. [Hệ Thống Hành Vi Custom (`ItemBehavior` & `ItemContext`)](#4-hệ-thống-hành-vi-custom-itembehavior--itemcontext)
+5. [Hệ Thống Recipe (Công Thức Chế Tạo)](#5-hệ-thống-recipe-công-thức-chế-tạo)
+   - [5.1 `RecipeType`, `Ingredient`, `ItemResult`](#51-recipetype-ingredient-itemresult)
+   - [5.2 `RecipeDefinition` & `ShapedRecipeDefinition`](#52-recipedefinition--shapedrecipedefinition)
+   - [5.3 `RecipeRegistry`](#53-reciperegistry)
+   - [5.4 `RecipeService`](#54-recipeservice)
+6. [Ví Dụ Tích Hợp Đầy Đủ (Full Integration Examples)](#6-ví-dụ-tích-hợp-đầy-đủ-full-integration-examples)
 
-#### Enum `ItemType`
-`MATERIAL` · `TOOL` · `WEAPON` · `ARMOR` · `FOOD` · `MACHINE_COMPONENT` · `CURRENCY` · `SPECIAL`
+---
 
-#### Các phương thức trong `ItemDefinition`
+## 1. Điểm Khởi Đầu (API Entrypoint) — `HaoHanItemCore`
 
-| Phương thức | Mô tả |
-| :--- | :--- |
-| `String getId()` | ID dạng `namespace:key` (ví dụ: `haohan:oxygen_tank`). |
-| `String getNamespace()` | Phần namespace (ví dụ: `haohan`). |
-| `String getKey()` | Phần key (ví dụ: `oxygen_tank`). |
-| `Material getMaterial()` | Material Minecraft gốc. |
-| `String getDisplayName()` | Tên hiển thị (hỗ trợ `§`). |
-| `int getMaxStackSize()` | Số lượng tối đa 1 stack (1–99). |
-| `List<String> getLore()` | Danh sách lore. |
-| `Integer getCustomModelData()` | CustomModelData (có thể null). |
-| `String getItemModel()` | NamespacedKey dạng string cho item model (có thể null). |
-| `Map<String, Object> getProperties()` | Map thuộc tính tùy biến (bao gồm built-in keys). |
-| `ItemBehavior getBehavior()` | Đối tượng xử lý hành vi. |
-| `boolean hasBehavior()` | Kiểm tra có hành vi tùy biến không. |
-| `static boolean isValidId(String id)` | Kiểm tra ID đúng format `namespace:key`. |
+Class Singleton chính cung cấp quyền truy cập vào tất cả các quản lý con (Registry, Factory, Service) của plugin.
 
-#### Builder Pattern cho `ItemDefinition`
+### Lấy Singleton Instance
+```java
+import vn.haohan.itemcore.api.HaoHanItemCore;
+
+HaoHanItemCore core = HaoHanItemCore.get();
+```
+
+### Danh Sách Phương Thức trong `HaoHanItemCore`
+
+#### `static HaoHanItemCore get()`
+* **Tác dụng:** Lấy instance duy nhất của `HaoHanItemCore`.
+* **Tham số:** Không có.
+* **Trả về:** `HaoHanItemCore` — Instance đang hoạt động.
+* **Lưu ý:** Ném `IllegalStateException` nếu plugin chưa hoàn tất giai đoạn `onLoad()`.
+
+#### `ItemRegistry getItemRegistry()`
+* **Tác dụng:** Truy cập registry lưu trữ danh sách định nghĩa item (`ItemDefinition`).
+* **Trả về:** `ItemRegistry`
+
+#### `ItemFactory getItemFactory()`
+* **Tác dụng:** Truy cập factory khởi tạo `ItemStack` từ định nghĩa.
+* **Trả về:** `ItemFactory`
+
+#### `ItemService getItemService()`
+* **Tác dụng:** Truy cập service tổng hợp (Facade). Đây là lựa chọn **khuyến nghị** cho các plugin bên ngoài.
+* **Trả về:** `ItemService`
+
+#### `RecipeRegistry getRecipeRegistry()`
+* **Tác dụng:** Truy cập registry quản lý công thức chế tạo (`RecipeDefinition`).
+* **Trả về:** `RecipeRegistry`
+
+#### `RecipeService getRecipeService()`
+* **Tác dụng:** Truy cập service tra cứu và tìm kiếm công thức chế tạo.
+* **Trả về:** `RecipeService`
+
+---
+
+## 2. Hệ Thống Định Nghĩa Custom Item
+
+### 2.1 Enum `ItemType`
+Phân loại chức năng chính của vập phẩm custom:
+* `MATERIAL`: Nguyên liệu chế tạo cơ bản.
+* `TOOL`: Công cụ khai thác (cúp, rìu, xẻng,...).
+* `WEAPON`: Vũ khí tấn công (kiếm, nỏ, gậy phép,...).
+* `ARMOR`: Trang phục, giáp bảo vệ.
+* `FOOD`: Thức ăn, dược phẩm.
+* `MACHINE_COMPONENT`: Linh kiện máy móc, thiết bị kỹ thuật.
+* `CURRENCY`: Tiền tệ, tiền tệ sự kiện.
+* `SPECIAL`: Vật phẩm đặc biệt/kích hoạt sự kiện.
+
+---
+
+### 2.2 Class `ItemDefinition` & Builder
+
+`ItemDefinition` là **Source of Truth** chứa toàn bộ thuộc tính, thông số, lore, model và component của một Custom Item.
+
+#### Bảng Phương Thức Getter của `ItemDefinition`
+
+| Phương thức | Tác dụng | Giá trị trả về |
+| :--- | :--- | :--- |
+| `String getId()` | Lấy ID đầy đủ dạng `namespace:key` | `String` (VD: `"lunar:anorthosite_pickaxe"`) |
+| `String getNamespace()` | Lấy phần namespace (trước `:`) | `String` (VD: `"lunar"`) |
+| `String getKey()` | Lấy phần key (sau `:`) | `String` (VD: `"anorthosite_pickaxe"`) |
+| `Material getMaterial()` | Material Minecraft gốc của item | `Material` (VD: `Material.DIAMOND_PICKAXE`) |
+| `String getDisplayName()` | Tên hiển thị (hỗ trợ mã màu `§` hoặc `&`) | `String` |
+| `int getMaxStackSize()` | Số lượng xếp chồng tối đa (1 - 99) | `int` |
+| `List<String> getLore()` | Danh sách các dòng mô tả cơ bản | `List<String>` |
+| `Integer getCustomModelData()`| Giá trị CustomModelData (nếu dùng resourcepack cũ) | `Integer` (có thể `null`) |
+| `String getItemModel()` | Mô hình 1.21.4+ (`NamespacedKey` dạng String) | `String` (có thể `null`) |
+| `Map<String, Object> getProperties()` | Map các thuộc tính tùy biến | `Map<String, Object>` |
+| `ItemType getType()` | Thể loại vập phẩm | `ItemType` |
+| `ItemBehavior getBehavior()` | Đối tượng lắng nghe hành vi custom | `ItemBehavior` (có thể `null`) |
+| `List<ItemComponent> getComponents()` | Các component chức năng tùy biến | `List<ItemComponent>` |
+| `List<ItemInfoSection> getInfoSections()` | Danh sách các mục lore định hình sẵn | `List<ItemInfoSection>` |
+| `boolean hasBehavior()` | Kiểm tra vật phẩm có hành vi custom không | `boolean` |
+| `static boolean isValidId(String id)` | Kiểm tra định dạng ID đúng dạng `namespace:key` | `boolean` |
+
+#### Xây Dựng `ItemDefinition` Bằng Builder Pattern
 
 ```java
-ItemDefinition.builder("magic:fire_crystal")
-    .material(Material.EMERALD)
-    .displayName("§cFire Crystal")
-    .maxStackSize(16)
-    .lore(List.of("§7A fire crystal."))
-    .addLore("§8Tier: 1")
-    .customModelData(1001)
-    .properties(Map.of("element", "fire"))
-    .property("tier", 1)
-    .type(ItemType.MATERIAL)
-    .behavior(new FireCrystalBehavior())
+import org.bukkit.Material;
+import vn.haohan.itemcore.api.item.*;
+
+ItemDefinition customPickaxe = ItemDefinition.builder("lunar:anorthosite_pickaxe")
+    .material(Material.DIAMOND_PICKAXE)
+    .displayName("§bCúp Anorthosite Supercharged")
+    .maxStackSize(1)
+    .type(ItemType.TOOL)
+    .addLore("§7Dùng để khai thác các loại quặng Mặt Trăng.")
+    .property("max_damage", 1561)
+    .property("custom_block_drop", "lunar:raw_anorthosite")
+    .component(new MiningComponent(4, 1.5f))
+    .component(new TierComponent(3, "Mặt Trăng"))
+    .infoSection("§eKỹ năng kích hoạt", List.of("§7Chuột phải: Khai thác diện rộng 3x3"))
     .build();
 ```
 
-**Built-in property keys được xử lý tự động:**
+#### Các Property Keys Tự Động Xử Lý (Built-in Properties)
 
-| Property Key | Kiểu | Mô tả |
+| Property Key | Kiểu Dữ Liệu | Tác Dụng |
 | :--- | :--- | :--- |
-| `max_damage` | `int` | Đặt MaxDamage (độ bền). Item phải là `Damageable`. |
-| `jukebox_playable` | `String` NamespacedKey | Gắn `minecraft:jukebox_playable` — đĩa nhạc custom. Ví dụ: `"haohan:my_song"`. |
-| `equippable_asset_id` | `String` NamespacedKey | Gắn `minecraft:equippable` với custom armor model. Slot tự xác định theo Material suffix. Ví dụ: `"haohan:spacesuit"`. |
-| `custom_block_data` | `String` blockstate | Gắn `minecraft:block_state` cho client dự đoán block state khi đặt (Custom Block system). |
+| `max_damage` | `int` | Thiết lập độ bền tối đa của item (chỉ áp dụng cho `Damageable`). |
+| `jukebox_playable` | `String` (Key) | Đăng ký đĩa nhạc jukebox custom (VD: `"haohan:space_theme"`). |
+| `equippable_asset_id` | `String` (Key) | Đăng ký model giáp hiển thị 3D trên nhân vật (VD: `"haohan:spacesuit"`). |
+| `custom_block_data` | `String` (BlockState) | Gắn `minecraft:block_state` cho client xử lý Custom Block (VD: `minecraft:note_block[note=1,instrument=harp]`). |
+| `custom_block_drop` | `String` (ID) | ID custom item sẽ rơi ra khi phá custom block này. |
 
 ---
 
-### 2.2 Đăng ký Item (`ItemRegistry`)
+### 2.3 Các Thành Phần Lập Trình (`ItemComponent`)
 
-`ItemRegistry` là "Source of Truth" duy nhất chứa thông tin tất cả Custom Items trên server.
-
-| Kiểu trả về | Tên phương thức | Mô tả |
-| :--- | :--- | :--- |
-| `void` | `register(ItemDefinition)` | Đăng ký item mới. Lỗi nếu ID trùng hoặc không hợp lệ. |
-| `ItemDefinition` | `get(String id)` | Tìm theo ID, `null` nếu không thấy. |
-| `ItemDefinition` | `require(String id)` | Tìm theo ID, ném `IllegalArgumentException` nếu không thấy. |
-| `boolean` | `exists(String id)` | Kiểm tra ID đã đăng ký chưa. |
-| `void` | `unregister(String id)` | Hủy đăng ký item. |
-| `Collection<ItemDefinition>` | `all()` | Toàn bộ Custom Items. |
-| `List<ItemDefinition>` | `getByNamespace(String ns)` | Items thuộc namespace cụ thể. |
-| `List<ItemDefinition>` | `search(String keyword)` | Tìm theo từ khóa trong ID hoặc Display Name. |
-| `int` | `size()` | Tổng số items đang đăng ký. |
-| `void` | `clear()` | Xóa toàn bộ đăng ký. |
-
----
-
-### 2.3 Tạo và Quản lý ItemStack (`ItemService` & `ItemFactory`)
-
-> [!TIP]
-> Ưu tiên dùng `ItemService` từ plugin ngoài — nó là Facade đơn giản và đầy đủ nhất.
-
-#### Phương thức của `ItemService`
-
-| Kiểu trả về | Phương thức | Mô tả |
-| :--- | :--- | :--- |
-| `ItemStack` | `create(String id)` | Tạo ItemStack số lượng 1. |
-| `ItemStack` | `create(String id, int amount)` | Tạo ItemStack số lượng chỉ định. |
-| `boolean` | `isItem(ItemStack, String id)` | Kiểm tra có phải custom item với ID cụ thể. |
-| `boolean` | `isCustomItem(ItemStack)` | Kiểm tra có phải custom item bất kỳ. |
-| `String` | `getId(ItemStack)` | Lấy Custom Item ID, `null` nếu là vanilla. |
-| `ItemDefinition` | `getDefinition(String id)` | Lấy `ItemDefinition` theo ID. |
-| `boolean` | `exists(String id)` | Kiểm tra item tồn tại trong registry. |
-| `Map<String, Object>` | `getProperties(ItemStack)` | Lấy properties từ definition của item. |
-| `ItemStack` | `validateAndUpdate(ItemStack)` | Đồng bộ/upgrade các component của custom item theo definition hiện tại. Bỏ qua item vanilla. |
-
-**`validateAndUpdate()` đồng bộ:**
-- Item Model (NamespacedKey theo ID)
-- Max Stack Size (Mặc định là 1 nếu không cấu hình)
-- Unique UUID tag (Nếu Max Stack Size là 1, tự động gán random UUID tag `uuid` vào PDC để ngăn chặn việc Minecraft/Spigot tự động stack các custom items độc lập. Nếu Max Stack Size > 1, tự động xóa tag `uuid` để cho phép stack)
-- Max Damage (nếu có property `max_damage`)
-- Jukebox Playable (nếu có property `jukebox_playable`)
-- Equippable Component (nếu có property `equippable_asset_id` và chưa được gắn hoặc asset_id bị sai lệch so với config)
-
----
-
-### 2.4 Hành vi Custom (`ItemBehavior` & `ItemContext`)
-
-#### Record `ItemContext`
-
-| Field | Kiểu | Mô tả |
-| :--- | :--- | :--- |
-| `player()` | `Player` | Người chơi thực hiện hành động. |
-| `item()` | `ItemStack` | Vật phẩm được tương tác. |
-| `definition()` | `ItemDefinition` | Định nghĩa của custom item đó. |
-| `event()` | `Event` | Sự kiện Bukkit gốc. |
-
-#### Interface `ItemBehavior` — các method
+Interface `ItemComponent` cho phép mở rộng các tính năng động được áp dụng trực tiếp lên `ItemStack` khi khởi tạo hoặc kiểm tra.
 
 ```java
-public interface ItemBehavior {
-    default void onUse(ItemContext context) {}         // Right-click AIR/BLOCK
-    default void onInteract(ItemContext context) {}    // Left-click
-    default void onBreak(ItemContext context) {}       // Phá block
-    default void onCraft(ItemContext context) {}       // Craft thành công
-    default void onInventoryClick(ItemContext context) {} // Click trong inventory
-    default void onDrop(ItemContext context) {}        // Drop item
-    default void onPickup(ItemContext context) {}      // Nhặt item
+public interface ItemComponent {
+    default void apply(ItemStack item, ItemDefinition definition) {}
+    default void appendLore(List<String> lore) {}
+}
+```
+
+#### `AbilityComponent`
+Gắn tên kỹ năng đặc biệt vào lore của vật phẩm.
+* **Constructor:** `AbilityComponent(String abilityId, String displayName)`
+* **Code Mẫu:**
+  ```java
+  var ability = new AbilityComponent("laser_beam", "§c§lBắn Tia Laser");
+  ```
+
+#### `AttributeComponent`
+Thêm thuộc tính chỉ số Paper/Minecraft trực tiếp lên item (sát thương, tốc độ đánh, giáp,...).
+* **Constructor:**
+  - `AttributeComponent(Attribute attribute, double amount)` *(mặc định: ADD_NUMBER, MAINHAND)*
+  - `AttributeComponent(Attribute attribute, double amount, AttributeModifier.Operation operation, EquipmentSlotGroup slotGroup)`
+* **Code Mẫu:**
+  ```java
+  import org.bukkit.attribute.Attribute;
+  import org.bukkit.attribute.AttributeModifier;
+  import org.bukkit.inventory.EquipmentSlotGroup;
+
+  // Cộng 8.5 Sát thương cho tay chính
+  var dmg = new AttributeComponent(Attribute.GENERIC_ATTACK_DAMAGE, 8.5);
+
+  // Tăng 10% Tốc độ di chuyển khi mặc giáp
+  var speed = new AttributeComponent(
+      Attribute.GENERIC_MOVEMENT_SPEED, 
+      0.10, 
+      AttributeModifier.Operation.ADD_SCALED_ERROR, 
+      EquipmentSlotGroup.ARMOR
+  );
+  ```
+
+#### `DurabilityComponent`
+Khai báo độ bền custom độc lập với độ bền gốc Minecraft. Item sẽ được đặt thành `Unbreakable` và ẩn tag unbreakable vanilla.
+* **Constructor:** `DurabilityComponent(int maxDurability)`
+* **Code Mẫu:**
+  ```java
+  var durability = new DurabilityComponent(2500); // 2500 độ bền custom
+  ```
+
+#### `MiningComponent`
+Định nghĩa thông số cấp độ và tốc độ khai thác cho công cụ.
+* **Constructor:** `MiningComponent(int miningLevel, float speedMultiplier)`
+* **Code Mẫu:**
+  ```java
+  var mining = new MiningComponent(4, 2.0f); // Level 4 (Netherite+), tốc độ x2.0
+  ```
+
+#### `TierComponent`
+Hiển thị cấp độ vập phẩm trên lore.
+* **Constructor:** `TierComponent(int tier, String tierName)`
+* **Code Mẫu:**
+  ```java
+  var tier = new TierComponent(5, "Huyền Thoại");
+  ```
+
+---
+
+### 2.4 Cấu Trúc Lore Nâng Cao (`ItemInfoSection`)
+
+`ItemInfoSection` (Record) giúp nhóm các dòng lore theo tiêu đề một cách chuẩn hóa và thẩm mỹ.
+
+* **Constructor:** `ItemInfoSection(String title, List<String> lines)`
+* **Code Mẫu:**
+  ```java
+  ItemInfoSection statsSection = new ItemInfoSection(
+      "§6§lTHÔNG SỐ VẬT PHẨM",
+      List.of("§7- Tốc độ đánh: §af+15%", "§7- Sức sát thương: §c+50")
+  );
+  ```
+
+---
+
+### 2.5 Dữ Liệu Từng Vật Phẩm (`ItemInstanceData`)
+
+Khác với `ItemDefinition` (là thuộc tính chung định sẵn), `ItemInstanceData` quản lý **trạng thái động riêng biệt của từng vật phẩm cụ thể** lưu giữ trong `PersistentDataContainer` (PDC).
+
+#### Phương Thức trong `ItemInstanceData`
+
+| Phương thức | Tác dụng | Tham số | Giá trị trả về |
+| :--- | :--- | :--- | :--- |
+| `durability(ItemStack item, int defaultValue)` | Đọc độ bền còn lại của vật phẩm | `ItemStack`, `int default` | `int` |
+| `setDurability(ItemStack item, int value)` | Ghi độ bền mới cho vật phẩm | `ItemStack`, `int value` | `void` |
+| `upgradeLevel(ItemStack item)` | Đọc cấp độ cường hóa/nâng cấp | `ItemStack` | `int` |
+| `setUpgradeLevel(ItemStack item, int level)` | Ghi cấp độ cường hóa/nâng cấp mới | `ItemStack`, `int level` | `void` |
+
+#### Code Mẫu Thao Tác Trạng Thái Động
+
+```java
+ItemInstanceData instanceData = HaoHanItemCore.get().getItemService().getInstanceData();
+
+// Trừ 1 độ bền custom khi dùng
+int currentDurability = instanceData.durability(itemStack, 1000);
+instanceData.setDurability(itemStack, currentDurability - 1);
+
+// Nâng cấp level item
+int currentLevel = instanceData.upgradeLevel(itemStack);
+instanceData.setUpgradeLevel(itemStack, currentLevel + 1);
+```
+
+---
+
+## 3. Registry & Services Quản Lý Item
+
+### 3.1 `ItemRegistry`
+
+Nơi lưu trữ và tra cứu toàn bộ `ItemDefinition`.
+
+```java
+public interface ItemRegistry {
+    void register(ItemDefinition definition);
+    ItemDefinition get(String id);
+    ItemDefinition require(String id);
+    boolean exists(String id);
+    void unregister(String id);
+    Collection<ItemDefinition> all();
+    List<ItemDefinition> getByNamespace(String namespace);
+    List<ItemDefinition> search(String keyword);
+    int size();
+    void clear();
+}
+```
+
+* **`register(ItemDefinition def)`**: Đăng ký item. Trống ném `IllegalArgumentException` nếu ID đã tồn tại.
+* **`require(String id)`**: Giống `get(id)` nhưng ném exception nếu không tìm thấy item.
+* **`getByNamespace(String ns)`**: Lấy danh sách tất cả item của một plugin/hệ thống (VD: `"lunar"`).
+
+---
+
+### 3.2 `ItemFactory`
+
+Chịu trách nhiệm khởi tạo `ItemStack` chuẩn từ `ItemDefinition` hoặc `id`.
+
+```java
+public interface ItemFactory {
+    ItemStack create(String id);
+    ItemStack create(String id, int amount);
+    ItemStack create(ItemDefinition definition);
+    ItemStack create(ItemDefinition definition, int amount);
 }
 ```
 
 ---
 
-## 3. Hệ Thống Custom Recipes
+### 3.3 `ItemService` (Facade Chính)
 
-### 3.1 Cấu trúc Recipe (`RecipeDefinition`, `ShapedRecipeDefinition` & `RecipeType`)
+Đây là interface **quan trọng nhất và tiện lợi nhất** cho các plugin khác tích hợp.
 
-#### Enum `RecipeType`
-`SHAPED` · `SHAPELESS` · `SMELTING` · `BLASTING` · `SMOKING` · `CAMPFIRE` · `STONECUTTING` · `SMITHING` · `MACHINE`
-
-> `MACHINE` không đăng ký với Bukkit — plugin con tự xử lý.
-
-#### Class `RecipeDefinition`
-
-| Phương thức | Mô tả |
-| :--- | :--- |
-| `String getId()` | ID công thức. |
-| `RecipeType getType()` | Loại công thức. |
-| `List<Ingredient> getIngredients()` | Danh sách nguyên liệu. |
-| `ItemResult getResult()` | Kết quả đầu ra. |
-| `float getExperience()` | Exp nhận được (khi nung). |
-| `int getCookingTime()` | Thời gian nấu, ticks (khi nung). |
-
-#### Class `ShapedRecipeDefinition`
+#### Danh Sách Phương Thức trong `ItemService`
 
 ```java
-new ShapedRecipeDefinition(
-    "magic:mana_crystal",
-    List.of(" S ", "SBS", " S "),
-    Map.of(
-        'S', new Ingredient.ItemIngredient("magic:mana_shard"),
-        'B', new Ingredient.ItemIngredient("minecraft:blaze_rod")
+public interface ItemService {
+    ItemStack create(String id);
+    ItemStack create(String id, int amount);
+    boolean isItem(ItemStack item, String id);
+    boolean isCustomItem(ItemStack item);
+    String getId(ItemStack item);
+    ItemDefinition getDefinition(String id);
+    boolean exists(String id);
+    Map<String, Object> getProperties(ItemStack item);
+    ItemInstanceData getInstanceData();
+    ItemStack validateAndUpdate(ItemStack item);
+}
+```
+
+#### Chi Tiết Phương Thức Quan Trọng:
+
+* **`create(String id, int amount)`**:
+  - Tạo `ItemStack` hoàn chỉnh với full DisplayName, Lore, Components, và PDC Tag `haohanitemcore:item_id`.
+  - Tự động gán **Random UUID PDC Tag** nếu vật phẩm không thể xếp chồng (`maxStackSize == 1`) để ngăn Minecraft tự gộp item.
+
+* **`isItem(ItemStack item, String id)`**:
+  - **Tác dụng:** Kiểm tra chính xác vật phẩm trên tay player có đúng là Custom Item với ID chỉ định hay không.
+  - **Code Mẫu:**
+    ```java
+    if (itemService.isItem(handItem, "lunar:anorthosite_pickaxe")) {
+        // Thực hiện logic riêng
+    }
+    ```
+
+* **`validateAndUpdate(ItemStack item)`**:
+  - **Tác dụng:** Đồng bộ vật phẩm trong tay/hòm đồ của player với config mới nhất trên server mà **không làm mất dữ liệu độ bền hay cường hóa custom**.
+  - **Tự động đồng bộ:** CustomModelData, ItemModel, Built-in Equippable, Jukebox, MaxDamage, UUID tracking.
+
+---
+
+## 4. Hệ Thống Hành Vi Custom (`ItemBehavior` & `ItemContext`)
+
+Cho phép gán xử lý logic trực tiếp vào từng `ItemDefinition`.
+
+### Record `ItemContext`
+Chứa đầy đủ ngữ cảnh khi một sự kiện xảy ra:
+- `player()`: Người chơi tương tác.
+- `item()`: `ItemStack` được sử dụng.
+- `definition()`: `ItemDefinition` tương ứng.
+- `event()`: Sự kiện Bukkit gốc (`PlayerInteractEvent`, `BlockBreakEvent`, v.v.).
+
+### Interface `ItemBehavior`
+
+```java
+public interface ItemBehavior {
+    default void onUse(ItemContext context) {}             // Chuột phải (AIR / BLOCK)
+    default void onInteract(ItemContext context) {}        // Chuột trái
+    default void onBreak(ItemContext context) {}           // Phá khối thành công
+    default void onCraft(ItemContext context) {}           // Chế tạo thành công
+    default void onInventoryClick(ItemContext context) {}   // Click trong GUI/Hòm đồ
+    default void onDrop(ItemContext context) {}            // Vứt item ra đất
+    default void onPickup(ItemContext context) {}          // Nhặt item từ đất
+}
+```
+
+### Code Mẫu Tạo Class Behavior Custom
+
+```java
+import vn.haohan.itemcore.api.item.ItemBehavior;
+import vn.haohan.itemcore.api.item.ItemContext;
+
+public class OxygenTankBehavior implements ItemBehavior {
+    @Override
+    public void onUse(ItemContext context) {
+        var player = context.player();
+        player.setRemainingAir(player.getMaximumAir());
+        player.sendMessage("§a[HaoHanCore] Đã nạp đầy oxy!");
+    }
+}
+```
+
+---
+
+## 5. Hệ Thống Recipe (Công Thức Chế Tạo)
+
+### 5.1 `RecipeType`, `Ingredient`, `ItemResult`
+
+#### Enum `RecipeType`
+`SHAPED` (Có hình dạng) · `SHAPELESS` (Không hình dạng) · `SMELTING` (Nung thường) · `BLASTING` (Nung cao tần) · `SMOKING` (Hun khói) · `CAMPFIRE` (Lửa trại) · `STONECUTTING` (Cắt đá) · `SMITHING` (Bàn rèn) · `MACHINE` (Máy móc custom).
+
+#### Sealed Interface `Ingredient`
+Nguyên liệu chế tạo hỗ trợ 3 dạng:
+1. `Ingredient.ItemIngredient(String id, int amount)`: Dùng Custom Item ID hoặc `minecraft:xxx`.
+2. `Ingredient.MaterialIngredient(Material material, int amount)`: Dùng Material Bukkit trực tiếp.
+3. `Ingredient.TagIngredient(String tag, int amount)`: Dùng Tag Minecraft (VD: `"minecraft:logs"`).
+
+#### Record `ItemResult`
+Vật phẩm đầu ra: `ItemResult(String item, int amount)` (Tham số `item` có thể là Custom ID hoặc `minecraft:xxx`).
+
+---
+
+### 5.2 `RecipeDefinition` & `ShapedRecipeDefinition`
+
+#### Định Nghĩa Công Thức Thường (Shapeless / Smelting / Smithing...)
+
+```java
+import vn.haohan.itemcore.api.recipe.*;
+
+// Công thức nung quặng custom
+RecipeDefinition smeltingRecipe = new RecipeDefinition(
+    "lunar:smelt_anorthosite",                 // ID công thức
+    RecipeType.SMELTING,                      // Loại công thức
+    List.of(new Ingredient.ItemIngredient("lunar:raw_anorthosite", 1)), // Nguyên liệu
+    new ItemResult("lunar:anorthosite_ingot", 1), // Đầu ra
+    0.7f,                                     // Điểm kinh nghiệm
+    200                                       // Thời gian nung (ticks)
+);
+```
+
+#### Định Nghĩa Công Thức Có Hình Dạng (`ShapedRecipeDefinition`)
+
+```java
+Map<Character, Ingredient> ingredients = Map.of(
+    'A', new Ingredient.ItemIngredient("lunar:anorthosite_ingot", 1),
+    'S', new Ingredient.MaterialIngredient(Material.STICK, 1)
+);
+
+ShapedRecipeDefinition shapedRecipe = new ShapedRecipeDefinition(
+    "lunar:anorthosite_pickaxe_recipe",
+    List.of(
+        "AAA",
+        " S ",
+        " S "
     ),
-    new ItemResult("magic:mana_crystal", 1)
+    ingredients,
+    new ItemResult("lunar:anorthosite_pickaxe", 1)
 );
 ```
 
 ---
 
-### 3.2 Nguyên Liệu (`Ingredient`) & Kết Quả (`ItemResult`)
+### 5.3 `RecipeRegistry`
 
-#### Sealed Interface `Ingredient`
-
-1. `Ingredient.ItemIngredient(String id, int amount)` — Custom item hoặc `minecraft:item`.
-   - `boolean isVanilla()`: ID bắt đầu bằng `minecraft:`.
-2. `Ingredient.MaterialIngredient(Material material, int amount)` — Bukkit Material trực tiếp.
-3. `Ingredient.TagIngredient(String tag, int amount)` — Nhóm tag (ví dụ: `#minecraft:planks`).
-
-#### Record `ItemResult`
-
-| Field | Mô tả |
-| :--- | :--- |
-| `String item()` | ID item đầu ra. |
-| `int amount()` | Số lượng tạo ra. |
-
----
-
-### 3.3 Tra Cứu và Đăng Ký Recipes (`RecipeRegistry` & `RecipeService`)
-
-#### `RecipeRegistry`
-
-| Phương thức | Mô tả |
-| :--- | :--- |
-| `void register(RecipeDefinition)` | Đăng ký công thức. |
-| `RecipeDefinition get(String id)` | Tìm theo ID. |
-| `RecipeDefinition require(String id)` | Tìm theo ID, lỗi nếu không thấy. |
-| `boolean exists(String id)` | Kiểm tra đã tồn tại chưa. |
-| `void unregister(String id)` | Hủy đăng ký. |
-| `Collection<RecipeDefinition> all()` | Tất cả công thức. |
-| `int size()` | Số lượng đã đăng ký. |
-| `void clear()` | Xóa toàn bộ. |
-
-#### `RecipeService`
-
-| Phương thức | Mô tả |
-| :--- | :--- |
-| `List<RecipeDefinition> findByResult(String itemId)` | Công thức tạo ra item này. |
-| `List<RecipeDefinition> findByIngredient(String itemId)` | Công thức sử dụng item này. |
-| `List<RecipeDefinition> findByType(RecipeType type)` | Lọc theo loại. |
-| `List<RecipeDefinition> search(String keyword)` | Tìm theo từ khóa. |
-
----
-
-## 4. Hệ thống Tự Động Sanitization
-
-`ItemEventRouter` (internal) tự động gọi `ItemService.validateAndUpdate()` trên các sự kiện:
-
-| Event | Trigger | Priority |
-| :--- | :--- | :--- |
-| `PlayerJoinEvent` | Toàn bộ inventory + armor slots | LOWEST |
-| `InventoryOpenEvent` | Toàn bộ inventory được mở | LOWEST |
-| `InventoryClickEvent` | `currentItem` và `cursorItem` | NORMAL |
-| `EntityPickupItemEvent` | ItemStack vừa nhặt | LOWEST |
-| `PrepareItemCraftEvent` | Item kết quả craft | LOWEST |
-
-Engine bỏ qua item vanilla (không có PersistentData `haohanitemcore:item_id`).
-
----
-
-## 5. Hệ thống Custom Block (NoteBlock)
-
-### 5.1 Cơ chế
-
-Engine dùng NoteBlock block state để lưu custom block texture. Khi item có property `custom_block_data`:
-
-1. **`DefaultItemFactory.create()`**: Gắn NMS `BlockItemStateProperties` component vào ItemStack bằng Reflection → client dùng để dự đoán block state khi đặt (không flicker).
-2. **`ItemEventRouter.onBlockPlace()` (HIGH)**: Cưỡng bức block state đúng + `sendBlockChange()`.
-3. **`ItemEventRouter.onNoteBlockInteract()`**: Schedule 0-tick restore nếu note bị gảy.
-4. **`ItemEventRouter.onNoteBlockPhysics()`**: Schedule 0-tick restore nếu physics thay đổi state.
-
-### 5.2 Đăng ký Custom Block
+Đăng ký và quản lý tất cả các công thức chế tạo trong hệ thống.
 
 ```java
-ItemDefinition.builder("haohan:my_ore")
-    .material(Material.NOTE_BLOCK)
-    .property("custom_block_data", "minecraft:note_block[note=24,instrument=pling,powered=true]")
-    .build();
+public interface RecipeRegistry {
+    void register(RecipeDefinition recipe);
+    RecipeDefinition get(String id);
+    RecipeDefinition require(String id);
+    boolean exists(String id);
+    void unregister(String id);
+    Collection<RecipeDefinition> all();
+    int size();
+    void clear();
+}
 ```
 
 ---
 
-## 6. Hệ thống Custom Armor Model (Equippable)
+### 5.4 `RecipeService`
 
-### 6.1 Cơ chế (Minecraft 1.21+)
-
-Mô hình giáp khi mặc dùng component `minecraft:equippable` thay vì Custom Model Data.
-
-`DefaultItemFactory.applyComponents()` xử lý property `equippable_asset_id`:
-- Xác định `EquipmentSlot` từ Material name suffix.
-- Tạo `io.papermc.paper.datacomponent.item.Equippable` với `.assetId(Key.key(assetId))`.
-- Gọi `itemStack.setData(DataComponentTypes.EQUIPPABLE, equippable)`.
-
-### 6.2 `DefaultItemFactory.applyComponents()` (static, public)
-
-Phương thức này có thể được gọi từ plugin con để đồng bộ components vào `ItemStack` hiện có:
+Service hỗ trợ tra cứu công thức chế tạo cho GUI hoặc hệ thống máy móc.
 
 ```java
-boolean modified = DefaultItemFactory.applyComponents(itemStack, definition, plugin);
-```
-
-**Xử lý (theo thứ tự):**
-1. Item Model (NamespacedKey)
-2. Max Stack Size (Mặc định là 1 nếu không cấu hình)
-3. Max Damage (`max_damage` property)
-4. Jukebox Playable (`jukebox_playable` property)
-5. Unique UUID tag (`uuid` property trong PersistentDataContainer để tránh tự động stack khi Max Stack Size là 1)
-6. Equippable Component (`equippable_asset_id` property - tự động so sánh và cập nhật lại nếu bị sai lệch so với config)
-
-### 6.3 `DefaultItemFactory.getEquipmentSlotFromMaterial()` (static, public)
-
-Tiện ích xác định `EquipmentSlot` từ `Material`:
-
-```java
-EquipmentSlot slot = DefaultItemFactory.getEquipmentSlotFromMaterial(Material.NETHERITE_HELMET);
-// → EquipmentSlot.HEAD
+public interface RecipeService {
+    List<RecipeDefinition> findByResult(String itemId);      // Tìm các công thức chế tạo ra item này
+    List<RecipeDefinition> findByIngredient(String itemId);  // Tìm các công thức sử dụng item này làm nguyên liệu
+    List<RecipeDefinition> findByType(RecipeType type);       // Tìm công thức theo loại
+    Collection<RecipeDefinition> all();
+    List<RecipeDefinition> search(String keyword);            // Tìm kiếm theo từ khóa
+}
 ```
 
 ---
 
-## 7. Ví Dụ Tích Hợp Thực Tế (HaoHanLunar)
+## 6. Ví Dụ Tích Hợp Đầy Đủ (Full Integration Examples)
 
-### Bước 1: Đăng ký Custom Items
+### Ví Dụ 1: Đăng Ký Item & Công Thức Chế Tạo Từ Plugin Khác
 
 ```java
-public class LunarItems {
+package vn.haohan.myplugin;
 
-    public static void register() {
-        var registry = HaoHanItemCore.get().getItemRegistry();
-        var oxygenBehavior = new OxygenTankBehavior();
+import org.bukkit.Material;
+import org.bukkit.plugin.java.JavaPlugin;
+import vn.haohan.itemcore.api.HaoHanItemCore;
+import vn.haohan.itemcore.api.item.*;
+import vn.haohan.itemcore.api.recipe.*;
 
-        // Armor với model 3D custom
-        registry.register(ItemDefinition.builder("haohan:spacesuit_helmet")
-            .material(Material.NETHERITE_HELMET)
-            .displayName("Spacesuit Helmet")
-            .customModelData(1001)
-            .type(ItemType.ARMOR)
-            .property("equippable_asset_id", "haohan:spacesuit")
-            .build());
+import java.util.List;
+import java.util.Map;
 
-        // Bình oxy với độ bền custom
-        registry.register(ItemDefinition.builder("haohan:oxygen_tank_small")
-            .material(Material.CARROT_ON_A_STICK)
-            .displayName("§bBình Oxy Nhỏ")
-            .maxStackSize(1)
-            .type(ItemType.SPECIAL)
-            .behavior(oxygenBehavior)
-            .properties(Map.of(
-                "oxygen_tank", true,
-                "oxygen_tank_capacity", 1500,
-                "max_damage", 1500
-            ))
-            .build());
+public class MyPlugin extends JavaPlugin {
 
-        // Custom block qua NoteBlock
-        registry.register(ItemDefinition.builder("haohan:anorthosite_ore")
-            .material(Material.NOTE_BLOCK)
-            .displayName("§7Anorthosite Ore")
-            .type(ItemType.SPECIAL)
-            .property("custom_block_data",
-                "minecraft:note_block[note=24,instrument=pling,powered=true]")
-            .build());
+    @Override
+    public void onEnable() {
+        var itemRegistry = HaoHanItemCore.get().getItemRegistry();
+        var recipeRegistry = HaoHanItemCore.get().getRecipeRegistry();
+
+        // 1. Tạo và đăng ký Custom Item
+        ItemDefinition spaceHelmet = ItemDefinition.builder("haohan:space_helmet")
+                .material(Material.NETHERITE_HELMET)
+                .displayName("§bMũ Phi Hành Gia")
+                .maxStackSize(1)
+                .type(ItemType.ARMOR)
+                .addLore("§7Bảo vệ người chơi khỏi môi trường chân không.")
+                .property("equippable_asset_id", "haohan:spacesuit")
+                .component(new TierComponent(4, "Vũ Trụ"))
+                .build();
+
+        itemRegistry.register(spaceHelmet);
+
+        // 2. Tạo và đăng ký Công Thức Chế Tạo
+        ShapedRecipeDefinition recipe = new ShapedRecipeDefinition(
+                "haohan:space_helmet_recipe",
+                List.of(
+                        "GGG",
+                        "G G",
+                        "   "
+                ),
+                Map.of('G', new Ingredient.MaterialIngredient(Material.GLASS, 1)),
+                new ItemResult("haohan:space_helmet", 1)
+        );
+
+        recipeRegistry.register(recipe);
+        
+        getLogger().info("Đã đăng ký Mũ Phi Hành Gia thành công!");
     }
 }
 ```
 
-### Bước 2: Kiểm tra Item trong Event Listener
+### Ví Dụ 2: Xử Lý Sự Kiện Lắng Nghe & Cập Nhật Vật Phẩm Trong Game
 
 ```java
-public class OxygenListener implements Listener {
+package vn.haohan.myplugin;
+
+import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.inventory.ItemStack;
+import vn.haohan.itemcore.api.HaoHanItemCore;
+
+public class ItemInteractListener implements Listener {
 
     @EventHandler
-    public void onAirChange(EntityAirChangeEvent event) {
-        if (!(event.getEntity() instanceof Player player)) return;
-        if (!player.getWorld().getName().contains("lunar")) return;
+    public void onInteract(PlayerInteractEvent event) {
+        Player player = event.getPlayer();
+        ItemStack item = event.getItem();
 
-        ItemService items = HaoHanItemCore.get().getItemService();
-        ItemStack offhand = player.getInventory().getItemInOffHand();
+        if (item == null) return;
 
-        // Kiểm tra đang cầm bình oxy
-        if (items.isItem(offhand, "haohan:oxygen_tank_small")) {
-            // Lấy dung tích từ properties
-            Map<String, Object> props = items.getProperties(offhand);
-            int capacity = (int) props.getOrDefault("oxygen_tank_capacity", 0);
-            // ... logic
+        var itemService = HaoHanItemCore.get().getItemService();
+
+        // Kiểm tra xem vật phẩm có phải là "haohan:space_helmet" không
+        if (itemService.isItem(item, "haohan:space_helmet")) {
+            // Tự động kiểm tra và nâng cấp component nếu config vừa được reload
+            ItemStack updatedItem = itemService.validateAndUpdate(item);
+            
+            player.sendMessage("§aBạn đang cầm Mũ Phi Hành Gia chuẩn!");
         }
     }
 }
-```
-
-### Bước 3: Upgrade item hiện có thủ công
-
-```java
-// Ví dụ: khi player equip armor
-@EventHandler
-public void onArmorEquip(PlayerArmorChangeEvent event) {
-    ItemStack newArmor = event.getNewItem();
-    if (newArmor != null) {
-        HaoHanItemCore.get().getItemService().validateAndUpdate(newArmor);
-    }
-}
-```
-
----
-
-## 8. Chi tiết các Hàm Xử lý Phân tách (Refactored Sub-methods)
-
-Để đảm bảo tính modular, dễ bảo trì và hạn chế tối đa việc lồng hàm (nested functions), hệ thống đã phân rã các phương thức cồng kềnh thành các phương thức con chịu trách nhiệm đơn nhất:
-
-### 8.1 Hệ thống sự kiện (`ItemEventRouter`)
-* `findSmithingRecipe(ItemStack template, ItemStack base, ItemStack addition)`: Tìm kiếm và so khớp công thức rèn (Smithing) từ ba ô nguyên liệu gốc.
-* `findMatchingCustomBlockData(NoteBlock noteBlock)`: Tìm kiếm cấu hình khối tùy chỉnh (`custom_block_data`) khớp với note và instrument của NoteBlock hiện tại.
-* `applyCustomBlockData(Block block, ItemDefinition definition, Player player)`: Thực hiện áp dụng BlockData tùy chỉnh của định nghĩa vật phẩm lên khối vừa đặt.
-* `applyBlockStateMeta(Block block, ItemMeta meta, Player player, String itemId)`: Áp dụng BlockStateMeta đi kèm từ item stack (cơ chế dự phòng).
-* `dropCustomBlockItem(Block block, String itemId, PersistentDataContainer blockPDC)`: Tạo và rơi vật phẩm tùy chỉnh khi khối tùy chỉnh bị phá hủy, đồng thời bảo toàn dữ liệu PDC của khối sang PDC của item rớt ra.
-* `processExplodedBlock(Block block)`: Xử lý gỡ bỏ metadata khối bị nổ, đổi kiểu khối về AIR và tạo rơi vật phẩm tùy chỉnh tương ứng.
-
-### 8.2 Bộ tải cấu hình (`ItemConfigLoader` & `RecipeConfigLoader`)
-* `loadNamespace(String namespace, ConfigurationSection namespaceSection, String fileName, ItemRegistry registry)`: Đọc và đăng ký toàn bộ vật phẩm thuộc một namespace nhất định.
-* `loadSingleRecipe(ConfigurationSection config, List<RecipeDefinition> recipes)`: Xử lý tải công thức đơn lẻ (khi file YAML định nghĩa duy nhất một công thức ở lớp ngoài cùng).
-* `loadMultipleRecipes(YamlConfiguration config, String fileName, List<RecipeDefinition> recipes)`: Lặp và tải danh sách nhiều công thức nằm trong cùng một file YAML cấu hình.
-* `parseCookingRecipe(String id, RecipeType type, ConfigurationSection config, ItemResult result)`: Trích xuất và cấu tạo công thức nấu (Smelting, Blasting, Smoking, Campfire, Stonecutting).
-* `parseSmithingRecipe(String id, ConfigurationSection config, ItemResult result)`: Trích xuất nguyên liệu template, base, addition và cấu tạo công thức Smithing nâng cấp vật phẩm.
-* `parseShapelessOrMachineRecipe(String id, RecipeType type, ConfigurationSection config, ItemResult result)`: Trích xuất danh sách nguyên liệu không định hình và cấu tạo công thức Shapeless hoặc Machine.
-
-### 8.3 Thành phần Giao diện (`ItemBrowserGUI` & `RecipeViewerGUI`)
-* `populateItems(Inventory gui, BrowserSession session)`: Điền danh sách vật phẩm tương ứng với trang hiện tại vào ô giao diện hiển thị.
-* `populateNavigation(Inventory gui, BrowserSession/ViewerSession session)`: Tạo và bố trí các nút điều hướng (Trang trước, Trang sau, Thông tin trang, Đóng/Quay lại) vào thanh công cụ bên dưới.
-* `handleNavigationClick(int slot, Player player, BrowserSession/ViewerSession session)`: Nhận diện và xử lý sự kiện click chuột vào nút điều hướng.
-* `handleItemClick / handleIngredientClick`: Thực hiện logic khi người chơi click chọn vật phẩm/nguyên liệu (chuyển trang xem công thức chi tiết).
-
----
-
-## 9. Tóm tắt Class Diagram
-
-```mermaid
-classDiagram
-    class HaoHanItemCore {
-        +get() HaoHanItemCore
-        +getItemRegistry() ItemRegistry
-        +getItemFactory() ItemFactory
-        +getItemService() ItemService
-        +getRecipeRegistry() RecipeRegistry
-        +getRecipeService() RecipeService
-    }
-    class ItemDefinition {
-        +getId() String
-        +getMaterial() Material
-        +getDisplayName() String
-        +getLore() List~String~
-        +getMaxStackSize() int
-        +getCustomModelData() Integer
-        +getItemModel() String
-        +getProperties() Map
-        +getBehavior() ItemBehavior
-        +builder(String id) Builder
-    }
-    class ItemRegistry {
-        +register(ItemDefinition)
-        +get(String) ItemDefinition
-        +exists(String) boolean
-        +all() Collection
-        +search(String) List
-    }
-    class ItemService {
-        +create(String) ItemStack
-        +isItem(ItemStack, String) boolean
-        +isCustomItem(ItemStack) boolean
-        +getId(ItemStack) String
-        +getProperties(ItemStack) Map
-        +validateAndUpdate(ItemStack)
-    }
-    class DefaultItemFactory {
-        +create(ItemDefinition) ItemStack
-        +applyComponents(ItemMeta, ItemDefinition, ItemStack, Plugin) boolean$
-        +getEquipmentSlotFromMaterial(Material) EquipmentSlot$
-    }
-    class ItemBehavior {
-        <<interface>>
-        +onUse(ItemContext)
-        +onInteract(ItemContext)
-        +onBreak(ItemContext)
-        +onCraft(ItemContext)
-        +onInventoryClick(ItemContext)
-        +onDrop(ItemContext)
-        +onPickup(ItemContext)
-    }
-    HaoHanItemCore --> ItemRegistry
-    HaoHanItemCore --> ItemService
-    HaoHanItemCore --> DefaultItemFactory
-    ItemRegistry --> ItemDefinition
-    ItemDefinition --> ItemBehavior
-    ItemService ..> DefaultItemFactory : uses
 ```
