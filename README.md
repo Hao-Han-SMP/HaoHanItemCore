@@ -9,7 +9,7 @@ Plugin engine quản lý tập trung Custom Item và Recipe cho Minecraft Paper 
 [![Java](https://img.shields.io/badge/Java-21-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)](https://openjdk.org/)
 [![Gradle](https://img.shields.io/badge/Gradle-Build-02303A?style=for-the-badge&logo=gradle&logoColor=white)](https://gradle.org/)
 
-Ngôn ngữ: Tiếng Việt | [Wiki Hướng Dẫn Chi Tiết](WIKI.md)
+Ngôn ngữ: Tiếng Việt | [Wiki Hướng Dẫn Chi Tiết](https://github.com/Hao-Han-SMP/HaoHanItemCore/wiki)
 
 </div>
 
@@ -40,7 +40,7 @@ Ngôn ngữ: Tiếng Việt | [Wiki Hướng Dẫn Chi Tiết](WIKI.md)
 | Thành phần | Mô tả |
 | --- | --- |
 | `HaoHanItemCore` | Plugin server, xử lý Item Registry, Factory, Recipe Registry, Event Routing, GUI và Command. |
-| `WIKI.md` | Bộ tài liệu hướng dẫn chi tiết từ A-Z về cấu hình YAML, hệ thống Event/Behavior, API và FAQ. |
+| [WIKI](https://github.com/Hao-Han-SMP/HaoHanItemCore/wiki) | Hướng dẫn chi tiết từ A-Z về cấu hình YAML, hệ thống Event/Behavior, API và FAQ. |
 
 ## Yêu cầu
 
@@ -144,10 +144,27 @@ result:
 
 ## Tích hợp API (Cho Developer)
 
-Thêm `HaoHanItemCore` vào dependency của plugin:
+Thêm `HaoHanItemCore` vào dependency của plugin của bạn:
 
+### 1. Cấu hình Dependency
+
+#### Maven (`pom.xml`)
+```xml
+<dependency>
+    <groupId>vn.haohan</groupId>
+    <artifactId>HaoHanItemCore</artifactId>
+    <version>1.0.0</version>
+    <scope>provided</scope>
+</dependency>
+```
+
+#### Gradle (`build.gradle`)
+```groovy
+compileOnly 'vn.haohan:HaoHanItemCore:1.0.0'
+```
+
+#### Plugin Configuration (`paper-plugin.yml`)
 ```yaml
-# paper-plugin.yml
 dependencies:
   server:
     HaoHanItemCore:
@@ -155,7 +172,7 @@ dependencies:
       required: true
 ```
 
-### Lấy API Instance & Sử dụng:
+### 2. Lấy API Instance & Sử dụng
 
 ```java
 import vn.haohan.itemcore.api.HaoHanItemCore;
@@ -177,4 +194,5 @@ ItemDefinition customItem = ItemDefinition.builder("magic:wand")
 HaoHanItemCore.get().getItemRegistry().register(customItem);
 ```
 
-Chi tiết đầy đủ về API và hướng dẫn phát triển plugin phụ thuộc có tại **[WIKI.md](WIKI.md)**.
+Chi tiết đầy đủ về các lớp/phương thức của API xem tại **[Tài liệu API](https://github.com/Hao-Han-SMP/HaoHanItemCore/wiki/T%C3%A0i-li%E1%BB%87u-API)**.
+Hướng dẫn tích hợp chi tiết hơn có tại **[WIKI](https://github.com/Hao-Han-SMP/HaoHanItemCore/wiki)**.
