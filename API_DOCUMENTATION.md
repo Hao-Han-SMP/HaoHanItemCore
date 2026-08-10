@@ -118,6 +118,30 @@ ItemDefinition customPickaxe = ItemDefinition.builder("lunar:anorthosite_pickaxe
     .build();
 ```
 
+#### Bảng Thuộc Tính Đăng Ký (Builder Methods) của `ItemDefinition`
+
+Dưới đây là chi tiết các thuộc tính bạn có thể đăng ký khi xây dựng `ItemDefinition` thông qua Builder:
+
+| Tên phương thức | Kiểu đối số | Giá trị mặc định | Mô tả |
+| :--- | :--- | :--- | :--- |
+| `ItemDefinition.builder(id)` | `String` | *Bắt buộc* | Tạo Builder mới với ID định danh duy nhất của Custom Item dạng `namespace:key` (VD: `"lunar:anorthosite_pickaxe"`). |
+| `.material(material)` | `Material` | `Material.PAPER` | Chất liệu Minecraft gốc làm nền tảng cho vật phẩm (VD: `Material.DIAMOND_PICKAXE`). |
+| `.displayName(displayName)` | `String` | Trùng với `id` | Tên hiển thị của vật phẩm (hỗ trợ mã màu `§` hoặc `&`). |
+| `.maxStackSize(maxStackSize)` | `int` | `64` | Số lượng xếp chồng tối đa của vật phẩm trong một ô đồ (chỉ cho phép từ `1` đến `99`). |
+| `.lore(lore)` | `List<String>` | *List rỗng* | Thiết lập toàn bộ danh sách các dòng mô tả (lore) của vật phẩm. |
+| `.addLore(line)` | `String` | *Không có* | Thêm một dòng mô tả mới vào lore hiện tại. |
+| `.customModelData(customModelData)` | `Integer` | `null` | Giá trị CustomModelData dùng cho tài nguyên texture tùy chỉnh của Resource Pack. |
+| `.model(model)` | `String` | `null` | Mô hình 1.21.4+ (`NamespacedKey` dạng String). |
+| `.property(key, value)` | `String, Object` | *Không có* | Thêm một thuộc tính tùy biến (Metadata) đi kèm định nghĩa. |
+| `.properties(properties)` | `Map<String, Object>`| *Map rỗng* | Thiết lập toàn bộ Map các thuộc tính tùy biến đi kèm định nghĩa. |
+| `.type(type)` | `ItemType` | `ItemType.MATERIAL` | Phân loại thể loại vật phẩm (`TOOL`, `ARMOR`, `CONSUMABLE`, `CURRENCY`, v.v.). |
+| `.behavior(behavior)` | `ItemBehavior` | `null` | Gắn hành vi xử lý custom logic (Click chuột, tương tác, v.v.). |
+| `.component(component)` | `ItemComponent` | *Không có* | Thêm một component chức năng tùy biến trực tiếp lên item. |
+| `.components(components)` | `List<ItemComponent>`| *List rỗng* | Thiết lập danh sách component chức năng tùy biến. |
+| `.infoSection(title, lines)` | `String, List<String>` | *Không có* | Thêm một phần thông tin lore định hình sẵn theo nhóm. |
+| `.infoSection(section)` | `ItemInfoSection` | *Không có* | Thêm một đối tượng phần thông tin lore định hình sẵn. |
+| `.infoSections(sections)` | `List<ItemInfoSection>`| *List rỗng* | Thiết lập danh sách các phần thông tin lore định hình sẵn. |
+
 #### Các Property Keys Tự Động Xử Lý (Built-in Properties)
 
 | Property Key | Kiểu dữ liệu | Tác dụng |
