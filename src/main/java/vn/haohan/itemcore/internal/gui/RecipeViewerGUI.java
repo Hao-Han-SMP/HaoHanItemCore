@@ -232,6 +232,11 @@ public final class RecipeViewerGUI implements Listener {
     }
 
     private ItemStack createArrowItem() {
+        return MenuIcon.create(MenuIcon.RECIPE_ARROW, Component.empty());
+    }
+
+    @SuppressWarnings("unused")
+    private ItemStack createArrowItemLegacy() {
         ItemStack arrow = new ItemStack(Material.ARROW, 1);
         ItemMeta meta = arrow.getItemMeta();
         meta.displayName(Component.text("→", NamedTextColor.WHITE, TextDecoration.BOLD));
@@ -240,6 +245,15 @@ public final class RecipeViewerGUI implements Listener {
     }
 
     private ItemStack createNavItem(String name, boolean active) {
+        boolean previous = name.contains("Previous");
+        return MenuIcon.create(previous
+                        ? (active ? MenuIcon.PREVIOUS_ACTIVE : MenuIcon.PREVIOUS_DISABLED)
+                        : (active ? MenuIcon.NEXT_ACTIVE : MenuIcon.NEXT_DISABLED),
+                Component.text(name));
+    }
+
+    @SuppressWarnings("unused")
+    private ItemStack createNavItemLegacy(String name, boolean active) {
         ItemStack item = new ItemStack(active ? Material.LIME_DYE : Material.GRAY_DYE, 1);
         ItemMeta meta = item.getItemMeta();
         meta.displayName(Component.text(name));
@@ -248,6 +262,19 @@ public final class RecipeViewerGUI implements Listener {
     }
 
     private ItemStack createInfoItem(ViewerSession session) {
+        ItemStack item = MenuIcon.create(MenuIcon.INFO,
+                Component.text("Recipe " + (session.index + 1) + " / " + session.recipes.size(),
+                        NamedTextColor.GOLD));
+        ItemMeta meta = item.getItemMeta();
+        meta.lore(List.of(
+                Component.text("Type: " + session.currentRecipe().getType(), NamedTextColor.GRAY)
+        ));
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    @SuppressWarnings("unused")
+    private ItemStack createInfoItemLegacy(ViewerSession session) {
         ItemStack item = new ItemStack(Material.PAPER, 1);
         ItemMeta meta = item.getItemMeta();
         meta.displayName(Component.text("Recipe " + (session.index + 1) + " / " + session.recipes.size(),
@@ -260,6 +287,11 @@ public final class RecipeViewerGUI implements Listener {
     }
 
     private ItemStack createBackItem() {
+        return MenuIcon.create(MenuIcon.BACK, Component.text("Close", NamedTextColor.RED));
+    }
+
+    @SuppressWarnings("unused")
+    private ItemStack createBackItemLegacy() {
         ItemStack item = new ItemStack(Material.BARRIER, 1);
         ItemMeta meta = item.getItemMeta();
         meta.displayName(Component.text("§c✖ Close"));

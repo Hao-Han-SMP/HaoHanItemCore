@@ -109,10 +109,10 @@ public final class ItemBrowserGUI implements Listener {
         gui.setItem(NEXT_SLOT, createNavItem("§a▶ Next Page", session.page < session.totalPages - 1));
 
         // Info
-        ItemStack info = new ItemStack(Material.BOOK, 1);
+        ItemStack info = MenuIcon.create(MenuIcon.INFO,
+                Component.text("Page " + (session.page + 1) + " / " + session.totalPages,
+                        NamedTextColor.GOLD));
         ItemMeta infoMeta = info.getItemMeta();
-        infoMeta.displayName(Component.text("Page " + (session.page + 1) + " / " + session.totalPages,
-                NamedTextColor.GOLD));
         infoMeta.lore(List.of(
                 Component.text("Total items: " + session.items.size(), NamedTextColor.GRAY),
                 Component.text("Left click: Take item", NamedTextColor.YELLOW),
@@ -143,14 +143,19 @@ public final class ItemBrowserGUI implements Listener {
     }
 
     private ItemStack createNavItem(String name, boolean active) {
-        ItemStack item = new ItemStack(active ? Material.LIME_DYE : Material.GRAY_DYE, 1);
-        ItemMeta meta = item.getItemMeta();
-        meta.displayName(Component.text(name));
-        item.setItemMeta(meta);
-        return item;
+        boolean previous = name.contains("Previous");
+        return MenuIcon.create(previous
+                        ? (active ? MenuIcon.PREVIOUS_ACTIVE : MenuIcon.PREVIOUS_DISABLED)
+                        : (active ? MenuIcon.NEXT_ACTIVE : MenuIcon.NEXT_DISABLED),
+                Component.text(name));
     }
 
     private ItemStack createCloseItem() {
+        return MenuIcon.create(MenuIcon.CLOSE, Component.text("Close", NamedTextColor.RED));
+    }
+
+    @SuppressWarnings("unused")
+    private ItemStack createCloseItemLegacy() {
         ItemStack item = new ItemStack(Material.BARRIER, 1);
         ItemMeta meta = item.getItemMeta();
         meta.displayName(Component.text("§c✖ Close"));
