@@ -221,18 +221,31 @@ public final class ItemEventRouter implements Listener {
     @EventHandler(priority = EventPriority.NORMAL)
     public void onNoteBlockInteract(PlayerInteractEvent event) {
         if (event.getAction() != org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK) return;
+
+        // If the player is sneaking, they are attempting to place a block or use the item on hand.
+        // In vanilla Minecraft, sneaking players do not tune/interact with NoteBlocks,
+        // so the block state will not change. We must return early to avoid interfering
+        // with the block placement logic (which would cause placed blocks to disappear).
+        if (event.getPlayer().isSneaking()) return;
+
         Block block = event.getClickedBlock();
         if (block == null || block.getType() != org.bukkit.Material.NOTE_BLOCK) return;
 
-        if (block.getBlockData() instanceof org.bukkit.block.data.type.NoteBlock noteBlock) {
-            org.bukkit.block.data.BlockData customData = findMatchingCustomBlockData(noteBlock);
-            if (customData != null) {
-                org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
-                    if (block.getType() == org.bukkit.Material.NOTE_BLOCK) {
-                        block.setBlockData(customData, false);
-                    }
-                });
-            }
+        org.bukkit.block.data.BlockData customData = getCustomBlockData(block);
+        if (customData != null) {
+            // Deny block interaction immediately to prevent the block state from changing (tuning the note block)
+            event.setUseInteractedBlock(org.bukkit.event.Event.Result.DENY);
+            // Also deny using the item in hand to prevent block placement or item use when not sneaking,
+            // matching vanilla interactive block behavior (like chests/furnaces).
+            event.setUseItemInHand(org.bukkit.event.Event.Result.DENY);
+            // Correct client immediately to avoid texture flicking
+            event.getPlayer().sendBlockChange(block.getLocation(), customData);
+
+            org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
+                if (block.getType() == org.bukkit.Material.NOTE_BLOCK) {
+                    block.setBlockData(customData, false);
+                }
+            });
         }
     }
 
@@ -247,9 +260,12 @@ public final class ItemEventRouter implements Listener {
         Block block = event.getBlock();
         if (block.getType() != org.bukkit.Material.NOTE_BLOCK) return;
 
-        if (block.getBlockData() instanceof org.bukkit.block.data.type.NoteBlock noteBlock) {
-            org.bukkit.block.data.BlockData customData = findMatchingCustomBlockData(noteBlock);
-            if (customData != null && !block.getBlockData().getAsString().equals(customData.getAsString())) {
+        org.bukkit.block.data.BlockData customData = getCustomBlockData(block);
+        if (customData != null) {
+            // Cancel the physics event to prevent any state changes (like instrument updates from blocks underneath/adjacent)
+            event.setCancelled(true);
+
+            if (!block.getBlockData().getAsString().equals(customData.getAsString())) {
                 org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
                     if (block.getType() == org.bukkit.Material.NOTE_BLOCK) {
                         block.setBlockData(customData, false);
@@ -450,18 +466,19 @@ public final class ItemEventRouter implements Listener {
         return false;
     }
 
-    private org.bukkit.block.data.BlockData findMatchingCustomBlockData(org.bukkit.block.data.type.NoteBlock noteBlock) {
-        for (ItemDefinition def : registry.all()) {
-            Object customBlockData = def.getProperties().get("custom_block_data");
+    private org.bukkit.block.data.BlockData getCustomBlockData(Block block) {
+        PersistentDataContainer blockPDC = getBlockPDC(block);
+        if (blockPDC == null) return null;
+
+        String id = blockPDC.get(itemIdKey, PersistentDataType.STRING);
+        if (id == null) return null;
+
+        ItemDefinition definition = registry.get(id);
+        if (definition != null) {
+            Object customBlockData = definition.getProperties().get("custom_block_data");
             if (customBlockData instanceof String blockDataStr) {
                 try {
-                    org.bukkit.block.data.BlockData customData = org.bukkit.Bukkit.createBlockData(blockDataStr);
-                    if (customData instanceof org.bukkit.block.data.type.NoteBlock defNoteBlock) {
-                        if (noteBlock.getInstrument() == defNoteBlock.getInstrument() &&
-                                noteBlock.getNote().getId() == defNoteBlock.getNote().getId()) {
-                            return customData;
-                        }
-                    }
+                    return org.bukkit.Bukkit.createBlockData(blockDataStr);
                 } catch (Exception ignored) {}
             }
         }
