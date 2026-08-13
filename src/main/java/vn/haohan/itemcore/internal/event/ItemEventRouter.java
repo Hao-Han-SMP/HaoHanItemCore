@@ -53,6 +53,7 @@ public final class ItemEventRouter implements Listener {
     private final NamespacedKey itemIdKey;
     private final Logger logger;
     private final Plugin plugin;
+    private final java.util.Map<String, org.bukkit.block.data.BlockData> parsedBlockDataCache = new java.util.concurrent.ConcurrentHashMap<>();
 
     public ItemEventRouter(ItemRegistry registry, Plugin plugin) {
         this.registry = registry;
@@ -280,13 +281,11 @@ public final class ItemEventRouter implements Listener {
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onCustomBlockBreak(BlockBreakEvent event) {
         Block block = event.getBlock();
-        PersistentDataContainer blockPDC = getBlockPDC(block);
-        if (blockPDC == null) return;
-
-        String id = blockPDC.get(itemIdKey, PersistentDataType.STRING);
+        String id = getCustomBlockId(block);
         if (id == null) return;
 
         // Clean up block metadata
+        PersistentDataContainer blockPDC = getBlockPDC(block);
         removeBlockPDC(block);
 
         // Cancel default drops
@@ -328,7 +327,7 @@ public final class ItemEventRouter implements Listener {
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onPistonExtend(BlockPistonExtendEvent event) {
         for (Block block : event.getBlocks()) {
-            if (getBlockPDC(block) != null) {
+            if (getCustomBlockId(block) != null) {
                 event.setCancelled(true);
                 return;
             }
@@ -338,7 +337,7 @@ public final class ItemEventRouter implements Listener {
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onPistonRetract(BlockPistonRetractEvent event) {
         for (Block block : event.getBlocks()) {
-            if (getBlockPDC(block) != null) {
+            if (getCustomBlockId(block) != null) {
                 event.setCancelled(true);
                 return;
             }
@@ -350,7 +349,7 @@ public final class ItemEventRouter implements Listener {
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onBlockBurn(BlockBurnEvent event) {
         Block block = event.getBlock();
-        if (getBlockPDC(block) != null) {
+        if (getCustomBlockId(block) != null) {
             removeBlockPDC(block);
         }
     }
@@ -466,20 +465,56 @@ public final class ItemEventRouter implements Listener {
         return false;
     }
 
-    private org.bukkit.block.data.BlockData getCustomBlockData(Block block) {
-        PersistentDataContainer blockPDC = getBlockPDC(block);
-        if (blockPDC == null) return null;
+    private org.bukkit.block.data.BlockData getOrParseBlockData(String blockDataStr) {
+        org.bukkit.block.data.BlockData cached = parsedBlockDataCache.get(blockDataStr);
+        if (cached != null) return cached;
 
-        String id = blockPDC.get(itemIdKey, PersistentDataType.STRING);
+        try {
+            org.bukkit.block.data.BlockData parsed = org.bukkit.Bukkit.createBlockData(blockDataStr);
+            if (parsed != null) {
+                parsedBlockDataCache.put(blockDataStr, parsed);
+            }
+            return parsed;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private String getCustomBlockId(Block block) {
+        PersistentDataContainer blockPDC = getBlockPDC(block);
+        if (blockPDC != null) {
+            return blockPDC.get(itemIdKey, PersistentDataType.STRING);
+        }
+
+        // Fallback for worldgen-generated custom blocks
+        org.bukkit.block.data.BlockData currentData = block.getBlockData();
+        String currentDataStr = currentData.getAsString();
+
+        for (ItemDefinition def : registry.all()) {
+            Object customBlockDataObj = def.getProperties().get("custom_block_data");
+            if (customBlockDataObj instanceof String blockDataStr) {
+                org.bukkit.block.data.BlockData targetData = getOrParseBlockData(blockDataStr);
+                if (targetData != null && currentDataStr.equals(targetData.getAsString())) {
+                    // Self-healing: Dynamically save the block PDC to chunk PDC so future lookups are immediate
+                    PersistentDataContainer dummyPDC = block.getChunk().getPersistentDataContainer().getAdapterContext().newPersistentDataContainer();
+                    dummyPDC.set(itemIdKey, PersistentDataType.STRING, def.getId());
+                    saveBlockPDC(block, dummyPDC);
+                    return def.getId();
+                }
+            }
+        }
+        return null;
+    }
+
+    private org.bukkit.block.data.BlockData getCustomBlockData(Block block) {
+        String id = getCustomBlockId(block);
         if (id == null) return null;
 
         ItemDefinition definition = registry.get(id);
         if (definition != null) {
             Object customBlockData = definition.getProperties().get("custom_block_data");
             if (customBlockData instanceof String blockDataStr) {
-                try {
-                    return org.bukkit.Bukkit.createBlockData(blockDataStr);
-                } catch (Exception ignored) {}
+                return getOrParseBlockData(blockDataStr);
             }
         }
         return null;
@@ -511,23 +546,23 @@ public final class ItemEventRouter implements Listener {
     }
 
     private boolean processExplodedBlock(Block block) {
-        PersistentDataContainer blockPDC = getBlockPDC(block);
-        if (blockPDC == null) return false;
-
-        String id = blockPDC.get(itemIdKey, PersistentDataType.STRING);
+        String id = getCustomBlockId(block);
         if (id == null) return false;
 
+        PersistentDataContainer blockPDC = getBlockPDC(block);
         // Remove metadata
         removeBlockPDC(block);
 
         // Recreate and drop custom item
         ItemStack dropItem = HaoHanItemCore.get().getItemService().create(id);
         if (dropItem != null) {
-            ItemMeta meta = dropItem.getItemMeta();
-            if (meta != null) {
-                PersistentDataContainer itemPDC = meta.getPersistentDataContainer();
-                blockPDC.copyTo(itemPDC, true);
-                dropItem.setItemMeta(meta);
+            if (blockPDC != null) {
+                ItemMeta meta = dropItem.getItemMeta();
+                if (meta != null) {
+                    PersistentDataContainer itemPDC = meta.getPersistentDataContainer();
+                    blockPDC.copyTo(itemPDC, true);
+                    dropItem.setItemMeta(meta);
+                }
             }
             block.setType(org.bukkit.Material.AIR);
             block.getWorld().dropItemNaturally(block.getLocation(), dropItem);
