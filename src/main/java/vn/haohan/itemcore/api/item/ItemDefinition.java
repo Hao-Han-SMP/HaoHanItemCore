@@ -33,6 +33,7 @@ public final class ItemDefinition {
     private final ItemBehavior behavior;
     private final List<ItemComponent> components;
     private final List<ItemInfoSection> infoSections;
+    private final boolean usable;
 
     private ItemDefinition(Builder builder) {
         this.id = builder.id;
@@ -47,6 +48,7 @@ public final class ItemDefinition {
         this.behavior = builder.behavior;
         this.components = List.copyOf(builder.components);
         this.infoSections = List.copyOf(builder.infoSections);
+        this.usable = builder.usable;
     }
 
     // --- Getters ---
@@ -97,6 +99,8 @@ public final class ItemDefinition {
 
     public boolean hasBehavior() { return behavior != null; }
 
+    public boolean isUsable() { return usable; }
+
     /**
      * Kiểm tra ID có đúng format namespace:key không.
      */
@@ -128,6 +132,7 @@ public final class ItemDefinition {
         private ItemBehavior behavior = null;
         private List<ItemComponent> components = new ArrayList<>();
         private List<ItemInfoSection> infoSections = new ArrayList<>();
+        private boolean usable = true;
 
         private Builder(String id) {
             this.id = Objects.requireNonNull(id, "Item ID cannot be null");
@@ -189,6 +194,11 @@ public final class ItemDefinition {
 
         public Builder behavior(ItemBehavior behavior) {
             this.behavior = behavior;
+            return this;
+        }
+
+        public Builder usable(boolean usable) {
+            this.usable = usable;
             return this;
         }
 

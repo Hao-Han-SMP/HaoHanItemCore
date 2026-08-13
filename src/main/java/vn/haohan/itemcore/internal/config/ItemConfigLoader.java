@@ -157,6 +157,11 @@ public final class ItemConfigLoader {
             }
         }
 
+        // Usable
+        if (section.contains("usable")) {
+            builder.usable(section.getBoolean("usable"));
+        }
+
         // Properties
         ConfigurationSection propsSection = section.getConfigurationSection("properties");
         if (propsSection != null) {

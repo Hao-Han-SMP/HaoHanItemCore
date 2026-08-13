@@ -68,7 +68,18 @@ public final class ItemEventRouter implements Listener {
         if (item == null) return;
 
         ItemDefinition definition = getDefinition(item);
-        if (definition == null || !definition.hasBehavior()) return;
+        if (definition == null) return;
+
+        if (!definition.isUsable() && (event.getAction() == org.bukkit.event.block.Action.RIGHT_CLICK_AIR || event.getAction() == org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK)) {
+            event.setUseItemInHand(org.bukkit.event.Event.Result.DENY);
+            event.setCancelled(true);
+            org.bukkit.entity.Player player = event.getPlayer();
+            player.updateInventory();
+            org.bukkit.Bukkit.getScheduler().runTask(plugin, player::updateInventory);
+            return;
+        }
+
+        if (!definition.hasBehavior()) return;
 
         ItemContext context = new ItemContext(event.getPlayer(), item, definition, event);
 
