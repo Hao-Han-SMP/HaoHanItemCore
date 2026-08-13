@@ -96,6 +96,7 @@ Phân loại chức năng chính của vập phẩm custom:
 | `getComponents()` | `List<ItemComponent>` | *Không có* | Danh sách các component chức năng tùy biến. |
 | `getInfoSections()` | `List<ItemInfoSection>` | *Không có* | Danh sách các mục lore định hình sẵn theo nhóm. |
 | `hasBehavior()` | `boolean` | *Không có* | Kiểm tra vật phẩm có gắn đối tượng hành vi custom không. |
+| `isUsable()` | `boolean` | *Không có* | Kiểm tra xem vật phẩm có sử dụng được (chuột phải) hay không. |
 | `isValidId(id)` | `static boolean` | `String id` | Kiểm tra định dạng String ID có đúng dạng `namespace:key`. |
 
 #### Xây Dựng `ItemDefinition` Bằng Builder Pattern
@@ -136,6 +137,7 @@ Dưới đây là chi tiết các thuộc tính bạn có thể đăng ký khi x
 | `.properties(properties)` | `Map<String, Object>`| *Map rỗng* | Thiết lập toàn bộ Map các thuộc tính tùy biến đi kèm định nghĩa. |
 | `.type(type)` | `ItemType` | `ItemType.MATERIAL` | Phân loại thể loại vật phẩm (`TOOL`, `ARMOR`, `CONSUMABLE`, `CURRENCY`, v.v.). |
 | `.behavior(behavior)` | `ItemBehavior` | `null` | Gắn hành vi xử lý custom logic (Click chuột, tương tác, v.v.). |
+| `.usable(usable)` | `boolean` | `true` | Thiết lập vật phẩm có thể sử dụng (chuột phải) hay không. Đặt `false` cho `KNOWLEDGE_BOOK` để tránh bị mất sách khi click chuột phải. |
 | `.component(component)` | `ItemComponent` | *Không có* | Thêm một component chức năng tùy biến trực tiếp lên item. |
 | `.components(components)` | `List<ItemComponent>`| *List rỗng* | Thiết lập danh sách component chức năng tùy biến. |
 | `.infoSection(title, lines)` | `String, List<String>` | *Không có* | Thêm một phần thông tin lore định hình sẵn theo nhóm. |
