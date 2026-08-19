@@ -1,7 +1,6 @@
 package vn.haohan.itemcore.api.recipe;
 
 import java.util.Collection;
-import java.util.List;
 
 /**
  * Registry quản lý tất cả RecipeDefinition.

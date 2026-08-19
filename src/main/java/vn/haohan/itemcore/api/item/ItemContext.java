@@ -1,6 +1,5 @@
 package vn.haohan.itemcore.api.item;
 
-import org.bukkit.Material;
 import org.bukkit.event.Event;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;

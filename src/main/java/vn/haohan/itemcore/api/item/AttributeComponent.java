@@ -23,7 +23,7 @@ public record AttributeComponent(Attribute attribute, double amount, AttributeMo
     public void apply(ItemStack item, ItemDefinition definition) {
         var meta = item.getItemMeta();
         if (meta == null) return;
-        var key = new NamespacedKey("haohanitemcore", "attribute_" + attribute.name().toLowerCase());
+        var key = new NamespacedKey("haohanitemcore", "attribute_" + attribute.getKey().getKey().replace('.', '_'));
         meta.addAttributeModifier(attribute, new AttributeModifier(key, amount, operation, slotGroup));
         item.setItemMeta(meta);
     }
