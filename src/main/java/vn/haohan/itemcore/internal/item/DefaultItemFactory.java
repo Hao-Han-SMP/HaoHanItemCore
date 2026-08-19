@@ -55,6 +55,7 @@ public final class DefaultItemFactory implements ItemFactory {
     }
 
     @Override
+    @SuppressWarnings("deprecation")
     public ItemStack create(ItemDefinition definition, int amount) {
         Objects.requireNonNull(definition, "ItemDefinition cannot be null");
 
@@ -186,6 +187,7 @@ public final class DefaultItemFactory implements ItemFactory {
         return false;
     }
 
+    @SuppressWarnings("deprecation")
     private static boolean applyCustomModelData(ItemMeta meta, ItemDefinition definition) {
         Integer targetCMD = definition.getCustomModelData();
         if (targetCMD != null) {
@@ -249,6 +251,7 @@ public final class DefaultItemFactory implements ItemFactory {
         return false;
     }
 
+    @SuppressWarnings("deprecation")
     private static boolean applyHideAdditionalTooltip(ItemMeta meta, ItemDefinition definition) {
         Object hideVal = definition.getProperties().get("hide_additional_tooltip");
         if (Boolean.TRUE.equals(hideVal)) {
