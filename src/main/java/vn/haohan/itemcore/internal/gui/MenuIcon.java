@@ -22,6 +22,7 @@ final class MenuIcon {
 
     private MenuIcon() {}
 
+    @SuppressWarnings("deprecation")
     static ItemStack create(int customModelData, Component displayName) {
         ItemStack item = new ItemStack(Material.PAPER, 1);
         ItemMeta meta = item.getItemMeta();

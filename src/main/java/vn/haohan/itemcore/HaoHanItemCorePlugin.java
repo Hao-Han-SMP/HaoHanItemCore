@@ -1,10 +1,7 @@
 package vn.haohan.itemcore;
 
 import vn.haohan.itemcore.api.HaoHanItemCore;
-import vn.haohan.itemcore.api.item.ItemRegistry;
 import vn.haohan.itemcore.api.recipe.RecipeDefinition;
-import vn.haohan.itemcore.api.recipe.RecipeRegistry;
-import vn.haohan.itemcore.api.recipe.RecipeService;
 import vn.haohan.itemcore.internal.command.ItemCoreCommand;
 import vn.haohan.itemcore.internal.config.ItemConfigLoader;
 import vn.haohan.itemcore.internal.config.RecipeConfigLoader;

@@ -42,8 +42,6 @@ public final class RecipeViewerGUI implements Listener {
     private static final int NEXT_SLOT = 50;
     private static final int INFO_SLOT = 49;
     private static final int BACK_SLOT = 45;
-
-    private final Plugin plugin;
     private final ItemService itemService;
     private final RecipeService recipeService;
     private final ItemRegistry itemRegistry;
@@ -51,12 +49,16 @@ public final class RecipeViewerGUI implements Listener {
     // Track active GUIs
     private final Map<UUID, ViewerSession> activeSessions = new HashMap<>();
 
-    public RecipeViewerGUI(Plugin plugin, ItemService itemService, RecipeService recipeService,
+    public RecipeViewerGUI(ItemService itemService, RecipeService recipeService,
                            ItemRegistry itemRegistry) {
-        this.plugin = plugin;
         this.itemService = itemService;
         this.recipeService = recipeService;
         this.itemRegistry = itemRegistry;
+    }
+
+    public RecipeViewerGUI(Plugin plugin, ItemService itemService, RecipeService recipeService,
+                           ItemRegistry itemRegistry) {
+        this(itemService, recipeService, itemRegistry);
     }
 
     /**

@@ -3,7 +3,6 @@ package vn.haohan.itemcore.internal.gui;
 import vn.haohan.itemcore.api.item.ItemDefinition;
 import vn.haohan.itemcore.api.item.ItemRegistry;
 import vn.haohan.itemcore.api.item.ItemService;
-import vn.haohan.itemcore.api.recipe.RecipeService;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -60,7 +59,7 @@ public final class ItemBrowserGUI implements Listener {
      */
     public void open(Player player, int page) {
         List<ItemDefinition> allItems = new ArrayList<>(itemRegistry.all());
-        allItems.sort(Comparator.comparing(ItemDefinition::getId));
+        allItems.sort(Comparator.comparing(def -> def.getId()));
 
         int totalPages = Math.max(1, (int) Math.ceil((double) allItems.size() / ITEMS_PER_PAGE));
         page = Math.max(0, Math.min(page, totalPages - 1));
