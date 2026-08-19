@@ -17,7 +17,6 @@ import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.block.NotePlayEvent;
 import org.bukkit.event.block.BlockPhysicsEvent;
 import org.bukkit.inventory.meta.BlockStateMeta;
-import org.bukkit.block.BlockState;
 import org.bukkit.event.block.BlockExplodeEvent;
 import org.bukkit.event.block.BlockBurnEvent;
 import org.bukkit.event.block.BlockPistonExtendEvent;
@@ -86,6 +85,7 @@ public final class ItemEventRouter implements Listener {
         switch (event.getAction()) {
             case RIGHT_CLICK_AIR, RIGHT_CLICK_BLOCK -> definition.getBehavior().onUse(context);
             case LEFT_CLICK_AIR, LEFT_CLICK_BLOCK -> definition.getBehavior().onInteract(context);
+            case PHYSICAL -> {}
         }
     }
 
