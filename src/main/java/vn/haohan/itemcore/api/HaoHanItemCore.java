@@ -5,6 +5,7 @@ import vn.haohan.itemcore.api.item.ItemRegistry;
 import vn.haohan.itemcore.api.item.ItemService;
 import vn.haohan.itemcore.api.recipe.RecipeRegistry;
 import vn.haohan.itemcore.api.recipe.RecipeService;
+import vn.haohan.itemcore.api.texture.IconTextureRegistry;
 
 /**
  * API chính của HaoHanItemCore.
@@ -31,14 +32,17 @@ public final class HaoHanItemCore {
     private final ItemService itemService;
     private final RecipeRegistry recipeRegistry;
     private final RecipeService recipeService;
+    private final IconTextureRegistry iconTextureRegistry;
 
     public HaoHanItemCore(ItemRegistry itemRegistry, ItemFactory itemFactory, ItemService itemService,
-                      RecipeRegistry recipeRegistry, RecipeService recipeService) {
+                      RecipeRegistry recipeRegistry, RecipeService recipeService,
+                      IconTextureRegistry iconTextureRegistry) {
         this.itemRegistry = itemRegistry;
         this.itemFactory = itemFactory;
         this.itemService = itemService;
         this.recipeRegistry = recipeRegistry;
         this.recipeService = recipeService;
+        this.iconTextureRegistry = iconTextureRegistry;
     }
 
     /**
@@ -83,4 +87,7 @@ public final class HaoHanItemCore {
      * Lấy RecipeService - lookup recipes.
      */
     public RecipeService getRecipeService() { return recipeService; }
+
+    /** Registry nạp icon riêng lẻ hoặc cắt từ texture atlas. */
+    public IconTextureRegistry getIconTextureRegistry() { return iconTextureRegistry; }
 }

@@ -17,6 +17,7 @@ import vn.haohan.itemcore.internal.item.DefaultItemService;
 import vn.haohan.itemcore.internal.recipe.BukkitRecipeAdapter;
 import vn.haohan.itemcore.internal.recipe.DefaultRecipeRegistry;
 import vn.haohan.itemcore.internal.recipe.DefaultRecipeService;
+import vn.haohan.itemcore.internal.texture.DefaultIconTextureRegistry;
 
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -44,6 +45,7 @@ public final class HaoHanItemCorePlugin extends JavaPlugin {
     private BukkitRecipeAdapter recipeAdapter;
     private ItemConfigLoader itemConfigLoader;
     private RecipeConfigLoader recipeConfigLoader;
+    private DefaultIconTextureRegistry iconTextureRegistry;
 
     @Override
     public void onLoad() {
@@ -55,12 +57,13 @@ public final class HaoHanItemCorePlugin extends JavaPlugin {
         itemService = new DefaultItemService(itemRegistry, itemFactory, this);
         recipeRegistry = new DefaultRecipeRegistry(log);
         recipeService = new DefaultRecipeService(recipeRegistry);
+        iconTextureRegistry = new DefaultIconTextureRegistry();
         recipeAdapter = new BukkitRecipeAdapter(this, itemRegistry, itemFactory);
 
         // Set singleton
         HaoHanItemCore.setInstance(new HaoHanItemCore(
                 itemRegistry, itemFactory, itemService,
-                recipeRegistry, recipeService
+                recipeRegistry, recipeService, iconTextureRegistry
         ));
 
         log.info("HaoHanItemCore loaded. Registries initialized.");
@@ -126,6 +129,7 @@ public final class HaoHanItemCorePlugin extends JavaPlugin {
         // Clear registries
         itemRegistry.clear();
         recipeRegistry.clear();
+        iconTextureRegistry.clear();
 
         // Reload
         loadAllConfigs();

@@ -42,6 +42,28 @@ Ngôn ngữ: Tiếng Việt | [Wiki Hướng Dẫn Chi Tiết](https://github.co
 | `HaoHanItemCore` | Plugin server, xử lý Item Registry, Factory, Recipe Registry, Event Routing, GUI và Command. |
 | [WIKI](https://github.com/Hao-Han-SMP/HaoHanItemCore/wiki) | Hướng dẫn chi tiết từ A-Z về cấu hình YAML, hệ thống Event/Behavior, API và FAQ. |
 
+## Icon texture
+
+Icon có thể được nạp riêng lẻ hoặc cắt tự động từ atlas. Atlas được đọc theo
+thứ tự trái sang phải, trên xuống dưới; kích thước atlas không cần vuông nhưng
+phải chia hết cho kích thước một icon.
+
+```java
+IconTextureRegistry icons = HaoHanItemCore.get().getIconTextureRegistry();
+
+// Một file icon riêng
+icons.register("ui:search", getDataFolder().toPath().resolve("textures/search.png"));
+
+// Atlas 64x32 với ô 16x16 → 8 icon, ID ui:buttons:0 ... ui:buttons:7
+List<IconTexture> buttons = icons.registerAtlas(
+        "ui:buttons", getDataFolder().toPath().resolve("textures/buttons.png"), 16, 16);
+IconTexture first = icons.get("ui:buttons:0").orElseThrow();
+```
+
+Loader này chỉ quản lý và cắt ảnh ở phía server/plugin. Để Minecraft client
+hiển thị texture, ảnh vẫn cần được đưa vào resource pack và model/item model
+phải trỏ tới texture tương ứng.
+
 ## Yêu cầu
 
 - Minecraft server chạy Paper hoặc Purpur 1.21.11.
