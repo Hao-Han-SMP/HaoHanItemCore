@@ -14,11 +14,7 @@ final class MenuIcon {
     static final int RECIPE_ARROW = 900005;
     static final int CLOSE = 900006;
     static final int INFO = 900007;
-    static final int CONFIRM = 900008;
-    static final int CANCEL = 900009;
     static final int BACK = 900010;
-    static final int REFRESH = 900011;
-    static final int SEARCH = 900012;
 
     private MenuIcon() {}
 

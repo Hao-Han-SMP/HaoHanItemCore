@@ -58,6 +58,14 @@ icons.register("ui:search", getDataFolder().toPath().resolve("textures/search.pn
 List<IconTexture> buttons = icons.registerAtlas(
         "ui:buttons", getDataFolder().toPath().resolve("textures/buttons.png"), 16, 16);
 IconTexture first = icons.get("ui:buttons:0").orElseThrow();
+
+// Tạo biến thể mà không cần lưu thêm file ảnh
+IconTexture right = first.rotate180("ui:buttons:right");
+IconTexture mirrored = first.flipHorizontal("ui:buttons:mirrored");
+IconTexture blue = first.hueShift("ui:buttons:blue", 180);
+icons.register(right.getId(), right);
+icons.register(mirrored.getId(), mirrored);
+icons.register(blue.getId(), blue);
 ```
 
 Loader này chỉ quản lý và cắt ảnh ở phía server/plugin. Để Minecraft client

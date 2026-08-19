@@ -16,6 +16,7 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
@@ -92,9 +93,6 @@ public final class DefaultItemFactory implements ItemFactory {
 
         // Item Model (Paper 1.21+)
         String model = definition.getItemModel();
-        if (model == null && definition.getCustomModelData() != null) {
-            model = definition.getId();
-        }
         if (model != null) {
             try {
                 NamespacedKey modelKey = NamespacedKey.fromString(model);
@@ -206,9 +204,6 @@ public final class DefaultItemFactory implements ItemFactory {
 
     private static boolean applyItemModel(ItemMeta meta, ItemDefinition definition) {
         String model = definition.getItemModel();
-        if (model == null && definition.getCustomModelData() != null) {
-            model = definition.getId();
-        }
         if (model != null) {
             try {
                 NamespacedKey modelKey = NamespacedKey.fromString(model);
@@ -385,7 +380,7 @@ public final class DefaultItemFactory implements ItemFactory {
     }
 
     public static org.bukkit.inventory.EquipmentSlot getEquipmentSlotFromMaterial(org.bukkit.Material material) {
-        String name = material.name();
+        String name = material.getKey().getKey().toUpperCase(Locale.ROOT);
         if (name.endsWith("_HELMET")) return org.bukkit.inventory.EquipmentSlot.HEAD;
         if (name.endsWith("_CHESTPLATE")) return org.bukkit.inventory.EquipmentSlot.CHEST;
         if (name.endsWith("_LEGGINGS")) return org.bukkit.inventory.EquipmentSlot.LEGS;

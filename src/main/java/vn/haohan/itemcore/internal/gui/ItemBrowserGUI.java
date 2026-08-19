@@ -88,7 +88,7 @@ public final class ItemBrowserGUI implements Listener {
             if (itemIndex < session.items.size()) {
                 ItemDefinition def = session.items.get(itemIndex);
                 ItemStack display = itemService.create(def.getId());
-                clearInferredModel(display, def);
+                clearPreviewModel(display, def);
                 gui.setItem(i, display);
             }
         }
@@ -116,8 +116,7 @@ public final class ItemBrowserGUI implements Listener {
                 Component.text("Total items: " + session.items.size(), NamedTextColor.GRAY),
                 Component.text("Left click: Take item", NamedTextColor.YELLOW),
                 Component.text("Right click: View recipe", NamedTextColor.YELLOW),
-                Component.text("Shift + left click: Take a stack", NamedTextColor.YELLOW)
-        ));
+                Component.text("Shift + left click: Take a stack", NamedTextColor.YELLOW)));
         info.setItemMeta(infoMeta);
         gui.setItem(INFO_SLOT, info);
 
@@ -125,10 +124,17 @@ public final class ItemBrowserGUI implements Listener {
         gui.setItem(CLOSE_SLOT, createCloseItem());
     }
 
-    private static void clearInferredModel(ItemStack item, ItemDefinition definition) {
-        if (definition.getItemModel() != null || definition.getCustomModelData() == null) return;
+    /**
+     * Item Browser previews custom-model-data through the material item mapping.
+     * Explicit 32px item models are intended for world/hand rendering and can
+     * overflow a 16px inventory slot when used as a GUI preview.
+     */
+    private static void clearPreviewModel(ItemStack item, ItemDefinition definition) {
+        if (definition.getCustomModelData() == null)
+            return;
         ItemMeta meta = item.getItemMeta();
-        if (meta == null) return;
+        if (meta == null)
+            return;
         meta.setItemModel(null);
         item.setItemMeta(meta);
     }
@@ -144,8 +150,8 @@ public final class ItemBrowserGUI implements Listener {
     private ItemStack createNavItem(String name, boolean active) {
         boolean previous = name.contains("Previous");
         return MenuIcon.create(previous
-                        ? (active ? MenuIcon.PREVIOUS_ACTIVE : MenuIcon.PREVIOUS_DISABLED)
-                        : (active ? MenuIcon.NEXT_ACTIVE : MenuIcon.NEXT_DISABLED),
+                ? (active ? MenuIcon.PREVIOUS_ACTIVE : MenuIcon.PREVIOUS_DISABLED)
+                : (active ? MenuIcon.NEXT_ACTIVE : MenuIcon.NEXT_DISABLED),
                 Component.text(name));
     }
 
@@ -153,21 +159,14 @@ public final class ItemBrowserGUI implements Listener {
         return MenuIcon.create(MenuIcon.CLOSE, Component.text("Close", NamedTextColor.RED));
     }
 
-    @SuppressWarnings("unused")
-    private ItemStack createCloseItemLegacy() {
-        ItemStack item = new ItemStack(Material.BARRIER, 1);
-        ItemMeta meta = item.getItemMeta();
-        meta.displayName(Component.text("§c✖ Close"));
-        item.setItemMeta(meta);
-        return item;
-    }
-
     @EventHandler
     public void onInventoryClick(InventoryClickEvent event) {
-        if (!(event.getWhoClicked() instanceof Player player)) return;
+        if (!(event.getWhoClicked() instanceof Player player))
+            return;
 
         BrowserSession session = activeSessions.get(player.getUniqueId());
-        if (session == null) return;
+        if (session == null)
+            return;
 
         event.setCancelled(true);
 
@@ -199,12 +198,13 @@ public final class ItemBrowserGUI implements Listener {
     }
 
     private void handleItemClick(int slot, Player player, BrowserSession session,
-                                 ItemStack clicked, ClickType click) {
+            ItemStack clicked, ClickType click) {
         if (clicked != null && clicked.getType() != Material.AIR) {
             String itemId = itemService.getId(clicked);
             if (itemId != null) {
                 if (click.isRightClick()) {
-                    if (!recipeViewer.hasRecipes(itemId)) return;
+                    if (!recipeViewer.hasRecipes(itemId))
+                        return;
                     recipeViewer.open(player, itemId);
                 } else if (click.isLeftClick()) {
                     int amount = click.isShiftClick()

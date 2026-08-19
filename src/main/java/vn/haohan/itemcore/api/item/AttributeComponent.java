@@ -6,6 +6,8 @@ import org.bukkit.attribute.AttributeModifier;
 import org.bukkit.inventory.EquipmentSlotGroup;
 import org.bukkit.inventory.ItemStack;
 
+import java.util.Locale;
+
 /** Adds a Paper attribute modifier to newly-created stacks. */
 public record AttributeComponent(Attribute attribute, double amount, AttributeModifier.Operation operation,
                                  EquipmentSlotGroup slotGroup) implements ItemComponent {
@@ -23,7 +25,7 @@ public record AttributeComponent(Attribute attribute, double amount, AttributeMo
     public void apply(ItemStack item, ItemDefinition definition) {
         var meta = item.getItemMeta();
         if (meta == null) return;
-        var key = new NamespacedKey("haohanitemcore", "attribute_" + attribute.getKey().getKey().replace('.', '_'));
+        var key = new NamespacedKey("haohanitemcore", "attribute_" + attribute.getKey().getKey().replace('.', '_').toLowerCase(Locale.ROOT));
         meta.addAttributeModifier(attribute, new AttributeModifier(key, amount, operation, slotGroup));
         item.setItemMeta(meta);
     }
