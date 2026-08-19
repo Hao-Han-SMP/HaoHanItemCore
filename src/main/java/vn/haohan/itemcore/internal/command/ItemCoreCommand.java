@@ -23,7 +23,6 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.*;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 /**
@@ -104,7 +103,7 @@ public final class ItemCoreCommand implements BasicCommand {
 
         // Group by namespace
         Map<String, List<ItemDefinition>> byNamespace = items.stream()
-                .collect(Collectors.groupingBy(ItemDefinition::getNamespace));
+                .collect(Collectors.groupingBy(def -> def.getNamespace()));
 
         for (Map.Entry<String, List<ItemDefinition>> entry : byNamespace.entrySet()) {
             sender.sendMessage(Component.text("  [" + entry.getKey() + "]", NamedTextColor.AQUA));
@@ -379,13 +378,13 @@ public final class ItemCoreCommand implements BasicCommand {
 
     private List<String> getAllItemIds() {
         return itemRegistry.all().stream()
-                .map(ItemDefinition::getId)
+                .map(def -> def.getId())
                 .collect(Collectors.toList());
     }
 
     private List<String> getOnlinePlayerNames() {
         return Bukkit.getOnlinePlayers().stream()
-                .map(Player::getName)
+                .map(p -> p.getName())
                 .collect(Collectors.toList());
     }
 
