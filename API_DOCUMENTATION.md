@@ -152,7 +152,7 @@ Dưới đây là chi tiết các thuộc tính bạn có thể đăng ký khi x
 | `jukebox_playable` | `String` (Key) | Đăng ký đĩa nhạc jukebox custom (VD: `"haohan:space_theme"`). |
 | `equippable_asset_id` | `String` (Key) | Đăng ký model giáp hiển thị 3D trên nhân vật (VD: `"haohan:spacesuit"`). |
 | `custom_block_data` | `String` (BlockState) | Gắn `minecraft:block_state` cho client xử lý Custom Block (VD: `minecraft:note_block[note=1,instrument=harp]`). |
-| `custom_block_drop` | `String` (ID) | ID custom item sẽ rơi ra khi phá custom block này. |
+| `custom_block_drop` | `String` (ID) | ID custom item sẽ rơi ra khi phá/nổ custom block này (mặc định nếu không khai báo sẽ không rơi ra gì). |
 
 ---
 

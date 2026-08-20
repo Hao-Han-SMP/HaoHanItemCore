@@ -532,19 +532,20 @@ public final class ItemEventRouter implements Listener {
     }
 
     private void dropCustomBlockItem(Block block, String itemId, PersistentDataContainer blockPDC) {
-        String dropId = itemId;
         ItemDefinition definition = registry.get(itemId);
-        if (definition != null) {
-            Object customDrop = definition.getProperties().get("custom_block_drop");
-            if (customDrop instanceof String dropStr) {
-                dropId = dropStr;
-            }
+        if (definition == null) {
+            return;
+        }
+
+        Object customDrop = definition.getProperties().get("custom_block_drop");
+        if (!(customDrop instanceof String dropId) || dropId.isBlank()) {
+            return;
         }
 
         ItemStack dropItem = HaoHanItemCore.get().getItemService().create(dropId);
         if (dropItem != null) {
             // Only copy block state PDC if we are dropping the block itself
-            if (dropId.equals(itemId)) {
+            if (dropId.equals(itemId) && blockPDC != null) {
                 ItemMeta meta = dropItem.getItemMeta();
                 if (meta != null) {
                     PersistentDataContainer itemPDC = meta.getPersistentDataContainer();
@@ -563,21 +564,10 @@ public final class ItemEventRouter implements Listener {
         PersistentDataContainer blockPDC = getBlockPDC(block);
         // Remove metadata
         removeBlockPDC(block);
+        block.setType(org.bukkit.Material.AIR);
 
-        // Recreate and drop custom item
-        ItemStack dropItem = HaoHanItemCore.get().getItemService().create(id);
-        if (dropItem != null) {
-            if (blockPDC != null) {
-                ItemMeta meta = dropItem.getItemMeta();
-                if (meta != null) {
-                    PersistentDataContainer itemPDC = meta.getPersistentDataContainer();
-                    blockPDC.copyTo(itemPDC, true);
-                    dropItem.setItemMeta(meta);
-                }
-            }
-            block.setType(org.bukkit.Material.AIR);
-            block.getWorld().dropItemNaturally(block.getLocation(), dropItem);
-        }
+        // Recreate and drop custom item if custom_block_drop is configured
+        dropCustomBlockItem(block, id, blockPDC);
         return true;
     }
 
