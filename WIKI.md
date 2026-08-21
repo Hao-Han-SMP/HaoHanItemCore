@@ -479,6 +479,6 @@ public class ModItems {
 2. Kiểm tra file `equipment/<asset_id>.json` và texture tồn tại trong resource pack.
 3. Với item có từ trước update: mở inventory và click item một lần để trigger upgrade.
 
-**Q: Custom block flicker texture?** → Đảm bảo property `custom_block_data` khai báo đúng format blockstate. Engine tự gắn `minecraft:block_state` để client dự đoán đúng ngay lập tức.
+**Q: Custom block flicker texture?** → Đảm bảo property `custom_block_data` khai báo đúng format blockstate. Engine tự gửi block change và cập nhật state ngay trong cùng tick khi đặt.
 
 **Q: MACHINE recipe hoạt động thế nào?** → Engine chỉ lưu definition, không đăng ký Bukkit. Plugin con tự xử lý việc kiểm tra và thực thi recipe.

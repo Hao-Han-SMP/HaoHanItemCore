@@ -1,6 +1,7 @@
 package vn.haohan.itemcore.api.item;
 
 import org.bukkit.Material;
+import org.bukkit.inventory.ItemFlag;
 
 import java.util.*;
 
@@ -33,6 +34,7 @@ public final class ItemDefinition {
     private final ItemBehavior behavior;
     private final List<ItemComponent> components;
     private final List<ItemInfoSection> infoSections;
+    private final Set<ItemFlag> flags;
     private final boolean usable;
 
     private ItemDefinition(Builder builder) {
@@ -48,6 +50,7 @@ public final class ItemDefinition {
         this.behavior = builder.behavior;
         this.components = List.copyOf(builder.components);
         this.infoSections = List.copyOf(builder.infoSections);
+        this.flags = Set.copyOf(builder.flags);
         this.usable = builder.usable;
     }
 
@@ -97,6 +100,8 @@ public final class ItemDefinition {
     /** Structured lore sections displayed after the definition's base lore. */
     public List<ItemInfoSection> getInfoSections() { return infoSections; }
 
+    public Set<ItemFlag> getFlags() { return flags; }
+
     public boolean hasBehavior() { return behavior != null; }
 
     public boolean isUsable() { return usable; }
@@ -132,6 +137,7 @@ public final class ItemDefinition {
         private ItemBehavior behavior = null;
         private List<ItemComponent> components = new ArrayList<>();
         private List<ItemInfoSection> infoSections = new ArrayList<>();
+        private Set<ItemFlag> flags = new HashSet<>();
         private boolean usable = true;
 
         private Builder(String id) {
@@ -223,6 +229,21 @@ public final class ItemDefinition {
 
         public Builder infoSections(List<ItemInfoSection> sections) {
             this.infoSections = new ArrayList<>(sections);
+            return this;
+        }
+
+        public Builder flags(Collection<ItemFlag> flags) {
+            this.flags = new HashSet<>(flags);
+            return this;
+        }
+
+        public Builder flag(ItemFlag flag) {
+            this.flags.add(Objects.requireNonNull(flag));
+            return this;
+        }
+
+        public Builder addFlag(ItemFlag flag) {
+            this.flags.add(Objects.requireNonNull(flag));
             return this;
         }
 

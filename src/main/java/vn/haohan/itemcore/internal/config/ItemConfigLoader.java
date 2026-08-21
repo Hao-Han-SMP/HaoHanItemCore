@@ -162,6 +162,26 @@ public final class ItemConfigLoader {
             builder.usable(section.getBoolean("usable"));
         }
 
+        // Item Flags
+        List<String> flagList = section.getStringList("flags");
+        if (flagList.isEmpty()) {
+            flagList = section.getStringList("item-flags");
+        }
+        if (flagList.isEmpty()) {
+            flagList = section.getStringList("item_flags");
+        }
+        if (flagList.isEmpty() && section.isString("flags")) {
+            flagList = List.of(section.getString("flags"));
+        }
+        for (String flagName : flagList) {
+            try {
+                org.bukkit.inventory.ItemFlag flag = org.bukkit.inventory.ItemFlag.valueOf(flagName.toUpperCase(java.util.Locale.ROOT).trim());
+                builder.flag(flag);
+            } catch (IllegalArgumentException e) {
+                logger.warning("[ItemConfigLoader] Invalid item flag: '" + flagName + "' for " + id);
+            }
+        }
+
         // Properties
         ConfigurationSection propsSection = section.getConfigurationSection("properties");
         if (propsSection != null) {

@@ -93,13 +93,17 @@ public final class DefaultItemFactory implements ItemFactory {
 
         // Item Model (Paper 1.21+)
         String model = definition.getItemModel();
+        if (model == null && definition.getId() != null && definition.getId().contains(":")) {
+            model = definition.getId();
+        }
         if (model != null) {
             try {
                 NamespacedKey modelKey = NamespacedKey.fromString(model);
                 if (modelKey != null) {
                     meta.setItemModel(modelKey);
                 }
-            } catch (Throwable ignored) {}
+            } catch (Throwable ignored) {
+            }
         }
 
         // Max Stack Size
@@ -124,12 +128,14 @@ public final class DefaultItemFactory implements ItemFactory {
     }
 
     /**
-     * Đồng bộ/cập nhật các custom component của definition vào ItemMeta và ItemStack.
+     * Đồng bộ/cập nhật các custom component của definition vào ItemMeta và
+     * ItemStack.
      * Trả về true nếu có bất kỳ thay đổi nào được thực hiện.
      */
     public static ItemStack applyComponents(ItemStack itemStack, ItemDefinition definition, Plugin plugin) {
         ItemMeta meta = itemStack.getItemMeta();
-        if (meta == null) return itemStack;
+        if (meta == null)
+            return itemStack;
 
         boolean metaModified = false;
 
@@ -142,6 +148,7 @@ public final class DefaultItemFactory implements ItemFactory {
         metaModified |= applyMaxDamage(meta, definition, plugin);
         metaModified |= applyJukeboxPlayable(meta, definition, plugin);
         metaModified |= applyUniqueUUID(meta, definition, plugin);
+        metaModified |= applyItemFlags(meta, definition);
         metaModified |= applyHideAdditionalTooltip(meta, definition);
 
         if (metaModified) {
@@ -151,11 +158,9 @@ public final class DefaultItemFactory implements ItemFactory {
         // Apply ItemStack-level components
         applyEquippableComponent(itemStack, definition, plugin);
 
-        // Custom Block Data (directly setting modern NMS BLOCK_STATE component via reflection)
-        Object customBlockData = definition.getProperties().get("custom_block_data");
-        if (customBlockData instanceof String blockDataStr) {
-            itemStack = applyBlockStateComponent(itemStack, definition.getId(), blockDataStr, plugin);
-        }
+        // Ensure NMS BLOCK_STATE component is stripped so the client doesn't show
+        // raw block state properties (instrument, note, powered) in the item tooltip.
+        itemStack = removeBlockStateComponent(itemStack);
 
         return itemStack;
     }
@@ -177,7 +182,8 @@ public final class DefaultItemFactory implements ItemFactory {
                 .map(line -> LegacyComponentSerializer.legacySection().deserialize(line))
                 .collect(Collectors.toList());
         java.util.List<net.kyori.adventure.text.Component> currentLore = meta.lore();
-        if (currentLore == null) currentLore = java.util.List.of();
+        if (currentLore == null)
+            currentLore = java.util.List.of();
         if (!targetLore.equals(currentLore)) {
             meta.lore(targetLore.isEmpty() ? null : targetLore);
             return true;
@@ -204,6 +210,9 @@ public final class DefaultItemFactory implements ItemFactory {
 
     private static boolean applyItemModel(ItemMeta meta, ItemDefinition definition) {
         String model = definition.getItemModel();
+        if (model == null && definition.getId() != null && definition.getId().contains(":")) {
+            model = definition.getId();
+        }
         if (model != null) {
             try {
                 NamespacedKey modelKey = NamespacedKey.fromString(model);
@@ -214,7 +223,8 @@ public final class DefaultItemFactory implements ItemFactory {
                         return true;
                     }
                 }
-            } catch (Throwable ignored) {}
+            } catch (Throwable ignored) {
+            }
         }
         return false;
     }
@@ -239,17 +249,40 @@ public final class DefaultItemFactory implements ItemFactory {
                         return true;
                     }
                 } catch (Throwable t) {
-                    plugin.getLogger().warning("Failed to apply max_damage component for " + definition.getId() + ": " + t.getMessage());
+                    plugin.getLogger().warning(
+                            "Failed to apply max_damage component for " + definition.getId() + ": " + t.getMessage());
                 }
             }
         }
         return false;
     }
 
+    private static boolean applyItemFlags(ItemMeta meta, ItemDefinition definition) {
+        boolean modified = false;
+        if (definition.getFlags() != null && !definition.getFlags().isEmpty()) {
+            for (org.bukkit.inventory.ItemFlag flag : definition.getFlags()) {
+                if (!meta.hasItemFlag(flag)) {
+                    meta.addItemFlags(flag);
+                    modified = true;
+                }
+            }
+        }
+        return modified;
+    }
+
     @SuppressWarnings("deprecation")
     private static boolean applyHideAdditionalTooltip(ItemMeta meta, ItemDefinition definition) {
         Object hideVal = definition.getProperties().get("hide_additional_tooltip");
+        boolean shouldHide = false;
         if (Boolean.TRUE.equals(hideVal)) {
+            shouldHide = true;
+        } else if (hideVal == null) {
+            // Automatically hide additional tooltips for custom block definitions
+            if (definition.getProperties().containsKey("custom_block_data")) {
+                shouldHide = true;
+            }
+        }
+        if (shouldHide) {
             if (!meta.hasItemFlag(org.bukkit.inventory.ItemFlag.HIDE_ADDITIONAL_TOOLTIP)) {
                 meta.addItemFlags(org.bukkit.inventory.ItemFlag.HIDE_ADDITIONAL_TOOLTIP);
                 return true;
@@ -272,7 +305,8 @@ public final class DefaultItemFactory implements ItemFactory {
                     }
                 }
             } catch (Throwable t) {
-                plugin.getLogger().warning("Failed to apply JUKEBOX_PLAYABLE component for " + definition.getId() + ": " + t.getMessage());
+                plugin.getLogger().warning(
+                        "Failed to apply JUKEBOX_PLAYABLE component for " + definition.getId() + ": " + t.getMessage());
             }
         }
         return false;
@@ -283,7 +317,8 @@ public final class DefaultItemFactory implements ItemFactory {
         PersistentDataContainer pdc = meta.getPersistentDataContainer();
         if (definition.getMaxStackSize() == 1) {
             if (!pdc.has(uuidKey, org.bukkit.persistence.PersistentDataType.STRING)) {
-                pdc.set(uuidKey, org.bukkit.persistence.PersistentDataType.STRING, java.util.UUID.randomUUID().toString());
+                pdc.set(uuidKey, org.bukkit.persistence.PersistentDataType.STRING,
+                        java.util.UUID.randomUUID().toString());
                 return true;
             }
         } else {
@@ -301,7 +336,8 @@ public final class DefaultItemFactory implements ItemFactory {
             try {
                 boolean shouldUpdate = true;
                 if (itemStack.hasData(io.papermc.paper.datacomponent.DataComponentTypes.EQUIPPABLE)) {
-                    io.papermc.paper.datacomponent.item.Equippable current = itemStack.getData(io.papermc.paper.datacomponent.DataComponentTypes.EQUIPPABLE);
+                    io.papermc.paper.datacomponent.item.Equippable current = itemStack
+                            .getData(io.papermc.paper.datacomponent.DataComponentTypes.EQUIPPABLE);
                     if (current != null && current.assetId() != null) {
                         net.kyori.adventure.key.Key targetKey = net.kyori.adventure.key.Key.key(assetId);
                         if (current.assetId().equals(targetKey)) {
@@ -313,78 +349,63 @@ public final class DefaultItemFactory implements ItemFactory {
                 if (shouldUpdate) {
                     org.bukkit.inventory.EquipmentSlot slot = getEquipmentSlotFromMaterial(itemStack.getType());
                     if (slot != null) {
-                        io.papermc.paper.datacomponent.item.Equippable equippable = io.papermc.paper.datacomponent.item.Equippable.equippable(slot)
-                            .assetId(net.kyori.adventure.key.Key.key(assetId))
-                            .equipSound(net.kyori.adventure.key.Key.key("item.armor.equip_netherite"))
-                            .build();
+                        io.papermc.paper.datacomponent.item.Equippable equippable = io.papermc.paper.datacomponent.item.Equippable
+                                .equippable(slot)
+                                .assetId(net.kyori.adventure.key.Key.key(assetId))
+                                .equipSound(net.kyori.adventure.key.Key.key("item.armor.equip_netherite"))
+                                .build();
                         itemStack.setData(io.papermc.paper.datacomponent.DataComponentTypes.EQUIPPABLE, equippable);
                         return true;
                     }
                 }
             } catch (Throwable t) {
-                plugin.getLogger().warning("Failed to apply EQUIPPABLE component for " + definition.getId() + ": " + t.getMessage());
+                plugin.getLogger().warning(
+                        "Failed to apply EQUIPPABLE component for " + definition.getId() + ": " + t.getMessage());
             }
         }
         return false;
     }
 
-    private static ItemStack applyBlockStateComponent(ItemStack itemStack, String id, String blockDataStr, Plugin plugin) {
+    private static ItemStack removeBlockStateComponent(ItemStack itemStack) {
         try {
-            // 1. Parse properties from blockDataStr
-            Map<String, String> properties = new java.util.HashMap<>();
-            int bracketIndex = blockDataStr.indexOf('[');
-            if (bracketIndex != -1) {
-                String propsStr = blockDataStr.substring(bracketIndex + 1, blockDataStr.length() - 1);
-                String[] parts = propsStr.split(",");
-                for (String part : parts) {
-                    String[] kv = part.split("=");
-                    if (kv.length == 2) {
-                        properties.put(kv[0].trim(), kv[1].trim());
-                    }
-                }
-            }
-
-            // 2. Load CraftItemStack class
             Class<?> craftItemStackClass = Class.forName("org.bukkit.craftbukkit.inventory.CraftItemStack");
             java.lang.reflect.Method asNMSCopy = craftItemStackClass.getMethod("asNMSCopy", ItemStack.class);
-            java.lang.reflect.Method asBukkitCopy = craftItemStackClass.getMethod("asBukkitCopy", asNMSCopy.getReturnType());
+            java.lang.reflect.Method asBukkitCopy = craftItemStackClass.getMethod("asBukkitCopy",
+                    asNMSCopy.getReturnType());
 
-            // 3. Convert Bukkit ItemStack to NMS ItemStack
             Object nmsStack = asNMSCopy.invoke(null, itemStack);
+            if (nmsStack == null) {
+                return itemStack;
+            }
 
-            // 4. Get DataComponents.BLOCK_STATE field
             Class<?> dataComponentsClass = Class.forName("net.minecraft.core.component.DataComponents");
             java.lang.reflect.Field blockStateField = dataComponentsClass.getField("BLOCK_STATE");
             Object blockStateComponentType = blockStateField.get(null);
 
-            // 5. Remove existing BLOCK_STATE component first to avoid duplicate data
-            java.lang.reflect.Method removeMethod = nmsStack.getClass().getMethod("remove", blockStateField.getType());
-            removeMethod.invoke(nmsStack, blockStateComponentType);
+            java.lang.reflect.Method hasMethod = nmsStack.getClass().getMethod("has", blockStateField.getType());
+            boolean hasBlockState = (boolean) hasMethod.invoke(nmsStack, blockStateComponentType);
 
-            // 6. Instantiate BlockItemStateProperties using reflection
-            Class<?> blockItemStatePropertiesClass = Class.forName("net.minecraft.world.item.component.BlockItemStateProperties");
-            java.lang.reflect.Constructor<?> constructor = blockItemStatePropertiesClass.getConstructor(Map.class);
-            Object blockItemStateProperties = constructor.newInstance(properties);
-
-            // 7. Set component on NMS ItemStack
-            // Method signature: public <T> T set(DataComponentType<? super T> type, @Nullable T value)
-            java.lang.reflect.Method setMethod = nmsStack.getClass().getMethod("set", blockStateField.getType(), Object.class);
-            setMethod.invoke(nmsStack, blockStateComponentType, blockItemStateProperties);
-
-            // 7. Convert NMS ItemStack back to Bukkit ItemStack
-            return (ItemStack) asBukkitCopy.invoke(null, nmsStack);
-        } catch (Throwable t) {
-            plugin.getLogger().warning("Failed to apply NMS BLOCK_STATE component for " + id + ": " + t.getMessage());
-            return itemStack;
+            if (hasBlockState) {
+                java.lang.reflect.Method removeMethod = nmsStack.getClass().getMethod("remove",
+                        blockStateField.getType());
+                removeMethod.invoke(nmsStack, blockStateComponentType);
+                return (ItemStack) asBukkitCopy.invoke(null, nmsStack);
+            }
+        } catch (Throwable ignored) {
         }
+        return itemStack;
     }
 
     public static org.bukkit.inventory.EquipmentSlot getEquipmentSlotFromMaterial(org.bukkit.Material material) {
         String name = material.getKey().getKey().toUpperCase(Locale.ROOT);
-        if (name.endsWith("_HELMET")) return org.bukkit.inventory.EquipmentSlot.HEAD;
-        if (name.endsWith("_CHESTPLATE")) return org.bukkit.inventory.EquipmentSlot.CHEST;
-        if (name.endsWith("_LEGGINGS")) return org.bukkit.inventory.EquipmentSlot.LEGS;
-        if (name.endsWith("_BOOTS")) return org.bukkit.inventory.EquipmentSlot.FEET;
+        if (name.endsWith("_HELMET"))
+            return org.bukkit.inventory.EquipmentSlot.HEAD;
+        if (name.endsWith("_CHESTPLATE"))
+            return org.bukkit.inventory.EquipmentSlot.CHEST;
+        if (name.endsWith("_LEGGINGS"))
+            return org.bukkit.inventory.EquipmentSlot.LEGS;
+        if (name.endsWith("_BOOTS"))
+            return org.bukkit.inventory.EquipmentSlot.FEET;
         return null;
     }
 
