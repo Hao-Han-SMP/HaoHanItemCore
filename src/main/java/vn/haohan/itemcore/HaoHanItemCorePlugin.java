@@ -25,11 +25,12 @@ import java.util.logging.Logger;
 /**
  * HaoHanItemCore Plugin — Plugin nền tảng quản lý Custom Item & Recipe.
  * 
- * <p>Lifecycle:
+ * <p>
+ * Lifecycle:
  * <ol>
- *   <li>onLoad() → Initialize registries</li>
- *   <li>onEnable() → Load configs, register events, register commands</li>
- *   <li>onDisable() → Cleanup</li>
+ * <li>onLoad() → Initialize registries</li>
+ * <li>onEnable() → Load configs, register events, register commands</li>
+ * <li>onDisable() → Cleanup</li>
  * </ol>
  */
 public final class HaoHanItemCorePlugin extends JavaPlugin {
@@ -60,8 +61,7 @@ public final class HaoHanItemCorePlugin extends JavaPlugin {
         // Set singleton
         HaoHanItemCore.setInstance(new HaoHanItemCore(
                 itemRegistry, itemFactory, itemService,
-                recipeRegistry, recipeService, iconTextureRegistry
-        ));
+                recipeRegistry, recipeService, iconTextureRegistry));
 
         log.info("HaoHanItemCore loaded. Registries initialized.");
     }
@@ -90,15 +90,13 @@ public final class HaoHanItemCorePlugin extends JavaPlugin {
         // Register commands
         ItemCoreCommand commandHandler = new ItemCoreCommand(
                 itemRegistry, itemService, recipeRegistry, recipeService,
-                recipeViewer, itemBrowser, this::reload
-        );
+                recipeViewer, itemBrowser, this::reload);
 
         registerCommand(
                 "im",
                 "HaoHanItemCore command",
                 List.of("itemcore", "haohanitemcore"),
-                commandHandler
-        );
+                commandHandler);
 
         log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
         log.info("  HaoHanItemCore v" + getPluginMeta().getVersion() + " enabled!");

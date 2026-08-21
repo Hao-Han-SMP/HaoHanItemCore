@@ -11,10 +11,11 @@ import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
-import org.bukkit.event.inventory.InventoryClickEvent;
-import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.ClickType;
+import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -38,9 +39,6 @@ public final class ItemBrowserGUI implements Listener {
     private final ItemService itemService;
     private final RecipeViewerGUI recipeViewer;
 
-    // Track active sessions
-    private final Map<UUID, BrowserSession> activeSessions = new HashMap<>();
-
     public ItemBrowserGUI(ItemRegistry itemRegistry, ItemService itemService, RecipeViewerGUI recipeViewer) {
         this.itemRegistry = itemRegistry;
         this.itemService = itemService;
@@ -59,42 +57,35 @@ public final class ItemBrowserGUI implements Listener {
      */
     public void open(Player player, int page) {
         List<ItemDefinition> allItems = new ArrayList<>(itemRegistry.all());
-        allItems.sort(Comparator.comparing(def -> def.getId()));
+        allItems.sort(Comparator.comparing(ItemDefinition::getId));
 
         int totalPages = Math.max(1, (int) Math.ceil((double) allItems.size() / ITEMS_PER_PAGE));
         page = Math.max(0, Math.min(page, totalPages - 1));
 
-        BrowserSession session = new BrowserSession(allItems, page, totalPages);
-        activeSessions.put(player.getUniqueId(), session);
+        ItemBrowserHolder holder = new ItemBrowserHolder(allItems, page, totalPages);
+        Inventory gui = Bukkit.createInventory(holder, GUI_SIZE,
+                Component.text("Item Browser", NamedTextColor.DARK_PURPLE));
+        holder.setInventory(gui);
 
-        Inventory gui = createGUI(session);
+        populateItems(gui, holder);
+        populateNavigation(gui, holder);
+
         player.openInventory(gui);
     }
 
-    private Inventory createGUI(BrowserSession session) {
-        Inventory gui = Bukkit.createInventory(null, GUI_SIZE,
-                Component.text("Item Browser", NamedTextColor.DARK_PURPLE));
-
-        populateItems(gui, session);
-        populateNavigation(gui, session);
-
-        return gui;
-    }
-
-    private void populateItems(Inventory gui, BrowserSession session) {
-        int startIndex = session.page * ITEMS_PER_PAGE;
+    private void populateItems(Inventory gui, ItemBrowserHolder holder) {
+        int startIndex = holder.getPage() * ITEMS_PER_PAGE;
         for (int i = 0; i < ITEMS_PER_PAGE; i++) {
             int itemIndex = startIndex + i;
-            if (itemIndex < session.items.size()) {
-                ItemDefinition def = session.items.get(itemIndex);
+            if (itemIndex < holder.getItems().size()) {
+                ItemDefinition def = holder.getItems().get(itemIndex);
                 ItemStack display = itemService.create(def.getId());
-                clearPreviewModel(display, def);
                 gui.setItem(i, display);
             }
         }
     }
 
-    private void populateNavigation(Inventory gui, BrowserSession session) {
+    private void populateNavigation(Inventory gui, ItemBrowserHolder holder) {
         // Navigation bar (bottom row)
         ItemStack border = createBorderItem();
         for (int i = ITEMS_PER_PAGE; i < GUI_SIZE; i++) {
@@ -102,18 +93,18 @@ public final class ItemBrowserGUI implements Listener {
         }
 
         // Previous page
-        gui.setItem(PREV_SLOT, createNavItem("§a◀ Previous Page", session.page > 0));
+        gui.setItem(PREV_SLOT, createNavItem("§a◀ Previous Page", holder.getPage() > 0));
 
         // Next page
-        gui.setItem(NEXT_SLOT, createNavItem("§a▶ Next Page", session.page < session.totalPages - 1));
+        gui.setItem(NEXT_SLOT, createNavItem("§a▶ Next Page", holder.getPage() < holder.getTotalPages() - 1));
 
         // Info
         ItemStack info = MenuIcon.create(MenuIcon.INFO,
-                Component.text("Page " + (session.page + 1) + " / " + session.totalPages,
+                Component.text("Page " + (holder.getPage() + 1) + " / " + holder.getTotalPages(),
                         NamedTextColor.GOLD));
         ItemMeta infoMeta = info.getItemMeta();
         infoMeta.lore(List.of(
-                Component.text("Total items: " + session.items.size(), NamedTextColor.GRAY),
+                Component.text("Total items: " + holder.getItems().size(), NamedTextColor.GRAY),
                 Component.text("Left click: Take item", NamedTextColor.YELLOW),
                 Component.text("Right click: View recipe", NamedTextColor.YELLOW),
                 Component.text("Shift + left click: Take a stack", NamedTextColor.YELLOW)));
@@ -122,21 +113,6 @@ public final class ItemBrowserGUI implements Listener {
 
         // Close
         gui.setItem(CLOSE_SLOT, createCloseItem());
-    }
-
-    /**
-     * Item Browser previews custom-model-data through the material item mapping.
-     * Explicit 32px item models are intended for world/hand rendering and can
-     * overflow a 16px inventory slot when used as a GUI preview.
-     */
-    private static void clearPreviewModel(ItemStack item, ItemDefinition definition) {
-        if (definition.getCustomModelData() == null)
-            return;
-        ItemMeta meta = item.getItemMeta();
-        if (meta == null)
-            return;
-        meta.setItemModel(null);
-        item.setItemMeta(meta);
     }
 
     private ItemStack createBorderItem() {
@@ -159,35 +135,54 @@ public final class ItemBrowserGUI implements Listener {
         return MenuIcon.create(MenuIcon.CLOSE, Component.text("Close", NamedTextColor.RED));
     }
 
-    @EventHandler
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onInventoryClick(InventoryClickEvent event) {
         if (!(event.getWhoClicked() instanceof Player player))
             return;
 
-        BrowserSession session = activeSessions.get(player.getUniqueId());
-        if (session == null)
+        if (!(event.getView().getTopInventory().getHolder() instanceof ItemBrowserHolder holder))
             return;
 
         event.setCancelled(true);
 
         int slot = event.getRawSlot();
+        int topSize = event.getView().getTopInventory().getSize();
 
-        if (handleNavigationClick(slot, player, session)) {
+        // Clicks outside top inventory are ignored after cancellation
+        if (slot < 0 || slot >= topSize) {
             return;
         }
 
-        if (slot >= 0 && slot < ITEMS_PER_PAGE) {
-            handleItemClick(slot, player, session, event.getCurrentItem(), event.getClick());
+        if (handleNavigationClick(slot, player, holder)) {
+            return;
+        }
+
+        if (slot < ITEMS_PER_PAGE) {
+            handleItemClick(slot, player, holder, event.getCurrentItem(), event.getClick());
         }
     }
 
-    private boolean handleNavigationClick(int slot, Player player, BrowserSession session) {
-        if (slot == PREV_SLOT && session.page > 0) {
-            open(player, session.page - 1);
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onInventoryDrag(InventoryDragEvent event) {
+        if (!(event.getWhoClicked() instanceof Player))
+            return;
+
+        if (!(event.getView().getTopInventory().getHolder() instanceof ItemBrowserHolder))
+            return;
+
+        int topSize = event.getView().getTopInventory().getSize();
+        if (event.getRawSlots().stream().anyMatch(slot -> slot < topSize)) {
+            event.setCancelled(true);
+        }
+    }
+
+    private boolean handleNavigationClick(int slot, Player player, ItemBrowserHolder holder) {
+        if (slot == PREV_SLOT && holder.getPage() > 0) {
+            open(player, holder.getPage() - 1);
             return true;
         }
-        if (slot == NEXT_SLOT && session.page < session.totalPages - 1) {
-            open(player, session.page + 1);
+        if (slot == NEXT_SLOT && holder.getPage() < holder.getTotalPages() - 1) {
+            open(player, holder.getPage() + 1);
             return true;
         }
         if (slot == CLOSE_SLOT) {
@@ -197,7 +192,7 @@ public final class ItemBrowserGUI implements Listener {
         return false;
     }
 
-    private void handleItemClick(int slot, Player player, BrowserSession session,
+    private void handleItemClick(int slot, Player player, ItemBrowserHolder holder,
             ItemStack clicked, ClickType click) {
         if (clicked != null && clicked.getType() != Material.AIR) {
             String itemId = itemService.getId(clicked);
@@ -213,25 +208,6 @@ public final class ItemBrowserGUI implements Listener {
                     player.getInventory().addItem(itemService.create(itemId, amount));
                 }
             }
-        }
-    }
-
-    @EventHandler
-    public void onInventoryClose(InventoryCloseEvent event) {
-        if (event.getPlayer() instanceof Player player) {
-            activeSessions.remove(player.getUniqueId());
-        }
-    }
-
-    private static final class BrowserSession {
-        final List<ItemDefinition> items;
-        final int page;
-        final int totalPages;
-
-        BrowserSession(List<ItemDefinition> items, int page, int totalPages) {
-            this.items = items;
-            this.page = page;
-            this.totalPages = totalPages;
         }
     }
 }

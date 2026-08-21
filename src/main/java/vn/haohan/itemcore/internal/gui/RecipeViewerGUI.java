@@ -15,7 +15,6 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
-import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
@@ -45,9 +44,6 @@ public final class RecipeViewerGUI implements Listener {
     private final RecipeService recipeService;
     private final ItemRegistry itemRegistry;
 
-    // Track active GUIs
-    private final Map<UUID, ViewerSession> activeSessions = new HashMap<>();
-
     public RecipeViewerGUI(ItemService itemService, RecipeService recipeService,
                            ItemRegistry itemRegistry) {
         this.itemService = itemService;
@@ -71,11 +67,7 @@ public final class RecipeViewerGUI implements Listener {
             return;
         }
 
-        ViewerSession session = new ViewerSession(itemId, recipes, 0);
-        activeSessions.put(player.getUniqueId(), session);
-
-        Inventory gui = createGUI(session);
-        player.openInventory(gui);
+        open(player, itemId, recipes, 0);
     }
 
     public boolean hasRecipes(String itemId) {
@@ -87,17 +79,21 @@ public final class RecipeViewerGUI implements Listener {
      */
     public void open(Player player, RecipeDefinition recipe) {
         List<RecipeDefinition> recipes = List.of(recipe);
-        ViewerSession session = new ViewerSession(recipe.getResult().item(), recipes, 0);
-        activeSessions.put(player.getUniqueId(), session);
-
-        Inventory gui = createGUI(session);
-        player.openInventory(gui);
+        open(player, recipe.getResult().item(), recipes, 0);
     }
 
-    private Inventory createGUI(ViewerSession session) {
-        RecipeDefinition recipe = session.currentRecipe();
-        Inventory gui = Bukkit.createInventory(null, GUI_SIZE,
+    /**
+     * Mở Recipe Viewer với danh sách recipes và index cụ thể.
+     */
+    public void open(Player player, String itemId, List<RecipeDefinition> recipes, int index) {
+        if (recipes.isEmpty()) return;
+        index = Math.max(0, Math.min(index, recipes.size() - 1));
+
+        RecipeViewerHolder holder = new RecipeViewerHolder(itemId, recipes, index);
+        RecipeDefinition recipe = recipes.get(index);
+        Inventory gui = Bukkit.createInventory(holder, GUI_SIZE,
                 Component.text("Recipe: " + recipe.getResult().item()));
+        holder.setInventory(gui);
 
         // Fill border
         ItemStack border = createBorderItem();
@@ -106,9 +102,9 @@ public final class RecipeViewerGUI implements Listener {
         }
 
         populateRecipeGrid(gui, recipe);
-        populateNavigation(gui, session);
+        populateNavigation(gui, holder);
 
-        return gui;
+        player.openInventory(gui);
     }
 
     private void populateRecipeGrid(Inventory gui, RecipeDefinition recipe) {
@@ -133,12 +129,12 @@ public final class RecipeViewerGUI implements Listener {
         gui.setItem(RESULT_SLOT, createDisplayItem(recipe.getResult().item(), recipe.getResult().amount()));
     }
 
-    private void populateNavigation(Inventory gui, ViewerSession session) {
+    private void populateNavigation(Inventory gui, RecipeViewerHolder holder) {
         // Navigation
-        if (session.recipes.size() > 1) {
-            gui.setItem(PREV_SLOT, createNavItem("§a◀ Previous", session.index > 0));
-            gui.setItem(NEXT_SLOT, createNavItem("§a▶ Next", session.index < session.recipes.size() - 1));
-            gui.setItem(INFO_SLOT, createInfoItem(session));
+        if (holder.getRecipes().size() > 1) {
+            gui.setItem(PREV_SLOT, createNavItem("§a◀ Previous", holder.getIndex() > 0));
+            gui.setItem(NEXT_SLOT, createNavItem("§a▶ Next", holder.getIndex() < holder.getRecipes().size() - 1));
+            gui.setItem(INFO_SLOT, createInfoItem(holder));
         }
 
         // Back button
@@ -178,8 +174,7 @@ public final class RecipeViewerGUI implements Listener {
             return createDisplayItem(item.id(), item.amount());
         }
         if (ingredient instanceof Ingredient.MaterialIngredient mat) {
-            ItemStack stack = new ItemStack(mat.material(), mat.amount());
-            return stack;
+            return new ItemStack(mat.material(), mat.amount());
         }
         if (ingredient instanceof Ingredient.TagIngredient tag) {
             ItemStack stack = new ItemStack(Material.NAME_TAG, tag.amount());
@@ -194,17 +189,7 @@ public final class RecipeViewerGUI implements Listener {
     private ItemStack createDisplayItem(String itemId, int amount) {
         // Custom item
         if (itemRegistry.exists(itemId)) {
-            ItemStack display = itemService.create(itemId, Math.max(1, amount));
-            ItemDefinition definition = itemRegistry.get(itemId);
-            if (definition != null && definition.getItemModel() == null
-                    && definition.getCustomModelData() != null) {
-                ItemMeta meta = display.getItemMeta();
-                if (meta != null) {
-                    meta.setItemModel(null);
-                    display.setItemMeta(meta);
-                }
-            }
-            return display;
+            return itemService.create(itemId, Math.max(1, amount));
         }
 
         // Vanilla item
@@ -244,13 +229,13 @@ public final class RecipeViewerGUI implements Listener {
                 Component.text(name));
     }
 
-    private ItemStack createInfoItem(ViewerSession session) {
+    private ItemStack createInfoItem(RecipeViewerHolder holder) {
         ItemStack item = MenuIcon.create(MenuIcon.INFO,
-                Component.text("Recipe " + (session.index + 1) + " / " + session.recipes.size(),
+                Component.text("Recipe " + (holder.getIndex() + 1) + " / " + holder.getRecipes().size(),
                         NamedTextColor.GOLD));
         ItemMeta meta = item.getItemMeta();
         meta.lore(List.of(
-                Component.text("Type: " + session.currentRecipe().getType(), NamedTextColor.GRAY)
+                Component.text("Type: " + holder.currentRecipe().getType(), NamedTextColor.GRAY)
         ));
         item.setItemMeta(meta);
         return item;
@@ -264,47 +249,44 @@ public final class RecipeViewerGUI implements Listener {
     public void onInventoryClick(InventoryClickEvent event) {
         if (!(event.getWhoClicked() instanceof Player player)) return;
 
-        ViewerSession session = activeSessions.get(player.getUniqueId());
-        if (session == null) return;
+        if (!(event.getView().getTopInventory().getHolder() instanceof RecipeViewerHolder holder)) return;
 
         event.setCancelled(true);
 
         int slot = event.getRawSlot();
         int topSize = event.getView().getTopInventory().getSize();
 
-        // The player inventory is never part of the viewer.  Return before
+        // The player inventory is never part of the viewer. Return before
         // any navigation/ingredient handling so shift-click, number keys,
         // double-click and drag-like actions cannot move items through it.
         if (slot < 0 || slot >= topSize) {
             return;
         }
 
-        if (handleNavigationClick(slot, player, session)) {
+        if (handleNavigationClick(slot, player, holder)) {
             return;
         }
 
-        handleIngredientClick(event.getCurrentItem(), player, session);
+        handleIngredientClick(event.getCurrentItem(), player, holder);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onInventoryDrag(InventoryDragEvent event) {
-        if (!(event.getWhoClicked() instanceof Player player)) return;
-        if (!activeSessions.containsKey(player.getUniqueId())) return;
+        if (!(event.getWhoClicked() instanceof Player)) return;
+        if (!(event.getView().getTopInventory().getHolder() instanceof RecipeViewerHolder)) return;
         int topSize = event.getView().getTopInventory().getSize();
         if (event.getRawSlots().stream().anyMatch(slot -> slot < topSize)) {
             event.setCancelled(true);
         }
     }
 
-    private boolean handleNavigationClick(int slot, Player player, ViewerSession session) {
-        if (slot == PREV_SLOT && session.index > 0) {
-            session.index--;
-            player.openInventory(createGUI(session));
+    private boolean handleNavigationClick(int slot, Player player, RecipeViewerHolder holder) {
+        if (slot == PREV_SLOT && holder.getIndex() > 0) {
+            open(player, holder.getItemId(), holder.getRecipes(), holder.getIndex() - 1);
             return true;
         }
-        if (slot == NEXT_SLOT && session.index < session.recipes.size() - 1) {
-            session.index++;
-            player.openInventory(createGUI(session));
+        if (slot == NEXT_SLOT && holder.getIndex() < holder.getRecipes().size() - 1) {
+            open(player, holder.getItemId(), holder.getRecipes(), holder.getIndex() + 1);
             return true;
         }
         if (slot == BACK_SLOT) {
@@ -314,41 +296,15 @@ public final class RecipeViewerGUI implements Listener {
         return false;
     }
 
-    private void handleIngredientClick(ItemStack clicked, Player player, ViewerSession session) {
+    private void handleIngredientClick(ItemStack clicked, Player player, RecipeViewerHolder holder) {
         if (clicked != null && clicked.getType() != Material.AIR) {
             String clickedId = itemService.getId(clicked);
-            if (clickedId != null && !clickedId.equals(session.itemId)) {
+            if (clickedId != null && !clickedId.equals(holder.getItemId())) {
                 List<RecipeDefinition> recipes = recipeService.findByResult(clickedId);
                 if (!recipes.isEmpty()) {
                     open(player, clickedId);
                 }
             }
-        }
-    }
-
-    @EventHandler
-    public void onInventoryClose(InventoryCloseEvent event) {
-        if (event.getPlayer() instanceof Player player) {
-            activeSessions.remove(player.getUniqueId());
-        }
-    }
-
-    /**
-     * Session tracking cho mỗi player.
-     */
-    private static final class ViewerSession {
-        final String itemId;
-        final List<RecipeDefinition> recipes;
-        int index;
-
-        ViewerSession(String itemId, List<RecipeDefinition> recipes, int index) {
-            this.itemId = itemId;
-            this.recipes = recipes;
-            this.index = index;
-        }
-
-        RecipeDefinition currentRecipe() {
-            return recipes.get(index);
         }
     }
 }
