@@ -81,7 +81,7 @@ public final class ItemCoreCommand implements BasicCommand {
             case "recipe" -> handleRecipe(sender, args);
             case "reload" -> handleReload(sender);
             case "search" -> handleSearch(sender, args);
-            case "browse" -> handleBrowse(sender);
+            case "browse" -> handleBrowse(sender, args);
             default -> {
                 sender.sendMessage(Component.text("Unknown sub-command: " + sub, NamedTextColor.RED));
                 sendHelp(sender);
@@ -323,13 +323,18 @@ public final class ItemCoreCommand implements BasicCommand {
         return true;
     }
 
-    private boolean handleBrowse(CommandSender sender) {
+    private boolean handleBrowse(CommandSender sender, String[] args) {
         if (!(sender instanceof Player player)) {
             sender.sendMessage(Component.text("This command can only be used by players.", NamedTextColor.RED));
             return true;
         }
 
-        itemBrowser.open(player);
+        if (args.length > 1) {
+            String query = String.join(" ", Arrays.copyOfRange(args, 1, args.length));
+            itemBrowser.open(player, 0, query);
+        } else {
+            itemBrowser.open(player);
+        }
         return true;
     }
 

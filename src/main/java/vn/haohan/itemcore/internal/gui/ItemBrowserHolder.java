@@ -9,25 +9,29 @@ import java.util.List;
 
 /**
  * InventoryHolder cho ItemBrowserGUI.
- * Gắn trực tiếp dữ liệu phiên duyệt item vào container Inventory.
+ * Gắn trực tiếp dữ liệu phiên duyệt item và trạng thái filter vào container Inventory.
  */
 public final class ItemBrowserHolder implements InventoryHolder {
 
     private final List<ItemDefinition> items;
     private final int page;
     private final int totalPages;
-    private final String searchQuery;
+    private final ItemBrowserFilter filter;
     private Inventory inventory;
 
     public ItemBrowserHolder(List<ItemDefinition> items, int page, int totalPages) {
-        this(items, page, totalPages, null);
+        this(items, page, totalPages, ItemBrowserFilter.empty());
     }
 
     public ItemBrowserHolder(List<ItemDefinition> items, int page, int totalPages, String searchQuery) {
+        this(items, page, totalPages, new ItemBrowserFilter(searchQuery, null, null));
+    }
+
+    public ItemBrowserHolder(List<ItemDefinition> items, int page, int totalPages, ItemBrowserFilter filter) {
         this.items = items;
         this.page = page;
         this.totalPages = totalPages;
-        this.searchQuery = searchQuery;
+        this.filter = (filter != null) ? filter : ItemBrowserFilter.empty();
     }
 
     public List<ItemDefinition> getItems() {
@@ -42,8 +46,12 @@ public final class ItemBrowserHolder implements InventoryHolder {
         return totalPages;
     }
 
+    public ItemBrowserFilter getFilter() {
+        return filter;
+    }
+
     public String getSearchQuery() {
-        return searchQuery;
+        return filter.getQuery();
     }
 
     public void setInventory(Inventory inventory) {

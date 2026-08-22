@@ -9,7 +9,7 @@ import java.util.List;
 
 /**
  * InventoryHolder cho RecipeViewerGUI.
- * Gắn trực tiếp dữ liệu công thức và chỉ số recipe vào container Inventory.
+ * Gắn trực tiếp dữ liệu công thức, chỉ số recipe và trạng thái filter để quay về Item Browser.
  */
 public final class RecipeViewerHolder implements InventoryHolder {
 
@@ -17,19 +17,23 @@ public final class RecipeViewerHolder implements InventoryHolder {
     private final List<RecipeDefinition> recipes;
     private final int index;
     private final int returnPage;
-    private final String returnSearchQuery;
+    private final ItemBrowserFilter returnFilter;
     private Inventory inventory;
 
     public RecipeViewerHolder(String itemId, List<RecipeDefinition> recipes, int index) {
-        this(itemId, recipes, index, 0, null);
+        this(itemId, recipes, index, 0, ItemBrowserFilter.empty());
     }
 
     public RecipeViewerHolder(String itemId, List<RecipeDefinition> recipes, int index, int returnPage, String returnSearchQuery) {
+        this(itemId, recipes, index, returnPage, new ItemBrowserFilter(returnSearchQuery, null, null));
+    }
+
+    public RecipeViewerHolder(String itemId, List<RecipeDefinition> recipes, int index, int returnPage, ItemBrowserFilter returnFilter) {
         this.itemId = itemId;
         this.recipes = recipes;
         this.index = index;
         this.returnPage = returnPage;
-        this.returnSearchQuery = returnSearchQuery;
+        this.returnFilter = (returnFilter != null) ? returnFilter : ItemBrowserFilter.empty();
     }
 
     public String getItemId() {
@@ -49,7 +53,11 @@ public final class RecipeViewerHolder implements InventoryHolder {
     }
 
     public String getReturnSearchQuery() {
-        return returnSearchQuery;
+        return returnFilter.getQuery();
+    }
+
+    public ItemBrowserFilter getReturnFilter() {
+        return returnFilter;
     }
 
     public RecipeDefinition currentRecipe() {
