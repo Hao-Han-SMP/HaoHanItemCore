@@ -396,7 +396,7 @@ public final class ItemCoreCommand implements BasicCommand {
 
     private List<String> getAllItemIds() {
         return itemRegistry.all().stream()
-                .map(ItemDefinition::getId)
+                .map(def -> def.getId())
                 .collect(Collectors.toList());
     }
 
