@@ -170,6 +170,9 @@ public final class DefaultItemFactory implements ItemFactory {
         if (definition.getDisplayName() != null) {
             net.kyori.adventure.text.Component targetName = LegacyComponentSerializer.legacySection()
                     .deserialize(definition.getDisplayName());
+            if (!targetName.hasDecoration(net.kyori.adventure.text.format.TextDecoration.ITALIC)) {
+                targetName = targetName.decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false);
+            }
             if (!targetName.equals(meta.displayName())) {
                 meta.displayName(targetName);
                 return true;
@@ -180,7 +183,13 @@ public final class DefaultItemFactory implements ItemFactory {
 
     private static boolean applyLore(ItemMeta meta, ItemDefinition definition) {
         java.util.List<net.kyori.adventure.text.Component> targetLore = definition.getLore().stream()
-                .map(line -> LegacyComponentSerializer.legacySection().deserialize(line))
+                .map(line -> {
+                    net.kyori.adventure.text.Component comp = LegacyComponentSerializer.legacySection().deserialize(line);
+                    if (!comp.hasDecoration(net.kyori.adventure.text.format.TextDecoration.ITALIC)) {
+                        comp = comp.decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false);
+                    }
+                    return comp;
+                })
                 .collect(Collectors.toList());
         java.util.List<net.kyori.adventure.text.Component> currentLore = meta.lore();
         if (currentLore == null)

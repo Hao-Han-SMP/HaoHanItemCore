@@ -1,6 +1,7 @@
 package vn.haohan.itemcore.internal.gui;
 
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -22,9 +23,16 @@ final class MenuIcon {
     static ItemStack create(int customModelData, Component displayName) {
         ItemStack item = new ItemStack(Material.PAPER, 1);
         ItemMeta meta = item.getItemMeta();
-        meta.setCustomModelData(customModelData);
-        meta.displayName(displayName);
-        item.setItemMeta(meta);
+        if (meta != null) {
+            meta.setCustomModelData(customModelData);
+            if (displayName != null) {
+                if (!displayName.hasDecoration(TextDecoration.ITALIC)) {
+                    displayName = displayName.decoration(TextDecoration.ITALIC, false);
+                }
+                meta.displayName(displayName);
+            }
+            item.setItemMeta(meta);
+        }
         return item;
     }
 }
