@@ -349,50 +349,128 @@ public final class ItemCoreCommand implements BasicCommand {
 
     @Override
     public Collection<String> suggest(CommandSourceStack source, String[] args) {
+        CommandSender sender = source.getSender();
+        boolean isAdmin = sender.hasPermission("baseengine.admin");
+
+        List<String> subCommands = new ArrayList<>(List.of("items", "item", "recipes", "recipe", "search", "browse"));
+        if (isAdmin) {
+            subCommands.add("give");
+            subCommands.add("reload");
+        }
+
+        if (args.length == 0) {
+            return subCommands;
+        }
+
         if (args.length == 1) {
-            return filterStartsWith(List.of("items", "item", "give", "recipes", "recipe", "search", "browse", "reload"), args[0]);
+            return filterSuggestions(subCommands, args[0]);
         }
 
         if (args.length == 2) {
             return switch (args[0].toLowerCase()) {
-                case "item", "recipe" -> filterStartsWith(getAllIds(), args[1]);
-                case "give" -> filterStartsWith(getOnlinePlayerNames(), args[1]);
-                case "search" -> List.of();
+                case "item" -> filterSuggestions(getAllItemIds(), args[1]);
+                case "recipe" -> filterSuggestions(getAllRecipeIds(), args[1]);
+                case "give" -> isAdmin ? filterSuggestions(getPlayerTargets(), args[1]) : List.of();
+                case "search" -> filterSuggestions(getAllIds(), args[1]);
                 default -> List.of();
             };
         }
 
         if (args.length == 3 && args[0].equalsIgnoreCase("give")) {
-            return filterStartsWith(getAllItemIds(), args[2]);
+            return isAdmin ? filterSuggestions(getAllItemIds(), args[2]) : List.of();
+        }
+
+        if (args.length == 4 && args[0].equalsIgnoreCase("give")) {
+            return isAdmin ? filterSuggestions(List.of("1", "16", "32", "64"), args[3]) : List.of();
         }
 
         return List.of();
     }
 
     private List<String> getAllIds() {
-        List<String> ids = new ArrayList<>();
+        Set<String> ids = new LinkedHashSet<>();
         itemRegistry.all().forEach(def -> ids.add(def.getId()));
         recipeRegistry.all().forEach(recipe -> ids.add(recipe.getId()));
-        return ids;
+        return new ArrayList<>(ids);
     }
 
     private List<String> getAllItemIds() {
         return itemRegistry.all().stream()
-                .map(def -> def.getId())
+                .map(ItemDefinition::getId)
                 .collect(Collectors.toList());
     }
 
-    private List<String> getOnlinePlayerNames() {
-        return Bukkit.getOnlinePlayers().stream()
-                .map(p -> p.getName())
-                .collect(Collectors.toList());
+    private List<String> getAllRecipeIds() {
+        Set<String> ids = new LinkedHashSet<>();
+        recipeRegistry.all().forEach(recipe -> ids.add(recipe.getId()));
+        recipeRegistry.all().forEach(recipe -> ids.add(recipe.getResult().item()));
+        return new ArrayList<>(ids);
     }
 
-    private List<String> filterStartsWith(List<String> list, String prefix) {
-        String lower = prefix.toLowerCase();
+    private List<String> getPlayerTargets() {
+        List<String> targets = new ArrayList<>();
+        for (Player p : Bukkit.getOnlinePlayers()) {
+            targets.add(p.getName());
+        }
+        targets.addAll(List.of("@p", "@a", "@r", "@s"));
+        return targets;
+    }
+
+    private List<String> filterSuggestions(Collection<String> list, String input) {
+        if (input == null || input.isEmpty()) {
+            return new ArrayList<>(list);
+        }
+
+        String lowerInput = input.toLowerCase();
+
         return list.stream()
-                .filter(s -> s.toLowerCase().startsWith(lower))
+                .filter(item -> {
+                    String lowerItem = item.toLowerCase();
+                    if (lowerItem.contains(lowerInput)) {
+                        return true;
+                    }
+                    int colonIndex = lowerItem.indexOf(':');
+                    if (colonIndex != -1 && colonIndex < lowerItem.length() - 1) {
+                        String keyPart = lowerItem.substring(colonIndex + 1);
+                        return keyPart.contains(lowerInput);
+                    }
+                    return false;
+                })
+                .sorted((a, b) -> {
+                    String lowerA = a.toLowerCase();
+                    String lowerB = b.toLowerCase();
+
+                    // Exact start match on full string
+                    boolean aStarts = lowerA.startsWith(lowerInput);
+                    boolean bStarts = lowerB.startsWith(lowerInput);
+                    if (aStarts != bStarts) {
+                        return aStarts ? -1 : 1;
+                    }
+
+                    // Start match on key part (after ':')
+                    String keyA = getKeyPart(lowerA);
+                    String keyB = getKeyPart(lowerB);
+                    boolean aKeyStarts = keyA.startsWith(lowerInput);
+                    boolean bKeyStarts = keyB.startsWith(lowerInput);
+                    if (aKeyStarts != bKeyStarts) {
+                        return aKeyStarts ? -1 : 1;
+                    }
+
+                    // Contains match on key part
+                    boolean aKeyContains = keyA.contains(lowerInput);
+                    boolean bKeyContains = keyB.contains(lowerInput);
+                    if (aKeyContains != bKeyContains) {
+                        return aKeyContains ? -1 : 1;
+                    }
+
+                    return lowerA.compareTo(lowerB);
+                })
                 .collect(Collectors.toList());
+    }
+
+    private String getKeyPart(String id) {
+        int colonIndex = id.indexOf(':');
+        return (colonIndex != -1 && colonIndex < id.length() - 1) ? id.substring(colonIndex + 1) : id;
     }
 
     private int parseInt(String s, int defaultValue) {
