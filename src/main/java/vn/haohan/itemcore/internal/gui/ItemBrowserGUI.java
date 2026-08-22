@@ -84,7 +84,7 @@ public final class ItemBrowserGUI implements Listener {
      */
     public void open(Player player, int page, String searchQuery) {
         List<ItemDefinition> allItems = new ArrayList<>(itemRegistry.all());
-        allItems.sort(Comparator.comparing(ItemDefinition::getId));
+        allItems.sort((a, b) -> a.getId().compareTo(b.getId()));
 
         String query = (searchQuery != null && !searchQuery.isBlank()) ? searchQuery.trim() : null;
         List<ItemDefinition> displayItems;

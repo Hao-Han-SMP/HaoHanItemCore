@@ -1,6 +1,5 @@
 package vn.haohan.itemcore.internal.gui;
 
-import vn.haohan.itemcore.api.item.ItemDefinition;
 import vn.haohan.itemcore.api.item.ItemRegistry;
 import vn.haohan.itemcore.api.item.ItemService;
 import vn.haohan.itemcore.api.recipe.*;
