@@ -150,6 +150,7 @@ public final class DefaultItemFactory implements ItemFactory {
         metaModified |= applyUniqueUUID(meta, definition, plugin);
         metaModified |= applyItemFlags(meta, definition);
         metaModified |= applyHideAdditionalTooltip(meta, definition);
+        metaModified |= applyHideTooltip(meta, definition);
 
         if (metaModified) {
             itemStack.setItemMeta(meta);
@@ -285,6 +286,17 @@ public final class DefaultItemFactory implements ItemFactory {
         if (shouldHide) {
             if (!meta.hasItemFlag(org.bukkit.inventory.ItemFlag.HIDE_ADDITIONAL_TOOLTIP)) {
                 meta.addItemFlags(org.bukkit.inventory.ItemFlag.HIDE_ADDITIONAL_TOOLTIP);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean applyHideTooltip(ItemMeta meta, ItemDefinition definition) {
+        Object hideTooltipVal = definition.getProperties().get("hide_tooltip");
+        if (Boolean.TRUE.equals(hideTooltipVal) || "true".equalsIgnoreCase(String.valueOf(hideTooltipVal))) {
+            if (!meta.isHideTooltip()) {
+                meta.setHideTooltip(true);
                 return true;
             }
         }

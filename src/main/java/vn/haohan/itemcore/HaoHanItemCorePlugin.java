@@ -83,6 +83,7 @@ public final class HaoHanItemCorePlugin extends JavaPlugin {
         // Create GUI handlers
         RecipeViewerGUI recipeViewer = new RecipeViewerGUI(this, itemService, recipeService, itemRegistry);
         ItemBrowserGUI itemBrowser = new ItemBrowserGUI(itemRegistry, itemService, recipeViewer);
+        recipeViewer.setItemBrowser(itemBrowser);
 
         getServer().getPluginManager().registerEvents(recipeViewer, this);
         getServer().getPluginManager().registerEvents(itemBrowser, this);

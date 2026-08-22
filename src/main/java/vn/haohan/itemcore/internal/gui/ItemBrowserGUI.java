@@ -103,12 +103,14 @@ public final class ItemBrowserGUI implements Listener {
                 Component.text("Page " + (holder.getPage() + 1) + " / " + holder.getTotalPages(),
                         NamedTextColor.GOLD));
         ItemMeta infoMeta = info.getItemMeta();
-        infoMeta.lore(List.of(
-                Component.text("Total items: " + holder.getItems().size(), NamedTextColor.GRAY),
-                Component.text("Left click: Take item", NamedTextColor.YELLOW),
-                Component.text("Right click: View recipe", NamedTextColor.YELLOW),
-                Component.text("Shift + left click: Take a stack", NamedTextColor.YELLOW)));
-        info.setItemMeta(infoMeta);
+        if (infoMeta != null) {
+            infoMeta.lore(List.of(
+                    Component.text("Total items: " + holder.getItems().size(), NamedTextColor.GRAY).decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false),
+                    Component.text("Left click: Take item", NamedTextColor.YELLOW).decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false),
+                    Component.text("Right click: View recipe", NamedTextColor.YELLOW).decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false),
+                    Component.text("Shift + left click: Take a stack", NamedTextColor.YELLOW).decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false)));
+            info.setItemMeta(infoMeta);
+        }
         gui.setItem(INFO_SLOT, info);
 
         // Close
@@ -118,8 +120,11 @@ public final class ItemBrowserGUI implements Listener {
     private ItemStack createBorderItem() {
         ItemStack border = new ItemStack(Material.GRAY_STAINED_GLASS_PANE, 1);
         ItemMeta meta = border.getItemMeta();
-        meta.displayName(Component.text(" "));
-        border.setItemMeta(meta);
+        if (meta != null) {
+            meta.displayName(Component.empty());
+            meta.setHideTooltip(true);
+            border.setItemMeta(meta);
+        }
         return border;
     }
 

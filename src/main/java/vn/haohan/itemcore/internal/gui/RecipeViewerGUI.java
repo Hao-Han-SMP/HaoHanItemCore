@@ -43,6 +43,7 @@ public final class RecipeViewerGUI implements Listener {
     private final ItemService itemService;
     private final RecipeService recipeService;
     private final ItemRegistry itemRegistry;
+    private ItemBrowserGUI itemBrowser;
 
     public RecipeViewerGUI(ItemService itemService, RecipeService recipeService,
                            ItemRegistry itemRegistry) {
@@ -54,6 +55,10 @@ public final class RecipeViewerGUI implements Listener {
     public RecipeViewerGUI(Plugin plugin, ItemService itemService, RecipeService recipeService,
                            ItemRegistry itemRegistry) {
         this(itemService, recipeService, itemRegistry);
+    }
+
+    public void setItemBrowser(ItemBrowserGUI itemBrowser) {
+        this.itemBrowser = itemBrowser;
     }
 
     /**
@@ -212,8 +217,11 @@ public final class RecipeViewerGUI implements Listener {
     private ItemStack createBorderItem() {
         ItemStack border = new ItemStack(Material.BLACK_STAINED_GLASS_PANE, 1);
         ItemMeta meta = border.getItemMeta();
-        meta.displayName(Component.text(" "));
-        border.setItemMeta(meta);
+        if (meta != null) {
+            meta.displayName(Component.empty());
+            meta.setHideTooltip(true);
+            border.setItemMeta(meta);
+        }
         return border;
     }
 
@@ -234,15 +242,18 @@ public final class RecipeViewerGUI implements Listener {
                 Component.text("Recipe " + (holder.getIndex() + 1) + " / " + holder.getRecipes().size(),
                         NamedTextColor.GOLD));
         ItemMeta meta = item.getItemMeta();
-        meta.lore(List.of(
-                Component.text("Type: " + holder.currentRecipe().getType(), NamedTextColor.GRAY)
-        ));
-        item.setItemMeta(meta);
+        if (meta != null) {
+            meta.lore(List.of(
+                    Component.text("Type: " + holder.currentRecipe().getType(), NamedTextColor.GRAY)
+                            .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false)
+            ));
+            item.setItemMeta(meta);
+        }
         return item;
     }
 
     private ItemStack createBackItem() {
-        return MenuIcon.create(MenuIcon.BACK, Component.text("Close", NamedTextColor.RED));
+        return MenuIcon.create(MenuIcon.BACK, Component.text("Back", NamedTextColor.RED));
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
@@ -290,7 +301,11 @@ public final class RecipeViewerGUI implements Listener {
             return true;
         }
         if (slot == BACK_SLOT) {
-            player.closeInventory();
+            if (itemBrowser != null) {
+                itemBrowser.open(player);
+            } else {
+                player.closeInventory();
+            }
             return true;
         }
         return false;
