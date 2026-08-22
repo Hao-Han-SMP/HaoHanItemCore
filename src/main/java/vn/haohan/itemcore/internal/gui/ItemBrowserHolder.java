@@ -16,12 +16,18 @@ public final class ItemBrowserHolder implements InventoryHolder {
     private final List<ItemDefinition> items;
     private final int page;
     private final int totalPages;
+    private final String searchQuery;
     private Inventory inventory;
 
     public ItemBrowserHolder(List<ItemDefinition> items, int page, int totalPages) {
+        this(items, page, totalPages, null);
+    }
+
+    public ItemBrowserHolder(List<ItemDefinition> items, int page, int totalPages, String searchQuery) {
         this.items = items;
         this.page = page;
         this.totalPages = totalPages;
+        this.searchQuery = searchQuery;
     }
 
     public List<ItemDefinition> getItems() {
@@ -34,6 +40,10 @@ public final class ItemBrowserHolder implements InventoryHolder {
 
     public int getTotalPages() {
         return totalPages;
+    }
+
+    public String getSearchQuery() {
+        return searchQuery;
     }
 
     public void setInventory(Inventory inventory) {

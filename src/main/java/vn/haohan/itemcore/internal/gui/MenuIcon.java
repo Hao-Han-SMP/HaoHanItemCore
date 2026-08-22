@@ -16,6 +16,7 @@ final class MenuIcon {
     static final int CLOSE = 900006;
     static final int INFO = 900007;
     static final int BACK = 900010;
+    static final int SEARCH = 900012;
 
     private MenuIcon() {}
 
