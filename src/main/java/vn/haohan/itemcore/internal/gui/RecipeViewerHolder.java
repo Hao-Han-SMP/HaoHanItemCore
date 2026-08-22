@@ -16,12 +16,20 @@ public final class RecipeViewerHolder implements InventoryHolder {
     private final String itemId;
     private final List<RecipeDefinition> recipes;
     private final int index;
+    private final int returnPage;
+    private final String returnSearchQuery;
     private Inventory inventory;
 
     public RecipeViewerHolder(String itemId, List<RecipeDefinition> recipes, int index) {
+        this(itemId, recipes, index, 0, null);
+    }
+
+    public RecipeViewerHolder(String itemId, List<RecipeDefinition> recipes, int index, int returnPage, String returnSearchQuery) {
         this.itemId = itemId;
         this.recipes = recipes;
         this.index = index;
+        this.returnPage = returnPage;
+        this.returnSearchQuery = returnSearchQuery;
     }
 
     public String getItemId() {
@@ -34,6 +42,14 @@ public final class RecipeViewerHolder implements InventoryHolder {
 
     public int getIndex() {
         return index;
+    }
+
+    public int getReturnPage() {
+        return returnPage;
+    }
+
+    public String getReturnSearchQuery() {
+        return returnSearchQuery;
     }
 
     public RecipeDefinition currentRecipe() {

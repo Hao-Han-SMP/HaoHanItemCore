@@ -64,6 +64,13 @@ public final class RecipeViewerGUI implements Listener {
      * Mở Recipe Viewer cho một item ID.
      */
     public void open(Player player, String itemId) {
+        open(player, itemId, 0, null);
+    }
+
+    /**
+     * Mở Recipe Viewer cho một item ID kèm thông tin trang và search query để quay về.
+     */
+    public void open(Player player, String itemId, int returnPage, String returnSearchQuery) {
         List<RecipeDefinition> recipes = recipeService.findByResult(itemId);
 
         if (recipes.isEmpty()) {
@@ -71,7 +78,7 @@ public final class RecipeViewerGUI implements Listener {
             return;
         }
 
-        open(player, itemId, recipes, 0);
+        open(player, itemId, recipes, 0, returnPage, returnSearchQuery);
     }
 
     public boolean hasRecipes(String itemId) {
@@ -82,18 +89,32 @@ public final class RecipeViewerGUI implements Listener {
      * Mở Recipe Viewer cho một RecipeDefinition cụ thể.
      */
     public void open(Player player, RecipeDefinition recipe) {
+        open(player, recipe, 0, null);
+    }
+
+    /**
+     * Mở Recipe Viewer cho một RecipeDefinition cụ thể kèm thông tin trang và search query để quay về.
+     */
+    public void open(Player player, RecipeDefinition recipe, int returnPage, String returnSearchQuery) {
         List<RecipeDefinition> recipes = List.of(recipe);
-        open(player, recipe.getResult().item(), recipes, 0);
+        open(player, recipe.getResult().item(), recipes, 0, returnPage, returnSearchQuery);
     }
 
     /**
      * Mở Recipe Viewer với danh sách recipes và index cụ thể.
      */
     public void open(Player player, String itemId, List<RecipeDefinition> recipes, int index) {
+        open(player, itemId, recipes, index, 0, null);
+    }
+
+    /**
+     * Mở Recipe Viewer với danh sách recipes, index, trang và search query để quay về.
+     */
+    public void open(Player player, String itemId, List<RecipeDefinition> recipes, int index, int returnPage, String returnSearchQuery) {
         if (recipes.isEmpty()) return;
         index = Math.max(0, Math.min(index, recipes.size() - 1));
 
-        RecipeViewerHolder holder = new RecipeViewerHolder(itemId, recipes, index);
+        RecipeViewerHolder holder = new RecipeViewerHolder(itemId, recipes, index, returnPage, returnSearchQuery);
         RecipeDefinition recipe = recipes.get(index);
         Inventory gui = Bukkit.createInventory(holder, GUI_SIZE,
                 Component.text("Recipe: " + recipe.getResult().item()));
@@ -292,16 +313,16 @@ public final class RecipeViewerGUI implements Listener {
 
     private boolean handleNavigationClick(int slot, Player player, RecipeViewerHolder holder) {
         if (slot == PREV_SLOT && holder.getIndex() > 0) {
-            open(player, holder.getItemId(), holder.getRecipes(), holder.getIndex() - 1);
+            open(player, holder.getItemId(), holder.getRecipes(), holder.getIndex() - 1, holder.getReturnPage(), holder.getReturnSearchQuery());
             return true;
         }
         if (slot == NEXT_SLOT && holder.getIndex() < holder.getRecipes().size() - 1) {
-            open(player, holder.getItemId(), holder.getRecipes(), holder.getIndex() + 1);
+            open(player, holder.getItemId(), holder.getRecipes(), holder.getIndex() + 1, holder.getReturnPage(), holder.getReturnSearchQuery());
             return true;
         }
         if (slot == BACK_SLOT) {
             if (itemBrowser != null) {
-                itemBrowser.open(player);
+                itemBrowser.open(player, holder.getReturnPage(), holder.getReturnSearchQuery());
             } else {
                 player.closeInventory();
             }
@@ -316,7 +337,7 @@ public final class RecipeViewerGUI implements Listener {
             if (clickedId != null && !clickedId.equals(holder.getItemId())) {
                 List<RecipeDefinition> recipes = recipeService.findByResult(clickedId);
                 if (!recipes.isEmpty()) {
-                    open(player, clickedId);
+                    open(player, clickedId, holder.getReturnPage(), holder.getReturnSearchQuery());
                 }
             }
         }

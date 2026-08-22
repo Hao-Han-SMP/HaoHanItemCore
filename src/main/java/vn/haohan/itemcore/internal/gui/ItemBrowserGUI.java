@@ -370,7 +370,7 @@ public final class ItemBrowserGUI implements Listener {
                 if (click.isRightClick()) {
                     if (!recipeViewer.hasRecipes(itemId))
                         return;
-                    recipeViewer.open(player, itemId);
+                    recipeViewer.open(player, itemId, holder.getPage(), holder.getSearchQuery());
                 } else if (click.isLeftClick()) {
                     int amount = click.isShiftClick()
                             ? Math.max(1, Math.min(64, itemRegistry.get(itemId).getMaxStackSize()))
