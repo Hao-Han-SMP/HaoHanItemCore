@@ -18,7 +18,8 @@ import java.util.logging.Logger;
 
 /**
  * Chuyển đổi RecipeDefinition → Bukkit Recipe và đăng ký với server.
- * Xử lý tất cả các loại recipe: Shaped, Shapeless, Smelting, Blasting, Smoking, Campfire, Stonecutting.
+ * Xử lý tất cả các loại recipe: Shaped, Shapeless, Smelting, Blasting, Smoking,
+ * Campfire, Stonecutting.
  */
 public final class BukkitRecipeAdapter {
 
@@ -89,7 +90,8 @@ public final class BukkitRecipeAdapter {
         ItemStack result = createResultItem(recipe.getResult());
         List<Ingredient> ingredients = recipe.getIngredients();
         if (ingredients.size() < 3) {
-            throw new IllegalArgumentException("Smithing recipe requires 3 ingredients (template, base, addition): " + recipe.getId());
+            throw new IllegalArgumentException(
+                    "Smithing recipe requires 3 ingredients (template, base, addition): " + recipe.getId());
         }
         RecipeChoice template = toSmithingRecipeChoice(ingredients.get(0));
         RecipeChoice base = toSmithingRecipeChoice(ingredients.get(1));
@@ -148,8 +150,7 @@ public final class BukkitRecipeAdapter {
         RecipeChoice input = toRecipeChoice(recipe.getIngredients().getFirst());
 
         return new org.bukkit.inventory.FurnaceRecipe(
-                key, result, input, recipe.getExperience(), recipe.getCookingTime()
-        );
+                key, result, input, recipe.getExperience(), recipe.getCookingTime());
     }
 
     private org.bukkit.inventory.BlastingRecipe toBlastingRecipe(RecipeDefinition recipe) {
@@ -158,8 +159,7 @@ public final class BukkitRecipeAdapter {
         RecipeChoice input = toRecipeChoice(recipe.getIngredients().getFirst());
 
         return new org.bukkit.inventory.BlastingRecipe(
-                key, result, input, recipe.getExperience(), recipe.getCookingTime()
-        );
+                key, result, input, recipe.getExperience(), recipe.getCookingTime());
     }
 
     private org.bukkit.inventory.SmokingRecipe toSmokingRecipe(RecipeDefinition recipe) {
@@ -168,8 +168,7 @@ public final class BukkitRecipeAdapter {
         RecipeChoice input = toRecipeChoice(recipe.getIngredients().getFirst());
 
         return new org.bukkit.inventory.SmokingRecipe(
-                key, result, input, recipe.getExperience(), recipe.getCookingTime()
-        );
+                key, result, input, recipe.getExperience(), recipe.getCookingTime());
     }
 
     private org.bukkit.inventory.CampfireRecipe toCampfireRecipe(RecipeDefinition recipe) {
@@ -178,8 +177,7 @@ public final class BukkitRecipeAdapter {
         RecipeChoice input = toRecipeChoice(recipe.getIngredients().getFirst());
 
         return new org.bukkit.inventory.CampfireRecipe(
-                key, result, input, recipe.getExperience(), recipe.getCookingTime()
-        );
+                key, result, input, recipe.getExperience(), recipe.getCookingTime());
     }
 
     private org.bukkit.inventory.StonecuttingRecipe toStonecuttingRecipe(RecipeDefinition recipe) {
@@ -250,7 +248,8 @@ public final class BukkitRecipeAdapter {
     }
 
     private NamespacedKey createKey(RecipeDefinition recipe) {
-        // Chuyển "magic:mana_crystal" → NamespacedKey("baseengine", "magic_mana_crystal")
+        // Chuyển "magic:mana_crystal" → NamespacedKey("baseengine",
+        // "magic_mana_crystal")
         String keyStr = recipe.getId().replace(':', '_');
         return new NamespacedKey(plugin, keyStr);
     }

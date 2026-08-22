@@ -183,7 +183,8 @@ public final class DefaultItemFactory implements ItemFactory {
     private static boolean applyLore(ItemMeta meta, ItemDefinition definition) {
         java.util.List<net.kyori.adventure.text.Component> targetLore = definition.getLore().stream()
                 .map(line -> {
-                    net.kyori.adventure.text.Component comp = LegacyComponentSerializer.legacySection().deserialize(line);
+                    net.kyori.adventure.text.Component comp = LegacyComponentSerializer.legacySection()
+                            .deserialize(line);
                     if (!comp.hasDecoration(net.kyori.adventure.text.format.TextDecoration.ITALIC)) {
                         comp = comp.decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false);
                     }

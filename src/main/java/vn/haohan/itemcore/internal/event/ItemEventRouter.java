@@ -39,9 +39,12 @@ import java.util.List;
 import java.util.logging.Logger;
 
 /**
- * Event Router: nhận Minecraft event, xác định custom item, và dispatch tới ItemBehavior.
+ * Event Router: nhận Minecraft event, xác định custom item, và dispatch tới
+ * ItemBehavior.
  * 
- * <p>Flow:
+ * <p>
+ * Flow:
+ * 
  * <pre>
  * PlayerInteractEvent → HaoHanItemCore → Item ID → ItemDefinition → ItemBehavior.onUse()
  * </pre>
@@ -64,12 +67,15 @@ public final class ItemEventRouter implements Listener {
     @EventHandler(priority = EventPriority.NORMAL)
     public void onPlayerInteract(PlayerInteractEvent event) {
         ItemStack item = event.getItem();
-        if (item == null) return;
+        if (item == null)
+            return;
 
         ItemDefinition definition = getDefinition(item);
-        if (definition == null) return;
+        if (definition == null)
+            return;
 
-        if (!definition.isUsable() && (event.getAction() == org.bukkit.event.block.Action.RIGHT_CLICK_AIR || event.getAction() == org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK)) {
+        if (!definition.isUsable() && (event.getAction() == org.bukkit.event.block.Action.RIGHT_CLICK_AIR
+                || event.getAction() == org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK)) {
             event.setUseItemInHand(org.bukkit.event.Event.Result.DENY);
             event.setCancelled(true);
             org.bukkit.entity.Player player = event.getPlayer();
@@ -78,14 +84,16 @@ public final class ItemEventRouter implements Listener {
             return;
         }
 
-        if (!definition.hasBehavior()) return;
+        if (!definition.hasBehavior())
+            return;
 
         ItemContext context = new ItemContext(event.getPlayer(), item, definition, event);
 
         switch (event.getAction()) {
             case RIGHT_CLICK_AIR, RIGHT_CLICK_BLOCK -> definition.getBehavior().onUse(context);
             case LEFT_CLICK_AIR, LEFT_CLICK_BLOCK -> definition.getBehavior().onInteract(context);
-            case PHYSICAL -> {}
+            case PHYSICAL -> {
+            }
         }
     }
 
@@ -94,7 +102,8 @@ public final class ItemEventRouter implements Listener {
         ItemStack item = event.getPlayer().getInventory().getItemInMainHand();
 
         ItemDefinition definition = getDefinition(item);
-        if (definition == null || !definition.hasBehavior()) return;
+        if (definition == null || !definition.hasBehavior())
+            return;
 
         ItemContext context = new ItemContext(event.getPlayer(), item, definition, event);
         definition.getBehavior().onBreak(context);
@@ -105,7 +114,8 @@ public final class ItemEventRouter implements Listener {
         ItemStack result = event.getRecipe().getResult();
 
         ItemDefinition definition = getDefinition(result);
-        if (definition == null || !definition.hasBehavior()) return;
+        if (definition == null || !definition.hasBehavior())
+            return;
 
         if (event.getWhoClicked() instanceof Player player) {
             ItemContext context = new ItemContext(player, result, definition, event);
@@ -124,10 +134,12 @@ public final class ItemEventRouter implements Listener {
             vn.haohan.itemcore.api.HaoHanItemCore.get().getItemService().validateAndUpdate(cursor);
         }
 
-        if (item == null) return;
+        if (item == null)
+            return;
 
         ItemDefinition definition = getDefinition(item);
-        if (definition == null || !definition.hasBehavior()) return;
+        if (definition == null || !definition.hasBehavior())
+            return;
 
         if (event.getWhoClicked() instanceof Player player) {
             ItemContext context = new ItemContext(player, item, definition, event);
@@ -140,7 +152,8 @@ public final class ItemEventRouter implements Listener {
         ItemStack item = event.getItemDrop().getItemStack();
 
         ItemDefinition definition = getDefinition(item);
-        if (definition == null || !definition.hasBehavior()) return;
+        if (definition == null || !definition.hasBehavior())
+            return;
 
         ItemContext context = new ItemContext(event.getPlayer(), item, definition, event);
         definition.getBehavior().onDrop(context);
@@ -150,15 +163,18 @@ public final class ItemEventRouter implements Listener {
      * Xác định ItemDefinition từ ItemStack thông qua PersistentDataContainer.
      */
     private ItemDefinition getDefinition(ItemStack item) {
-        if (item == null || !item.hasItemMeta()) return null;
+        if (item == null || !item.hasItemMeta())
+            return null;
 
         ItemMeta meta = item.getItemMeta();
         PersistentDataContainer pdc = meta.getPersistentDataContainer();
 
-        if (!pdc.has(itemIdKey, PersistentDataType.STRING)) return null;
+        if (!pdc.has(itemIdKey, PersistentDataType.STRING))
+            return null;
 
         String id = pdc.get(itemIdKey, PersistentDataType.STRING);
-        if (id == null) return null;
+        if (id == null)
+            return null;
 
         return registry.get(id);
     }
@@ -204,14 +220,17 @@ public final class ItemEventRouter implements Listener {
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onBlockPlace(BlockPlaceEvent event) {
         ItemStack item = event.getItemInHand();
-        if (item == null || !item.hasItemMeta()) return;
+        if (item == null || !item.hasItemMeta())
+            return;
 
         ItemMeta meta = item.getItemMeta();
         PersistentDataContainer pdc = meta.getPersistentDataContainer();
-        if (!pdc.has(itemIdKey, PersistentDataType.STRING)) return;
+        if (!pdc.has(itemIdKey, PersistentDataType.STRING))
+            return;
 
         String id = pdc.get(itemIdKey, PersistentDataType.STRING);
-        if (id == null) return;
+        if (id == null)
+            return;
 
         // Save block metadata
         saveBlockPDC(event.getBlock(), pdc);
@@ -232,22 +251,29 @@ public final class ItemEventRouter implements Listener {
 
     @EventHandler(priority = EventPriority.NORMAL)
     public void onNoteBlockInteract(PlayerInteractEvent event) {
-        if (event.getAction() != org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK) return;
+        if (event.getAction() != org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK)
+            return;
 
-        // If the player is sneaking, they are attempting to place a block or use the item on hand.
+        // If the player is sneaking, they are attempting to place a block or use the
+        // item on hand.
         // In vanilla Minecraft, sneaking players do not tune/interact with NoteBlocks,
         // so the block state will not change. We must return early to avoid interfering
-        // with the block placement logic (which would cause placed blocks to disappear).
-        if (event.getPlayer().isSneaking()) return;
+        // with the block placement logic (which would cause placed blocks to
+        // disappear).
+        if (event.getPlayer().isSneaking())
+            return;
 
         Block block = event.getClickedBlock();
-        if (block == null || block.getType() != org.bukkit.Material.NOTE_BLOCK) return;
+        if (block == null || block.getType() != org.bukkit.Material.NOTE_BLOCK)
+            return;
 
         org.bukkit.block.data.BlockData customData = getCustomBlockData(block);
         if (customData != null) {
-            // Deny block interaction immediately to prevent the block state from changing (tuning the note block)
+            // Deny block interaction immediately to prevent the block state from changing
+            // (tuning the note block)
             event.setUseInteractedBlock(org.bukkit.event.Event.Result.DENY);
-            // Also deny using the item in hand to prevent block placement or item use when not sneaking,
+            // Also deny using the item in hand to prevent block placement or item use when
+            // not sneaking,
             // matching vanilla interactive block behavior (like chests/furnaces).
             event.setUseItemInHand(org.bukkit.event.Event.Result.DENY);
             // Correct client immediately to avoid texture flicking
@@ -270,11 +296,13 @@ public final class ItemEventRouter implements Listener {
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onNoteBlockPhysics(BlockPhysicsEvent event) {
         Block block = event.getBlock();
-        if (block.getType() != org.bukkit.Material.NOTE_BLOCK) return;
+        if (block.getType() != org.bukkit.Material.NOTE_BLOCK)
+            return;
 
         org.bukkit.block.data.BlockData customData = getCustomBlockData(block);
         if (customData != null) {
-            // Cancel the physics event to prevent any state changes (like instrument updates from blocks underneath/adjacent)
+            // Cancel the physics event to prevent any state changes (like instrument
+            // updates from blocks underneath/adjacent)
             event.setCancelled(true);
 
             if (!block.getBlockData().getAsString().equals(customData.getAsString())) {
@@ -293,7 +321,8 @@ public final class ItemEventRouter implements Listener {
     public void onCustomBlockBreak(BlockBreakEvent event) {
         Block block = event.getBlock();
         String id = getCustomBlockId(block);
-        if (id == null) return;
+        if (id == null)
+            return;
 
         // Clean up block metadata
         PersistentDataContainer blockPDC = getBlockPDC(block);
@@ -409,7 +438,7 @@ public final class ItemEventRouter implements Listener {
     public void onPrepareSmithing(PrepareSmithingEvent event) {
         SmithingInventory inventory = event.getInventory();
         ItemStack template = inventory.getItem(0); // Template slot
-        ItemStack base = inventory.getItem(1);     // Base item slot
+        ItemStack base = inventory.getItem(1); // Base item slot
         ItemStack addition = inventory.getItem(2); // Addition ingredient slot
 
         RecipeDefinition matchedRecipe = findSmithingRecipe(template, base, addition);
@@ -417,8 +446,7 @@ public final class ItemEventRouter implements Listener {
         if (matchedRecipe != null) {
             ItemStack resultStack = HaoHanItemCore.get().getItemFactory().create(
                     matchedRecipe.getResult().item(),
-                    matchedRecipe.getResult().amount()
-            );
+                    matchedRecipe.getResult().amount());
             event.setResult(resultStack);
         } else {
             ItemStack currentResult = event.getResult();
@@ -455,7 +483,8 @@ public final class ItemEventRouter implements Listener {
                     player.sendBlockChange(block.getLocation(), block.getBlockData());
                     return true;
                 } catch (Exception e) {
-                    logger.warning("Failed to apply custom block data for item " + definition.getId() + ": " + e.getMessage());
+                    logger.warning(
+                            "Failed to apply custom block data for item " + definition.getId() + ": " + e.getMessage());
                 }
             }
         }
@@ -478,7 +507,8 @@ public final class ItemEventRouter implements Listener {
 
     private org.bukkit.block.data.BlockData getOrParseBlockData(String blockDataStr) {
         org.bukkit.block.data.BlockData cached = parsedBlockDataCache.get(blockDataStr);
-        if (cached != null) return cached;
+        if (cached != null)
+            return cached;
 
         try {
             org.bukkit.block.data.BlockData parsed = org.bukkit.Bukkit.createBlockData(blockDataStr);
@@ -506,8 +536,10 @@ public final class ItemEventRouter implements Listener {
             if (customBlockDataObj instanceof String blockDataStr) {
                 org.bukkit.block.data.BlockData targetData = getOrParseBlockData(blockDataStr);
                 if (targetData != null && currentDataStr.equals(targetData.getAsString())) {
-                    // Self-healing: Dynamically save the block PDC to chunk PDC so future lookups are immediate
-                    PersistentDataContainer dummyPDC = block.getChunk().getPersistentDataContainer().getAdapterContext().newPersistentDataContainer();
+                    // Self-healing: Dynamically save the block PDC to chunk PDC so future lookups
+                    // are immediate
+                    PersistentDataContainer dummyPDC = block.getChunk().getPersistentDataContainer().getAdapterContext()
+                            .newPersistentDataContainer();
                     dummyPDC.set(itemIdKey, PersistentDataType.STRING, def.getId());
                     saveBlockPDC(block, dummyPDC);
                     return def.getId();
@@ -519,7 +551,8 @@ public final class ItemEventRouter implements Listener {
 
     private org.bukkit.block.data.BlockData getCustomBlockData(Block block) {
         String id = getCustomBlockId(block);
-        if (id == null) return null;
+        if (id == null)
+            return null;
 
         ItemDefinition definition = registry.get(id);
         if (definition != null) {
@@ -559,7 +592,8 @@ public final class ItemEventRouter implements Listener {
 
     private boolean processExplodedBlock(Block block) {
         String id = getCustomBlockId(block);
-        if (id == null) return false;
+        if (id == null)
+            return false;
 
         PersistentDataContainer blockPDC = getBlockPDC(block);
         // Remove metadata
@@ -573,18 +607,20 @@ public final class ItemEventRouter implements Listener {
 
     private RecipeDefinition findSmithingRecipe(ItemStack template, ItemStack base, ItemStack addition) {
         var recipeService = HaoHanItemCore.get().getRecipeService();
-        if (recipeService == null) return null;
+        if (recipeService == null)
+            return null;
 
         for (RecipeDefinition recipe : recipeService.all()) {
             if (recipe.getType() != RecipeType.SMITHING) {
                 continue;
             }
             List<Ingredient> ingredients = recipe.getIngredients();
-            if (ingredients.size() < 3) continue;
+            if (ingredients.size() < 3)
+                continue;
 
             if (matchIngredient(ingredients.get(0), template) &&
-                matchIngredient(ingredients.get(1), base) &&
-                matchIngredient(ingredients.get(2), addition)) {
+                    matchIngredient(ingredients.get(1), base) &&
+                    matchIngredient(ingredients.get(2), addition)) {
                 return recipe;
             }
         }

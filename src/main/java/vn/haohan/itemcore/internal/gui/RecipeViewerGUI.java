@@ -24,9 +24,11 @@ import org.bukkit.plugin.Plugin;
 import java.util.*;
 
 /**
- * Recipe Viewer GUI — hiển thị chi tiết công thức chế tạo theo đúng layout container của từng RecipeForm:
+ * Recipe Viewer GUI — hiển thị chi tiết công thức chế tạo theo đúng layout
+ * container của từng RecipeForm:
  * - Smithing Table (Blacksmith form: Template + Base + Addition ➔ Result)
- * - Furnace / Blasting / Smoker (Smelting form: Input ➔ Flame (time/xp) ➔ Result ➔ Fuel)
+ * - Furnace / Blasting / Smoker (Smelting form: Input ➔ Flame (time/xp) ➔
+ * Result ➔ Fuel)
  * - Stonecutter (Stonecutter form: Input ➔ Saw ➔ Result)
  * - Campfire (Campfire form: Input ➔ Fire ➔ Result)
  * - Crafting Table (3x3 Shaped & Shapeless grid ➔ Arrow ➔ Result)
@@ -44,7 +46,7 @@ public final class RecipeViewerGUI implements Listener {
     private static final int NEXT_SLOT = 50;
 
     // Crafting 3x3 Slots
-    private static final int[] CRAFTING_SLOTS = {10, 11, 12, 19, 20, 21, 28, 29, 30};
+    private static final int[] CRAFTING_SLOTS = { 10, 11, 12, 19, 20, 21, 28, 29, 30 };
     private static final int CRAFTING_ARROW_SLOT = 23;
     private static final int CRAFTING_RESULT_SLOT = 25;
 
@@ -82,14 +84,14 @@ public final class RecipeViewerGUI implements Listener {
     private ItemBrowserGUI itemBrowser;
 
     public RecipeViewerGUI(ItemService itemService, RecipeService recipeService,
-                           ItemRegistry itemRegistry) {
+            ItemRegistry itemRegistry) {
         this.itemService = itemService;
         this.recipeService = recipeService;
         this.itemRegistry = itemRegistry;
     }
 
     public RecipeViewerGUI(Plugin plugin, ItemService itemService, RecipeService recipeService,
-                           ItemRegistry itemRegistry) {
+            ItemRegistry itemRegistry) {
         this(itemService, recipeService, itemRegistry);
     }
 
@@ -137,8 +139,10 @@ public final class RecipeViewerGUI implements Listener {
         open(player, itemId, recipes, index, 0, ItemBrowserFilter.empty());
     }
 
-    public void open(Player player, String itemId, List<RecipeDefinition> recipes, int index, int returnPage, ItemBrowserFilter returnFilter) {
-        if (recipes.isEmpty()) return;
+    public void open(Player player, String itemId, List<RecipeDefinition> recipes, int index, int returnPage,
+            ItemBrowserFilter returnFilter) {
+        if (recipes.isEmpty())
+            return;
         index = Math.max(0, Math.min(index, recipes.size() - 1));
 
         RecipeViewerHolder holder = new RecipeViewerHolder(itemId, recipes, index, returnPage, returnFilter);
@@ -196,8 +200,7 @@ public final class RecipeViewerGUI implements Listener {
                 Material.SMITHING_TABLE,
                 "§6Smithing Table (Bàn Thợ Rèn)",
                 "§7Nâng cấp hoặc rèn trang bị/công cụ",
-                "§eLoại công thức: §fSmithing Transform"
-        ));
+                "§eLoại công thức: §fSmithing Transform"));
 
         // Clear active slots
         gui.setItem(SMITHING_TEMPLATE_SLOT, null);
@@ -212,7 +215,8 @@ public final class RecipeViewerGUI implements Listener {
 
         // 1. Template slot (ô 19)
         if (!ingredients.isEmpty()) {
-            gui.setItem(SMITHING_TEMPLATE_SLOT, createAnnotatedIngredientItem(ingredients.get(0), "§e[Khuôn Đúc / Template]"));
+            gui.setItem(SMITHING_TEMPLATE_SLOT,
+                    createAnnotatedIngredientItem(ingredients.get(0), "§e[Khuôn Đúc / Template]"));
         } else {
             gui.setItem(SMITHING_TEMPLATE_SLOT, createSlotGuide(Material.STRUCTURE_VOID, "§7Khuôn đúc rèn (Template)"));
         }
@@ -222,7 +226,8 @@ public final class RecipeViewerGUI implements Listener {
 
         // 2. Base item slot (ô 21)
         if (ingredients.size() > 1) {
-            gui.setItem(SMITHING_BASE_SLOT, createAnnotatedIngredientItem(ingredients.get(1), "§e[Trang Bị Gốc / Base Item]"));
+            gui.setItem(SMITHING_BASE_SLOT,
+                    createAnnotatedIngredientItem(ingredients.get(1), "§e[Trang Bị Gốc / Base Item]"));
         } else {
             gui.setItem(SMITHING_BASE_SLOT, createSlotGuide(Material.IRON_SWORD, "§7Trang bị gốc (Base Item)"));
         }
@@ -232,9 +237,11 @@ public final class RecipeViewerGUI implements Listener {
 
         // 3. Addition ingot slot (ô 23)
         if (ingredients.size() > 2) {
-            gui.setItem(SMITHING_ADDITION_SLOT, createAnnotatedIngredientItem(ingredients.get(2), "§e[Vật Liệu Rèn / Addition]"));
+            gui.setItem(SMITHING_ADDITION_SLOT,
+                    createAnnotatedIngredientItem(ingredients.get(2), "§e[Vật Liệu Rèn / Addition]"));
         } else {
-            gui.setItem(SMITHING_ADDITION_SLOT, createSlotGuide(Material.NETHERITE_INGOT, "§7Nguyên liệu rèn (Addition)"));
+            gui.setItem(SMITHING_ADDITION_SLOT,
+                    createSlotGuide(Material.NETHERITE_INGOT, "§7Nguyên liệu rèn (Addition)"));
         }
 
         // Arrow / Hammer icon (ô 24)
@@ -262,8 +269,7 @@ public final class RecipeViewerGUI implements Listener {
                 stationName,
                 "§7Nung luyện quặng, kim loại hoặc thức ăn",
                 "§eThời gian nung: §f" + (recipe.getCookingTime() / 20.0) + "s (" + recipe.getCookingTime() + " ticks)",
-                "§aKinh nghiệm: §f+" + recipe.getExperience() + " XP"
-        ));
+                "§aKinh nghiệm: §f+" + recipe.getExperience() + " XP"));
 
         // Clear active slots
         gui.setItem(FURNACE_INPUT_SLOT, null);
@@ -275,7 +281,8 @@ public final class RecipeViewerGUI implements Listener {
         // Input ingredient (ô 11)
         List<Ingredient> ingredients = recipe.getIngredients();
         if (!ingredients.isEmpty()) {
-            gui.setItem(FURNACE_INPUT_SLOT, createAnnotatedIngredientItem(ingredients.getFirst(), "§e[Nguyên Liệu Nung / Input]"));
+            gui.setItem(FURNACE_INPUT_SLOT,
+                    createAnnotatedIngredientItem(ingredients.getFirst(), "§e[Nguyên Liệu Nung / Input]"));
         }
 
         // Flame indicator (ô 20)
@@ -298,8 +305,7 @@ public final class RecipeViewerGUI implements Listener {
                 "§6Campfire (Lửa Trại)",
                 "§7Nướng thực phẩm chậm không cần nhiên liệu",
                 "§eThời gian nướng: §f" + (recipe.getCookingTime() / 20.0) + "s",
-                "§aKinh nghiệm: §f+" + recipe.getExperience() + " XP"
-        ));
+                "§aKinh nghiệm: §f+" + recipe.getExperience() + " XP"));
 
         gui.setItem(CAMPFIRE_INPUT_SLOT, null);
         gui.setItem(CAMPFIRE_FIRE_SLOT, null);
@@ -307,7 +313,8 @@ public final class RecipeViewerGUI implements Listener {
         gui.setItem(CAMPFIRE_RESULT_SLOT, null);
 
         if (!recipe.getIngredients().isEmpty()) {
-            gui.setItem(CAMPFIRE_INPUT_SLOT, createAnnotatedIngredientItem(recipe.getIngredients().getFirst(), "§e[Thực Phẩm Nướng]"));
+            gui.setItem(CAMPFIRE_INPUT_SLOT,
+                    createAnnotatedIngredientItem(recipe.getIngredients().getFirst(), "§e[Thực Phẩm Nướng]"));
         }
 
         gui.setItem(CAMPFIRE_FIRE_SLOT, createCampfireFlameItem(recipe.getCookingTime(), recipe.getExperience()));
@@ -321,8 +328,7 @@ public final class RecipeViewerGUI implements Listener {
                 Material.STONECUTTER,
                 "§6Stonecutter (Máy Cắt Đá)",
                 "§7Cắt khối đá trực tiếp 1-1 không hao hụt",
-                "§eLoại công thức: §fStonecutting"
-        ));
+                "§eLoại công thức: §fStonecutting"));
 
         gui.setItem(STONECUTTER_INPUT_SLOT, null);
         gui.setItem(STONECUTTER_SAW_SLOT, null);
@@ -330,7 +336,8 @@ public final class RecipeViewerGUI implements Listener {
         gui.setItem(STONECUTTER_RESULT_SLOT, null);
 
         if (!recipe.getIngredients().isEmpty()) {
-            gui.setItem(STONECUTTER_INPUT_SLOT, createAnnotatedIngredientItem(recipe.getIngredients().getFirst(), "§e[Khối Đá Đầu Vào / Input]"));
+            gui.setItem(STONECUTTER_INPUT_SLOT,
+                    createAnnotatedIngredientItem(recipe.getIngredients().getFirst(), "§e[Khối Đá Đầu Vào / Input]"));
         }
 
         gui.setItem(STONECUTTER_SAW_SLOT, createSawBladeItem());
@@ -344,8 +351,7 @@ public final class RecipeViewerGUI implements Listener {
                 Material.CRAFTING_TABLE,
                 "§6Crafting Table (Bàn Chế Tạo)",
                 "§7Công thức có hình dạng cố định (Shaped Recipe)",
-                "§eLưới chế tạo 3x3 chuẩn"
-        ));
+                "§eLưới chế tạo 3x3 chuẩn"));
 
         for (int slot : CRAFTING_SLOTS) {
             gui.setItem(slot, null);
@@ -381,7 +387,8 @@ public final class RecipeViewerGUI implements Listener {
         boolean isMachine = recipe.getType() == RecipeType.MACHINE;
         Material stationMat = isMachine ? Material.CRAFTER : Material.CRAFTING_TABLE;
         String title = isMachine ? "§6Custom Machine (Trạm Chế Tạo)" : "§6Crafting Table (Shapeless)";
-        String desc = isMachine ? "§7Chế tạo thông qua máy móc công nghệ" : "§7Công thức tự do không quan tâm vị trí đặt";
+        String desc = isMachine ? "§7Chế tạo thông qua máy móc công nghệ"
+                : "§7Công thức tự do không quan tâm vị trí đặt";
 
         gui.setItem(HEADER_STATION_SLOT, createStationHeader(stationMat, title, desc));
 
@@ -405,7 +412,8 @@ public final class RecipeViewerGUI implements Listener {
     private void populateNavigation(Inventory gui, RecipeViewerHolder holder) {
         if (holder.getRecipes().size() > 1) {
             gui.setItem(PREV_SLOT, createNavItem("§a◀ Previous Recipe", holder.getIndex() > 0));
-            gui.setItem(NEXT_SLOT, createNavItem("§a▶ Next Recipe", holder.getIndex() < holder.getRecipes().size() - 1));
+            gui.setItem(NEXT_SLOT,
+                    createNavItem("§a▶ Next Recipe", holder.getIndex() < holder.getRecipes().size() - 1));
             gui.setItem(INFO_SLOT, createInfoItem(holder));
         }
 
@@ -433,7 +441,8 @@ public final class RecipeViewerGUI implements Listener {
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
             List<Component> currentLore = meta.lore() != null ? new ArrayList<>(meta.lore()) : new ArrayList<>();
-            currentLore.add(0, Component.text(annotation, NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false));
+            currentLore.add(0,
+                    Component.text(annotation, NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false));
             meta.lore(currentLore);
             item.setItemMeta(meta);
         }
@@ -476,11 +485,12 @@ public final class RecipeViewerGUI implements Listener {
         if (meta != null) {
             meta.displayName(Component.text("§6Ngọn Lửa Nung").decoration(TextDecoration.ITALIC, false));
             meta.lore(List.of(
-                    Component.text("Thời gian: " + (cookingTime / 20.0) + "s (" + cookingTime + " ticks)", NamedTextColor.YELLOW)
+                    Component
+                            .text("Thời gian: " + (cookingTime / 20.0) + "s (" + cookingTime + " ticks)",
+                                    NamedTextColor.YELLOW)
                             .decoration(TextDecoration.ITALIC, false),
                     Component.text("Kinh nghiệm: +" + exp + " XP", NamedTextColor.GREEN)
-                            .decoration(TextDecoration.ITALIC, false)
-            ));
+                            .decoration(TextDecoration.ITALIC, false)));
             item.setItemMeta(meta);
         }
         return item;
@@ -495,8 +505,7 @@ public final class RecipeViewerGUI implements Listener {
                     Component.text("Thời gian: " + (cookingTime / 20.0) + "s", NamedTextColor.YELLOW)
                             .decoration(TextDecoration.ITALIC, false),
                     Component.text("Kinh nghiệm: +" + exp + " XP", NamedTextColor.GREEN)
-                            .decoration(TextDecoration.ITALIC, false)
-            ));
+                            .decoration(TextDecoration.ITALIC, false)));
             item.setItemMeta(meta);
         }
         return item;
@@ -506,7 +515,8 @@ public final class RecipeViewerGUI implements Listener {
         ItemStack item = new ItemStack(Material.IRON_BLOCK, 1);
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
-            meta.displayName(Component.text("§6Lưỡi Cưa Cắt Đá", NamedTextColor.GOLD).decoration(TextDecoration.ITALIC, false));
+            meta.displayName(
+                    Component.text("§6Lưỡi Cưa Cắt Đá", NamedTextColor.GOLD).decoration(TextDecoration.ITALIC, false));
             item.setItemMeta(meta);
         }
         return item;
@@ -516,11 +526,13 @@ public final class RecipeViewerGUI implements Listener {
         ItemStack item = new ItemStack(Material.COAL, 1);
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
-            meta.displayName(Component.text("§7Nhiên Liệu Nung", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+            meta.displayName(
+                    Component.text("§7Nhiên Liệu Nung", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
             meta.lore(List.of(
-                    Component.text("Than đá, Khối than, Than củi,", NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false),
-                    Component.text("Xô dung nham, Gỗ...", NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false)
-            ));
+                    Component.text("Than đá, Khối than, Than củi,", NamedTextColor.DARK_GRAY)
+                            .decoration(TextDecoration.ITALIC, false),
+                    Component.text("Xô dung nham, Gỗ...", NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC,
+                            false)));
             item.setItemMeta(meta);
         }
         return item;
@@ -585,8 +597,8 @@ public final class RecipeViewerGUI implements Listener {
     private ItemStack createNavItem(String name, boolean active) {
         boolean previous = name.contains("Previous");
         return MenuIcon.create(previous
-                        ? (active ? MenuIcon.PREVIOUS_ACTIVE : MenuIcon.PREVIOUS_DISABLED)
-                        : (active ? MenuIcon.NEXT_ACTIVE : MenuIcon.NEXT_DISABLED),
+                ? (active ? MenuIcon.PREVIOUS_ACTIVE : MenuIcon.PREVIOUS_DISABLED)
+                : (active ? MenuIcon.NEXT_ACTIVE : MenuIcon.NEXT_DISABLED),
                 Component.text(name));
     }
 
@@ -598,8 +610,7 @@ public final class RecipeViewerGUI implements Listener {
         if (meta != null) {
             meta.lore(List.of(
                     Component.text("Type: " + holder.currentRecipe().getType(), NamedTextColor.GRAY)
-                            .decoration(TextDecoration.ITALIC, false)
-            ));
+                            .decoration(TextDecoration.ITALIC, false)));
             item.setItemMeta(meta);
         }
         return item;
@@ -611,9 +622,11 @@ public final class RecipeViewerGUI implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onInventoryClick(InventoryClickEvent event) {
-        if (!(event.getWhoClicked() instanceof Player player)) return;
+        if (!(event.getWhoClicked() instanceof Player player))
+            return;
 
-        if (!(event.getView().getTopInventory().getHolder() instanceof RecipeViewerHolder holder)) return;
+        if (!(event.getView().getTopInventory().getHolder() instanceof RecipeViewerHolder holder))
+            return;
 
         event.setCancelled(true);
 
@@ -633,8 +646,10 @@ public final class RecipeViewerGUI implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onInventoryDrag(InventoryDragEvent event) {
-        if (!(event.getWhoClicked() instanceof Player)) return;
-        if (!(event.getView().getTopInventory().getHolder() instanceof RecipeViewerHolder)) return;
+        if (!(event.getWhoClicked() instanceof Player))
+            return;
+        if (!(event.getView().getTopInventory().getHolder() instanceof RecipeViewerHolder))
+            return;
         int topSize = event.getView().getTopInventory().getSize();
         if (event.getRawSlots().stream().anyMatch(slot -> slot < topSize)) {
             event.setCancelled(true);
@@ -643,11 +658,13 @@ public final class RecipeViewerGUI implements Listener {
 
     private boolean handleNavigationClick(int slot, Player player, RecipeViewerHolder holder) {
         if (slot == PREV_SLOT && holder.getIndex() > 0) {
-            open(player, holder.getItemId(), holder.getRecipes(), holder.getIndex() - 1, holder.getReturnPage(), holder.getReturnFilter());
+            open(player, holder.getItemId(), holder.getRecipes(), holder.getIndex() - 1, holder.getReturnPage(),
+                    holder.getReturnFilter());
             return true;
         }
         if (slot == NEXT_SLOT && holder.getIndex() < holder.getRecipes().size() - 1) {
-            open(player, holder.getItemId(), holder.getRecipes(), holder.getIndex() + 1, holder.getReturnPage(), holder.getReturnFilter());
+            open(player, holder.getItemId(), holder.getRecipes(), holder.getIndex() + 1, holder.getReturnPage(),
+                    holder.getReturnFilter());
             return true;
         }
         if (slot == BACK_SLOT) {

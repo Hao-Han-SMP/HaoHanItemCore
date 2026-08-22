@@ -43,7 +43,8 @@ public final class DefaultItemService implements ItemService {
 
     @Override
     public boolean isItem(ItemStack item, String id) {
-        if (item == null || !item.hasItemMeta()) return false;
+        if (item == null || !item.hasItemMeta())
+            return false;
         String itemId = getId(item);
         return id.equals(itemId);
     }
@@ -55,7 +56,8 @@ public final class DefaultItemService implements ItemService {
 
     @Override
     public String getId(ItemStack item) {
-        if (item == null || !item.hasItemMeta()) return null;
+        if (item == null || !item.hasItemMeta())
+            return null;
 
         ItemMeta meta = item.getItemMeta();
         PersistentDataContainer pdc = meta.getPersistentDataContainer();
@@ -79,10 +81,12 @@ public final class DefaultItemService implements ItemService {
     @Override
     public Map<String, Object> getProperties(ItemStack item) {
         String id = getId(item);
-        if (id == null) return Map.of();
+        if (id == null)
+            return Map.of();
 
         ItemDefinition def = registry.get(id);
-        if (def == null) return Map.of();
+        if (def == null)
+            return Map.of();
 
         return def.getProperties();
     }
@@ -94,13 +98,16 @@ public final class DefaultItemService implements ItemService {
 
     @Override
     public ItemStack validateAndUpdate(ItemStack item) {
-        if (item == null || item.getType().isAir()) return item;
+        if (item == null || item.getType().isAir())
+            return item;
 
         String id = getId(item);
-        if (id == null) return item;
+        if (id == null)
+            return item;
 
         ItemDefinition definition = registry.get(id);
-        if (definition == null) return item;
+        if (definition == null)
+            return item;
 
         item = DefaultItemFactory.applyComponents(item, definition, plugin);
         return item;
