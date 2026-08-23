@@ -7,13 +7,16 @@ import vn.haohan.itemcore.internal.item.DefaultItemFactory;
 
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
+import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.RecipeChoice;
 import org.bukkit.plugin.Plugin;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
 
 /**
@@ -27,7 +30,7 @@ public final class BukkitRecipeAdapter {
     private final ItemRegistry itemRegistry;
     private final DefaultItemFactory itemFactory;
     private final Logger logger;
-    private final List<NamespacedKey> registeredKeys = new ArrayList<>();
+    private final Map<String, NamespacedKey> registeredKeys = new ConcurrentHashMap<>();
 
     public BukkitRecipeAdapter(Plugin plugin, ItemRegistry itemRegistry, DefaultItemFactory itemFactory) {
         this.plugin = plugin;
@@ -47,9 +50,16 @@ public final class BukkitRecipeAdapter {
                 // MACHINE type không register với Bukkit
                 return true;
             }
-            plugin.getServer().addRecipe(bukkitRecipe);
             NamespacedKey key = createKey(recipe);
-            registeredKeys.add(key);
+            // Xóa recipe cũ nếu trùng key trước khi add
+            plugin.getServer().removeRecipe(key);
+            plugin.getServer().addRecipe(bukkitRecipe);
+            registeredKeys.put(recipe.getId(), key);
+
+            // Tự động unlock recipe cho người chơi đang online
+            for (Player player : plugin.getServer().getOnlinePlayers()) {
+                player.discoverRecipe(key);
+            }
             return true;
         } catch (Exception e) {
             logger.warning("[BukkitRecipeAdapter] Failed to register recipe: " + recipe.getId());
@@ -59,13 +69,27 @@ public final class BukkitRecipeAdapter {
     }
 
     /**
+     * Hủy đăng ký một recipe theo ID.
+     */
+    public void unregister(String recipeId) {
+        NamespacedKey key = registeredKeys.remove(recipeId);
+        if (key != null) {
+            plugin.getServer().removeRecipe(key);
+        }
+    }
+
+    /**
      * Xóa tất cả recipe đã đăng ký.
      */
     public void unregisterAll() {
-        for (NamespacedKey key : registeredKeys) {
+        for (NamespacedKey key : registeredKeys.values()) {
             plugin.getServer().removeRecipe(key);
         }
         registeredKeys.clear();
+    }
+
+    public List<NamespacedKey> getRegisteredKeys() {
+        return Collections.unmodifiableList(new ArrayList<>(registeredKeys.values()));
     }
 
     /**

@@ -9,15 +9,20 @@ import java.util.logging.Logger;
 
 /**
  * Default implementation của RecipeRegistry.
- * Thread-safe, sử dụng ConcurrentHashMap.
+ * Thread-safe, tự động đồng bộ đăng ký với BukkitRecipeAdapter.
  */
 public final class DefaultRecipeRegistry implements RecipeRegistry {
 
     private final Map<String, RecipeDefinition> recipes = new ConcurrentHashMap<>();
     private final Logger logger;
+    private BukkitRecipeAdapter recipeAdapter;
 
     public DefaultRecipeRegistry(Logger logger) {
         this.logger = logger;
+    }
+
+    public void setRecipeAdapter(BukkitRecipeAdapter recipeAdapter) {
+        this.recipeAdapter = recipeAdapter;
     }
 
     @Override
@@ -25,16 +30,21 @@ public final class DefaultRecipeRegistry implements RecipeRegistry {
         Objects.requireNonNull(recipe, "RecipeDefinition cannot be null");
 
         String id = recipe.getId();
-
         if (id == null || id.isEmpty()) {
             throw new IllegalArgumentException("Recipe ID cannot be null or empty");
         }
 
         if (recipes.containsKey(id)) {
-            throw new IllegalArgumentException("Recipe already registered: '" + id + "'");
+            // Thay thế recipe cũ nếu đã tồn tại để hỗ trợ plugin reload
+            unregister(id);
         }
 
         recipes.put(id, recipe);
+
+        if (recipeAdapter != null) {
+            recipeAdapter.register(recipe);
+        }
+
         logger.info("[RecipeRegistry] Registered: " + id +
                 " (Type: " + recipe.getType() + ", Result: " + recipe.getResult().item() + ")");
     }
@@ -62,6 +72,9 @@ public final class DefaultRecipeRegistry implements RecipeRegistry {
     public void unregister(String id) {
         RecipeDefinition removed = recipes.remove(id);
         if (removed != null) {
+            if (recipeAdapter != null) {
+                recipeAdapter.unregister(id);
+            }
             logger.info("[RecipeRegistry] Unregistered: " + id);
         }
     }
@@ -79,6 +92,10 @@ public final class DefaultRecipeRegistry implements RecipeRegistry {
     @Override
     public void clear() {
         recipes.clear();
+        if (recipeAdapter != null) {
+            recipeAdapter.unregisterAll();
+        }
         logger.info("[RecipeRegistry] Cleared all recipes.");
     }
 }
+
