@@ -57,6 +57,7 @@ public final class HaoHanItemCorePlugin extends JavaPlugin {
         recipeService = new DefaultRecipeService(recipeRegistry);
         iconTextureRegistry = new DefaultIconTextureRegistry();
         recipeAdapter = new BukkitRecipeAdapter(this, itemRegistry, itemFactory);
+        recipeRegistry.setRecipeAdapter(recipeAdapter);
 
         // Set singleton
         HaoHanItemCore.setInstance(new HaoHanItemCore(
@@ -77,7 +78,7 @@ public final class HaoHanItemCorePlugin extends JavaPlugin {
         loadAllConfigs();
 
         // Register event listeners
-        ItemEventRouter eventRouter = new ItemEventRouter(itemRegistry, this);
+        ItemEventRouter eventRouter = new ItemEventRouter(itemRegistry, recipeAdapter, this);
         getServer().getPluginManager().registerEvents(eventRouter, this);
 
         // Create GUI handlers
@@ -119,10 +120,7 @@ public final class HaoHanItemCorePlugin extends JavaPlugin {
     private void reload() {
         getLogger().info("Reloading HaoHanItemCore...");
 
-        // Unregister Bukkit recipes
-        recipeAdapter.unregisterAll();
-
-        // Clear registries
+        // Clear registries (recipeRegistry.clear() tự động gọi recipeAdapter.unregisterAll())
         itemRegistry.clear();
         recipeRegistry.clear();
         iconTextureRegistry.clear();
@@ -151,11 +149,10 @@ public final class HaoHanItemCorePlugin extends JavaPlugin {
         File recipesDir = new File(getDataFolder(), "recipes");
         List<RecipeDefinition> recipes = recipeConfigLoader.loadAll(recipesDir);
 
-        // Register with HaoHanItemCore and Bukkit
+        // Register with HaoHanItemCore (tự động đồng bộ sang Bukkit qua RecipeRegistry)
         for (RecipeDefinition recipe : recipes) {
             try {
                 recipeRegistry.register(recipe);
-                recipeAdapter.register(recipe);
             } catch (Exception e) {
                 log.warning("Failed to register recipe: " + recipe.getId() + " — " + e.getMessage());
             }

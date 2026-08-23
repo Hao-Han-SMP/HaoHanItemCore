@@ -55,13 +55,27 @@ public final class ItemEventRouter implements Listener {
     private final NamespacedKey itemIdKey;
     private final Logger logger;
     private final Plugin plugin;
+    private final vn.haohan.itemcore.internal.recipe.BukkitRecipeAdapter recipeAdapter;
+    private final vn.haohan.itemcore.internal.recipe.CraftingRecipeResolver craftingRecipeResolver;
     private final java.util.Map<String, org.bukkit.block.data.BlockData> parsedBlockDataCache = new java.util.concurrent.ConcurrentHashMap<>();
 
     public ItemEventRouter(ItemRegistry registry, Plugin plugin) {
+        this(registry, null, plugin);
+    }
+
+    public ItemEventRouter(ItemRegistry registry, vn.haohan.itemcore.internal.recipe.BukkitRecipeAdapter recipeAdapter, Plugin plugin) {
         this.registry = registry;
+        this.recipeAdapter = recipeAdapter;
         this.itemIdKey = new NamespacedKey(plugin, DefaultItemFactory.ITEM_ID_KEY_NAME);
         this.logger = plugin.getLogger();
         this.plugin = plugin;
+        this.craftingRecipeResolver = new vn.haohan.itemcore.internal.recipe.CraftingRecipeResolver(
+                registry,
+                HaoHanItemCore.get().getItemService(),
+                HaoHanItemCore.get().getRecipeService(),
+                HaoHanItemCore.get().getItemFactory(),
+                plugin
+        );
     }
 
     @EventHandler(priority = EventPriority.NORMAL)
@@ -109,17 +123,39 @@ public final class ItemEventRouter implements Listener {
         definition.getBehavior().onBreak(context);
     }
 
-    @EventHandler(priority = EventPriority.NORMAL)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onCraftItem(CraftItemEvent event) {
-        ItemStack result = event.getRecipe().getResult();
+        org.bukkit.inventory.Recipe recipe = event.getRecipe();
+        org.bukkit.inventory.ItemStack[] matrix = event.getInventory().getMatrix();
 
-        ItemDefinition definition = getDefinition(result);
-        if (definition == null || !definition.hasBehavior())
+        if (recipe instanceof org.bukkit.Keyed keyed
+                && org.bukkit.NamespacedKey.MINECRAFT.equals(keyed.getKey().getNamespace())
+                && containsCustomItem(matrix)) {
+            event.setCancelled(true);
+            event.getInventory().setResult(null);
             return;
+        }
 
-        if (event.getWhoClicked() instanceof Player player) {
-            ItemContext context = new ItemContext(player, result, definition, event);
-            definition.getBehavior().onCraft(context);
+        if (recipe != null) {
+            ItemStack result = recipe.getResult();
+            ItemDefinition definition = getDefinition(result);
+            if (definition != null && definition.hasBehavior() && event.getWhoClicked() instanceof Player player) {
+                ItemContext context = new ItemContext(player, result, definition, event);
+                definition.getBehavior().onCraft(context);
+            }
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onCrafterCraft(org.bukkit.event.block.CrafterCraftEvent event) {
+        if (!(event.getBlock().getState() instanceof org.bukkit.block.Crafter crafter)) {
+            return;
+        }
+        org.bukkit.inventory.ItemStack[] contents = crafter.getInventory().getContents();
+        if (event.getRecipe() instanceof org.bukkit.Keyed keyed
+                && org.bukkit.NamespacedKey.MINECRAFT.equals(keyed.getKey().getNamespace())
+                && containsCustomItem(contents)) {
+            event.setCancelled(true);
         }
     }
 
@@ -399,6 +435,12 @@ public final class ItemEventRouter implements Listener {
     @EventHandler(priority = EventPriority.LOWEST)
     public void onPlayerJoin(org.bukkit.event.player.PlayerJoinEvent event) {
         Player player = event.getPlayer();
+        if (recipeAdapter != null) {
+            List<NamespacedKey> keys = recipeAdapter.getRegisteredKeys();
+            if (!keys.isEmpty()) {
+                player.discoverRecipes(keys);
+            }
+        }
         for (ItemStack item : player.getInventory().getContents()) {
             if (item != null) {
                 vn.haohan.itemcore.api.HaoHanItemCore.get().getItemService().validateAndUpdate(item);
@@ -426,12 +468,49 @@ public final class ItemEventRouter implements Listener {
         vn.haohan.itemcore.api.HaoHanItemCore.get().getItemService().validateAndUpdate(item);
     }
 
-    @EventHandler(priority = EventPriority.LOWEST)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onPlayerRecipeBookClick(com.destroystokyo.paper.event.player.PlayerRecipeBookClickEvent event) {
+        if (craftingRecipeResolver != null) {
+            craftingRecipeResolver.handleRecipeBookClick(event);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST)
     public void onPrepareItemCraft(org.bukkit.event.inventory.PrepareItemCraftEvent event) {
+        org.bukkit.inventory.Recipe recipe = event.getRecipe();
+        org.bukkit.inventory.ItemStack[] matrix = event.getInventory().getMatrix();
+
+        // Chặn Carrier Leak: Nếu là recipe của vanilla Minecraft nhưng có chứa Custom Item trong matrix
+        if (recipe instanceof org.bukkit.Keyed keyed
+                && org.bukkit.NamespacedKey.MINECRAFT.equals(keyed.getKey().getNamespace())
+                && containsCustomItem(matrix)) {
+            event.getInventory().setResult(null);
+            return;
+        }
+
+        // Tự động xử lý Recipe Book auto-craft & Custom Recipe
+        if (craftingRecipeResolver != null) {
+            boolean resolved = craftingRecipeResolver.resolve(event);
+            if (resolved) {
+                return;
+            }
+        }
+
         ItemStack result = event.getInventory().getResult();
         if (result != null) {
             vn.haohan.itemcore.api.HaoHanItemCore.get().getItemService().validateAndUpdate(result);
         }
+    }
+
+    private boolean containsCustomItem(org.bukkit.inventory.ItemStack[] items) {
+        if (items == null) return false;
+        var itemService = vn.haohan.itemcore.api.HaoHanItemCore.get().getItemService();
+        for (org.bukkit.inventory.ItemStack item : items) {
+            if (item != null && !item.getType().isAir() && itemService.isCustomItem(item)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @EventHandler(priority = EventPriority.NORMAL)
