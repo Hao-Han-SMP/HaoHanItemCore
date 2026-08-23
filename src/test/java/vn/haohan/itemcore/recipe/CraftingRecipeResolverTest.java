@@ -1,0 +1,79 @@
+package vn.haohan.itemcore.recipe;
+
+import vn.haohan.itemcore.api.item.ItemDefinition;
+import vn.haohan.itemcore.api.item.ItemType;
+import vn.haohan.itemcore.api.recipe.Ingredient;
+import vn.haohan.itemcore.api.recipe.ItemResult;
+import vn.haohan.itemcore.api.recipe.ShapedRecipeDefinition;
+import vn.haohan.itemcore.internal.item.DefaultItemRegistry;
+import vn.haohan.itemcore.internal.recipe.CraftingRecipeResolver;
+import vn.haohan.itemcore.internal.recipe.DefaultRecipeRegistry;
+import vn.haohan.itemcore.internal.recipe.DefaultRecipeService;
+
+import org.bukkit.Material;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import java.util.List;
+import java.util.Map;
+import java.util.logging.Logger;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+class CraftingRecipeResolverTest {
+
+    private DefaultItemRegistry itemRegistry;
+    private DefaultRecipeRegistry recipeRegistry;
+    private DefaultRecipeService recipeService;
+    private CraftingRecipeResolver resolver;
+
+    @BeforeEach
+    void setUp() {
+        Logger logger = Logger.getLogger("ResolverTest");
+        itemRegistry = new DefaultItemRegistry(logger);
+        recipeRegistry = new DefaultRecipeRegistry(logger);
+        recipeService = new DefaultRecipeService(recipeRegistry);
+
+        // Register custom items
+        itemRegistry.register(ItemDefinition.builder("haohanmetallurgy:embersteel_ingot")
+                .material(Material.IRON_INGOT)
+                .displayName("Embersteel Ingot")
+                .type(ItemType.MATERIAL)
+                .build());
+
+        itemRegistry.register(ItemDefinition.builder("haohanmetallurgy:embersteel_pickaxe")
+                .material(Material.IRON_PICKAXE)
+                .displayName("Embersteel Pickaxe")
+                .type(ItemType.TOOL)
+                .build());
+
+        // Register custom shaped recipe
+        recipeRegistry.register(new ShapedRecipeDefinition(
+                "haohanmetallurgy:embersteel_pickaxe",
+                List.of("III", " T ", " T "),
+                Map.of(
+                        'I', new Ingredient.ItemIngredient("haohanmetallurgy:embersteel_ingot"),
+                        'T', new Ingredient.MaterialIngredient(Material.STICK)
+                ),
+                new ItemResult("haohanmetallurgy:embersteel_pickaxe", 1)
+        ));
+
+        resolver = new CraftingRecipeResolver(itemRegistry, null, recipeService, null, null);
+    }
+
+    @Test
+    void testRecipeRegisteredAndResolvable() {
+        assertEquals(2, itemRegistry.size());
+        assertEquals(1, recipeRegistry.size());
+
+        var recipes = recipeService.findByResult("haohanmetallurgy:embersteel_pickaxe");
+        assertEquals(1, recipes.size());
+        assertTrue(recipes.get(0) instanceof ShapedRecipeDefinition);
+
+        ShapedRecipeDefinition shaped = (ShapedRecipeDefinition) recipes.get(0);
+        assertEquals(3, shaped.getPattern().size());
+        assertEquals("III", shaped.getPattern().get(0));
+        assertEquals(" T ", shaped.getPattern().get(1));
+        assertEquals(" T ", shaped.getPattern().get(2));
+    }
+}
