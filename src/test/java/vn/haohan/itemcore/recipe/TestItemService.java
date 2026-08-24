@@ -24,6 +24,7 @@ public class TestItemService implements ItemService {
         this.registry = registry;
     }
 
+    @SuppressWarnings("deprecation")
     public static ItemStack mockItem(Material mat, int amount) {
         ItemStack stack = Mockito.mock(ItemStack.class);
         final Material[] currentMat = new Material[]{mat};
@@ -39,6 +40,11 @@ public class TestItemService implements ItemService {
             currentAmount[0] = i.getArgument(0);
             return null;
         }).when(stack).setAmount(ArgumentMatchers.anyInt());
+
+        Mockito.when(stack.withType(ArgumentMatchers.any(Material.class))).thenAnswer(i -> {
+            Material newMat = i.getArgument(0);
+            return mockItem(newMat, currentAmount[0]);
+        });
 
         Mockito.when(stack.clone()).thenAnswer(invocation -> mockItem(currentMat[0], currentAmount[0]));
 

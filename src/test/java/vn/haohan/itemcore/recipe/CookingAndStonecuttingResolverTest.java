@@ -41,8 +41,8 @@ class CookingAndStonecuttingResolverTest {
         DefaultRecipeRegistry recipeRegistry = new DefaultRecipeRegistry(logger);
         recipeService = new DefaultRecipeService(recipeRegistry);
         matcher = new RecipeIngredientMatcher(itemService);
-        cookingResolver = new CookingRecipeResolver(matcher, recipeService, null, itemService, itemRegistry);
-        stonecuttingResolver = new StonecuttingRecipeResolver(matcher, recipeService, null, itemService, itemRegistry);
+        cookingResolver = new CookingRecipeResolver(matcher, recipeService, null, itemService);
+        stonecuttingResolver = new StonecuttingRecipeResolver(matcher, recipeService, itemRegistry);
 
         // Register custom items
         itemRegistry.register(ItemDefinition.builder("example:raw_mithril")

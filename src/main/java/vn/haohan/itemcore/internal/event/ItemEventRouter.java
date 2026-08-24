@@ -2,9 +2,6 @@ package vn.haohan.itemcore.internal.event;
 
 import vn.haohan.itemcore.api.item.*;
 import vn.haohan.itemcore.api.HaoHanItemCore;
-import vn.haohan.itemcore.api.recipe.Ingredient;
-import vn.haohan.itemcore.api.recipe.RecipeDefinition;
-import vn.haohan.itemcore.api.recipe.RecipeType;
 import vn.haohan.itemcore.internal.item.DefaultItemFactory;
 
 import org.bukkit.NamespacedKey;
@@ -27,7 +24,6 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.inventory.PrepareSmithingEvent;
-import org.bukkit.inventory.SmithingInventory;
 import org.bukkit.block.Block;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -85,9 +81,9 @@ public final class ItemEventRouter implements Listener {
         this.smithingRecipeResolver = new vn.haohan.itemcore.internal.recipe.SmithingRecipeResolver(
                 matcher, recipeService, itemFactory, itemService, registry);
         this.cookingRecipeResolver = new vn.haohan.itemcore.internal.recipe.CookingRecipeResolver(
-                matcher, recipeService, itemFactory, itemService, registry);
+                matcher, recipeService, itemFactory, itemService);
         this.stonecuttingRecipeResolver = new vn.haohan.itemcore.internal.recipe.StonecuttingRecipeResolver(
-                matcher, recipeService, itemFactory, itemService, registry);
+                matcher, recipeService, registry);
     }
 
     @EventHandler(priority = EventPriority.NORMAL)

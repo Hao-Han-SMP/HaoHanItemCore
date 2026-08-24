@@ -1,7 +1,6 @@
 package vn.haohan.itemcore.internal.recipe;
 
 import vn.haohan.itemcore.api.item.ItemRegistry;
-import vn.haohan.itemcore.api.item.ItemDefinition;
 import vn.haohan.itemcore.api.recipe.*;
 import vn.haohan.itemcore.internal.item.DefaultItemFactory;
 

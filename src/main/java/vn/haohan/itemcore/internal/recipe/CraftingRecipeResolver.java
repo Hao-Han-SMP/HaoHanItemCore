@@ -19,9 +19,6 @@ import org.bukkit.event.inventory.PrepareItemCraftEvent;
 import org.bukkit.inventory.CraftingInventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
-import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.persistence.PersistentDataContainer;
-import org.bukkit.persistence.PersistentDataType;
 
 import java.util.*;
 
@@ -454,14 +451,6 @@ public final class CraftingRecipeResolver {
 
     public boolean matchesCustomItem(ItemStack item, String targetId) {
         return matcher.matchesCustomItem(item, targetId);
-    }
-
-    private boolean matchVanillaItem(ItemStack item, String vanillaId) {
-        return matcher.matchVanillaItem(item, vanillaId);
-    }
-
-    private boolean matchMaterial(ItemStack item, Material material) {
-        return matcher.matchMaterial(item, material);
     }
 
     private int countCustomItems(PlayerInventory inv, String customId) {

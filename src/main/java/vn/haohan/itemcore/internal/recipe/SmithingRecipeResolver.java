@@ -126,8 +126,7 @@ public final class SmithingRecipeResolver {
         if (templateMat == Material.NETHERITE_UPGRADE_SMITHING_TEMPLATE && additionMat == Material.NETHERITE_INGOT) {
             Material targetMat = getNetheriteUpgradeTarget(baseMat);
             if (targetMat != null) {
-                ItemStack result = base.clone();
-                result.setType(targetMat);
+                ItemStack result = base.clone().withType(targetMat);
                 result.setAmount(1);
                 return result;
             }

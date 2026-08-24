@@ -1,9 +1,7 @@
 package vn.haohan.itemcore.internal.recipe;
 
 import vn.haohan.itemcore.api.item.ItemDefinition;
-import vn.haohan.itemcore.api.item.ItemFactory;
 import vn.haohan.itemcore.api.item.ItemRegistry;
-import vn.haohan.itemcore.api.item.ItemService;
 import vn.haohan.itemcore.api.recipe.Ingredient;
 import vn.haohan.itemcore.api.recipe.RecipeDefinition;
 import vn.haohan.itemcore.api.recipe.RecipeService;
@@ -30,16 +28,12 @@ public final class StonecuttingRecipeResolver {
 
     private final RecipeIngredientMatcher matcher;
     private final RecipeService recipeService;
-    private final ItemFactory itemFactory;
-    private final ItemService itemService;
     private final ItemRegistry itemRegistry;
 
     public StonecuttingRecipeResolver(RecipeIngredientMatcher matcher, RecipeService recipeService,
-                                      ItemFactory itemFactory, ItemService itemService, ItemRegistry itemRegistry) {
+                                      ItemRegistry itemRegistry) {
         this.matcher = matcher;
         this.recipeService = recipeService;
-        this.itemFactory = itemFactory;
-        this.itemService = itemService;
         this.itemRegistry = itemRegistry;
     }
 
