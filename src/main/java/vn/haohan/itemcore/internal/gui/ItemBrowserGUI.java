@@ -549,7 +549,19 @@ public final class ItemBrowserGUI implements Listener {
         int slot = event.getRawSlot();
         int topSize = event.getView().getTopInventory().getSize();
 
-        if (slot < 0 || slot >= topSize) {
+        if (slot < 0) {
+            return;
+        }
+
+        if (slot >= topSize) {
+            if (event.isShiftClick() && event.isLeftClick()) {
+                event.setCurrentItem(null);
+                if (event.getClickedInventory() != null) {
+                    event.getClickedInventory().setItem(event.getSlot(), null);
+                }
+                player.updateInventory();
+                runSync(player::updateInventory);
+            }
             return;
         }
 

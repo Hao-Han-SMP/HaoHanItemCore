@@ -78,6 +78,7 @@ public final class RecipeViewerGUI implements Listener {
     private static final int CAMPFIRE_ARROW_SLOT = 22;
     private static final int CAMPFIRE_RESULT_SLOT = 24;
 
+    private final Plugin plugin;
     private final ItemService itemService;
     private final RecipeService recipeService;
     private final ItemRegistry itemRegistry;
@@ -85,14 +86,15 @@ public final class RecipeViewerGUI implements Listener {
 
     public RecipeViewerGUI(ItemService itemService, RecipeService recipeService,
             ItemRegistry itemRegistry) {
-        this.itemService = itemService;
-        this.recipeService = recipeService;
-        this.itemRegistry = itemRegistry;
+        this(null, itemService, recipeService, itemRegistry);
     }
 
     public RecipeViewerGUI(Plugin plugin, ItemService itemService, RecipeService recipeService,
             ItemRegistry itemRegistry) {
-        this(itemService, recipeService, itemRegistry);
+        this.plugin = plugin;
+        this.itemService = itemService;
+        this.recipeService = recipeService;
+        this.itemRegistry = itemRegistry;
     }
 
     public void setItemBrowser(ItemBrowserGUI itemBrowser) {
@@ -633,7 +635,19 @@ public final class RecipeViewerGUI implements Listener {
         int slot = event.getRawSlot();
         int topSize = event.getView().getTopInventory().getSize();
 
-        if (slot < 0 || slot >= topSize) {
+        if (slot < 0) {
+            return;
+        }
+
+        if (slot >= topSize) {
+            if (event.isShiftClick() && event.isLeftClick()) {
+                event.setCurrentItem(null);
+                if (event.getClickedInventory() != null) {
+                    event.getClickedInventory().setItem(event.getSlot(), null);
+                }
+                player.updateInventory();
+                runSync(player::updateInventory);
+            }
             return;
         }
 
@@ -687,6 +701,14 @@ public final class RecipeViewerGUI implements Listener {
                     open(player, clickedId, holder.getReturnPage(), holder.getReturnFilter());
                 }
             }
+        }
+    }
+
+    private void runSync(Runnable task) {
+        if (plugin != null) {
+            Bukkit.getScheduler().runTask(plugin, task);
+        } else {
+            task.run();
         }
     }
 }
