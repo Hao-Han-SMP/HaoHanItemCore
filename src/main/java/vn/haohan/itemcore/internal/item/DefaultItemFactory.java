@@ -35,7 +35,7 @@ public final class DefaultItemFactory implements ItemFactory {
     public DefaultItemFactory(ItemRegistry registry, Plugin plugin) {
         this.registry = registry;
         this.plugin = plugin;
-        this.itemIdKey = new NamespacedKey(plugin, ITEM_ID_KEY_NAME);
+        this.itemIdKey = plugin != null ? new NamespacedKey(plugin, ITEM_ID_KEY_NAME) : new NamespacedKey("haohanitemcore", ITEM_ID_KEY_NAME);
     }
 
     @Override
@@ -334,7 +334,7 @@ public final class DefaultItemFactory implements ItemFactory {
     }
 
     private static boolean applyUniqueUUID(ItemMeta meta, ItemDefinition definition, Plugin plugin) {
-        NamespacedKey uuidKey = new NamespacedKey(plugin, "uuid");
+        NamespacedKey uuidKey = plugin != null ? new NamespacedKey(plugin, "uuid") : new NamespacedKey("haohanitemcore", "uuid");
         PersistentDataContainer pdc = meta.getPersistentDataContainer();
         if (definition.getMaxStackSize() == 1) {
             if (!pdc.has(uuidKey, org.bukkit.persistence.PersistentDataType.STRING)) {

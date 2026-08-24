@@ -26,9 +26,9 @@ public final class DefaultItemService implements ItemService {
     public DefaultItemService(ItemRegistry registry, ItemFactory factory, Plugin plugin) {
         this.registry = registry;
         this.factory = factory;
-        this.itemIdKey = new NamespacedKey(plugin, DefaultItemFactory.ITEM_ID_KEY_NAME);
+        this.itemIdKey = plugin != null ? new NamespacedKey(plugin, DefaultItemFactory.ITEM_ID_KEY_NAME) : new NamespacedKey("haohanitemcore", DefaultItemFactory.ITEM_ID_KEY_NAME);
         this.plugin = plugin;
-        this.instanceData = new ItemInstanceData(plugin);
+        this.instanceData = plugin != null ? new ItemInstanceData(plugin) : null;
     }
 
     @Override
