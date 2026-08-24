@@ -58,7 +58,7 @@ class CraftingRecipeResolverTest {
                 new ItemResult("haohanmetallurgy:embersteel_pickaxe", 1)
         ));
 
-        resolver = new CraftingRecipeResolver(itemRegistry, null, recipeService, null, null);
+        resolver = new CraftingRecipeResolver(itemRegistry, null, recipeService, null);
     }
 
     @Test
@@ -75,5 +75,9 @@ class CraftingRecipeResolverTest {
         assertEquals("III", shaped.getPattern().get(0));
         assertEquals(" T ", shaped.getPattern().get(1));
         assertEquals(" T ", shaped.getPattern().get(2));
+
+        // Verify resolver can find custom recipes by NamespacedKey
+        assertNotNull(resolver.findRecipeByKey(org.bukkit.NamespacedKey.fromString("haohanmetallurgy:embersteel_pickaxe")));
+        assertNotNull(resolver.findRecipeByKey(new org.bukkit.NamespacedKey("minecraft", "haohanmetallurgy_embersteel_pickaxe")));
     }
 }

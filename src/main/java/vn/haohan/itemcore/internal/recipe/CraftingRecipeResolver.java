@@ -22,7 +22,6 @@ import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
-import org.bukkit.plugin.Plugin;
 
 import java.util.*;
 
@@ -41,15 +40,13 @@ public final class CraftingRecipeResolver {
     private final ItemService itemService;
     private final RecipeService recipeService;
     private final ItemFactory itemFactory;
-    private final Plugin plugin;
 
     public CraftingRecipeResolver(ItemRegistry itemRegistry, ItemService itemService,
-                                  RecipeService recipeService, ItemFactory itemFactory, Plugin plugin) {
+                                  RecipeService recipeService, ItemFactory itemFactory) {
         this.itemRegistry = itemRegistry;
         this.itemService = itemService;
         this.recipeService = recipeService;
         this.itemFactory = itemFactory;
-        this.plugin = plugin;
     }
 
     /**
@@ -163,13 +160,13 @@ public final class CraftingRecipeResolver {
                         if (itemIng.isVanilla()) {
                             Material mat = parseVanillaMaterial(itemIng.id());
                             if (mat != null) {
-                                neededMaterials.merge(mat, 1, Integer::sum);
+                                neededMaterials.put(mat, neededMaterials.getOrDefault(mat, 0) + 1);
                             }
                         } else {
-                            neededCustomItems.merge(itemIng.id(), 1, Integer::sum);
+                            neededCustomItems.put(itemIng.id(), neededCustomItems.getOrDefault(itemIng.id(), 0) + 1);
                         }
                     } else if (ing instanceof Ingredient.MaterialIngredient matIng) {
-                        neededMaterials.merge(matIng.material(), 1, Integer::sum);
+                        neededMaterials.put(matIng.material(), neededMaterials.getOrDefault(matIng.material(), 0) + 1);
                     }
                 }
             }
@@ -225,7 +222,10 @@ public final class CraftingRecipeResolver {
     private void fillShapelessRecipe(CraftingInventory craftingInv, Player player, RecipeDefinition recipe) {
         PlayerInventory playerInv = player.getInventory();
         List<Ingredient> ingredients = recipe.getIngredients();
-        int totalNeeded = ingredients.stream().mapToInt(Ingredient::amount).sum();
+        int totalNeeded = 0;
+        for (Ingredient ing : ingredients) {
+            totalNeeded += ing.amount();
+        }
         int gridSize = craftingInv.getMatrix().length;
 
         if (totalNeeded > gridSize) {
@@ -240,13 +240,13 @@ public final class CraftingRecipeResolver {
                 if (itemIng.isVanilla()) {
                     Material mat = parseVanillaMaterial(itemIng.id());
                     if (mat != null) {
-                        neededMaterials.merge(mat, ing.amount(), Integer::sum);
+                        neededMaterials.put(mat, neededMaterials.getOrDefault(mat, 0) + ing.amount());
                     }
                 } else {
-                    neededCustomItems.merge(itemIng.id(), ing.amount(), Integer::sum);
+                    neededCustomItems.put(itemIng.id(), neededCustomItems.getOrDefault(itemIng.id(), 0) + ing.amount());
                 }
             } else if (ing instanceof Ingredient.MaterialIngredient matIng) {
-                neededMaterials.merge(matIng.material(), ing.amount(), Integer::sum);
+                neededMaterials.put(matIng.material(), neededMaterials.getOrDefault(matIng.material(), 0) + ing.amount());
             }
         }
 
@@ -416,7 +416,10 @@ public final class CraftingRecipeResolver {
             }
         }
 
-        int totalNeeded = required.stream().mapToInt(Ingredient::amount).sum();
+        int totalNeeded = 0;
+        for (Ingredient ing : required) {
+            totalNeeded += ing.amount();
+        }
         if (nonNullSlots.size() != totalNeeded) {
             return false;
         }

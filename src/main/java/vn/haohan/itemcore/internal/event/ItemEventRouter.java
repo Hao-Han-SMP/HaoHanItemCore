@@ -73,8 +73,7 @@ public final class ItemEventRouter implements Listener {
                 registry,
                 HaoHanItemCore.get().getItemService(),
                 HaoHanItemCore.get().getRecipeService(),
-                HaoHanItemCore.get().getItemFactory(),
-                plugin
+                HaoHanItemCore.get().getItemFactory()
         );
     }
 
