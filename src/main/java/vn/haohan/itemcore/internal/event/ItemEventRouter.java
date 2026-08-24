@@ -56,25 +56,38 @@ public final class ItemEventRouter implements Listener {
     private final Logger logger;
     private final Plugin plugin;
     private final vn.haohan.itemcore.internal.recipe.BukkitRecipeAdapter recipeAdapter;
+    private final vn.haohan.itemcore.internal.recipe.RecipeIngredientMatcher matcher;
     private final vn.haohan.itemcore.internal.recipe.CraftingRecipeResolver craftingRecipeResolver;
+    private final vn.haohan.itemcore.internal.recipe.SmithingRecipeResolver smithingRecipeResolver;
+    private final vn.haohan.itemcore.internal.recipe.CookingRecipeResolver cookingRecipeResolver;
+    private final vn.haohan.itemcore.internal.recipe.StonecuttingRecipeResolver stonecuttingRecipeResolver;
     private final java.util.Map<String, org.bukkit.block.data.BlockData> parsedBlockDataCache = new java.util.concurrent.ConcurrentHashMap<>();
 
     public ItemEventRouter(ItemRegistry registry, Plugin plugin) {
         this(registry, null, plugin);
     }
 
-    public ItemEventRouter(ItemRegistry registry, vn.haohan.itemcore.internal.recipe.BukkitRecipeAdapter recipeAdapter, Plugin plugin) {
+    public ItemEventRouter(ItemRegistry registry, vn.haohan.itemcore.internal.recipe.BukkitRecipeAdapter recipeAdapter,
+            Plugin plugin) {
         this.registry = registry;
         this.recipeAdapter = recipeAdapter;
         this.itemIdKey = new NamespacedKey(plugin, DefaultItemFactory.ITEM_ID_KEY_NAME);
         this.logger = plugin.getLogger();
         this.plugin = plugin;
+
+        var itemService = HaoHanItemCore.get().getItemService();
+        var recipeService = HaoHanItemCore.get().getRecipeService();
+        var itemFactory = HaoHanItemCore.get().getItemFactory();
+
+        this.matcher = new vn.haohan.itemcore.internal.recipe.RecipeIngredientMatcher(itemService);
         this.craftingRecipeResolver = new vn.haohan.itemcore.internal.recipe.CraftingRecipeResolver(
-                registry,
-                HaoHanItemCore.get().getItemService(),
-                HaoHanItemCore.get().getRecipeService(),
-                HaoHanItemCore.get().getItemFactory()
-        );
+                registry, itemService, recipeService, itemFactory, matcher);
+        this.smithingRecipeResolver = new vn.haohan.itemcore.internal.recipe.SmithingRecipeResolver(
+                matcher, recipeService, itemFactory, itemService, registry);
+        this.cookingRecipeResolver = new vn.haohan.itemcore.internal.recipe.CookingRecipeResolver(
+                matcher, recipeService, itemFactory, itemService, registry);
+        this.stonecuttingRecipeResolver = new vn.haohan.itemcore.internal.recipe.StonecuttingRecipeResolver(
+                matcher, recipeService, itemFactory, itemService, registry);
     }
 
     @EventHandler(priority = EventPriority.NORMAL)
@@ -167,6 +180,13 @@ public final class ItemEventRouter implements Listener {
         ItemStack cursor = event.getCursor();
         if (cursor != null) {
             vn.haohan.itemcore.api.HaoHanItemCore.get().getItemService().validateAndUpdate(cursor);
+        }
+
+        if (smithingRecipeResolver != null) {
+            smithingRecipeResolver.handleResultClick(event);
+        }
+        if (stonecuttingRecipeResolver != null) {
+            stonecuttingRecipeResolver.handleInventoryClick(event);
         }
 
         if (item == null)
@@ -479,7 +499,8 @@ public final class ItemEventRouter implements Listener {
         org.bukkit.inventory.Recipe recipe = event.getRecipe();
         org.bukkit.inventory.ItemStack[] matrix = event.getInventory().getMatrix();
 
-        // Chặn Carrier Leak: Nếu là recipe của vanilla Minecraft nhưng có chứa Custom Item trong matrix
+        // Chặn Carrier Leak: Nếu là recipe của vanilla Minecraft nhưng có chứa Custom
+        // Item trong matrix
         if (recipe instanceof org.bukkit.Keyed keyed
                 && org.bukkit.NamespacedKey.MINECRAFT.equals(keyed.getKey().getNamespace())
                 && containsCustomItem(matrix)) {
@@ -502,53 +523,35 @@ public final class ItemEventRouter implements Listener {
     }
 
     private boolean containsCustomItem(org.bukkit.inventory.ItemStack[] items) {
-        if (items == null) return false;
-        var itemService = vn.haohan.itemcore.api.HaoHanItemCore.get().getItemService();
-        for (org.bukkit.inventory.ItemStack item : items) {
-            if (item != null && !item.getType().isAir() && itemService.isCustomItem(item)) {
-                return true;
-            }
-        }
-        return false;
+        return matcher != null ? matcher.containsCustomItem(items) : false;
     }
 
-    @EventHandler(priority = EventPriority.NORMAL)
+    @EventHandler(priority = EventPriority.HIGHEST)
     public void onPrepareSmithing(PrepareSmithingEvent event) {
-        SmithingInventory inventory = event.getInventory();
-        ItemStack template = inventory.getItem(0); // Template slot
-        ItemStack base = inventory.getItem(1); // Base item slot
-        ItemStack addition = inventory.getItem(2); // Addition ingredient slot
-
-        RecipeDefinition matchedRecipe = findSmithingRecipe(template, base, addition);
-
-        if (matchedRecipe != null) {
-            ItemStack resultStack = HaoHanItemCore.get().getItemFactory().create(
-                    matchedRecipe.getResult().item(),
-                    matchedRecipe.getResult().amount());
-            event.setResult(resultStack);
-        } else {
-            ItemStack currentResult = event.getResult();
-            if (currentResult != null && HaoHanItemCore.get().getItemService().isCustomItem(currentResult)) {
-                event.setResult(null);
-            }
+        if (smithingRecipeResolver != null) {
+            smithingRecipeResolver.resolve(event);
         }
     }
 
-    private boolean matchIngredient(Ingredient ingredient, ItemStack item) {
-        if (item == null || item.getType() == org.bukkit.Material.AIR) {
-            return false;
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onFurnaceSmelt(org.bukkit.event.inventory.FurnaceSmeltEvent event) {
+        if (cookingRecipeResolver != null) {
+            cookingRecipeResolver.handleFurnaceSmelt(event);
         }
-        if (ingredient instanceof Ingredient.ItemIngredient itemIng) {
-            if (itemIng.id().startsWith("minecraft:")) {
-                String matName = itemIng.id().substring("minecraft:".length()).toUpperCase();
-                return item.getType().name().equals(matName);
-            } else {
-                return HaoHanItemCore.get().getItemService().isItem(item, itemIng.id());
-            }
-        } else if (ingredient instanceof Ingredient.MaterialIngredient matIng) {
-            return item.getType() == matIng.material();
+    }
+
+    @EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = true)
+    public void onFurnaceStartSmelt(org.bukkit.event.inventory.FurnaceStartSmeltEvent event) {
+        if (cookingRecipeResolver != null) {
+            cookingRecipeResolver.handleFurnaceStartSmelt(event);
         }
-        return false;
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onBlockCook(org.bukkit.event.block.BlockCookEvent event) {
+        if (cookingRecipeResolver != null) {
+            cookingRecipeResolver.handleBlockCook(event);
+        }
     }
 
     private boolean applyCustomBlockData(Block block, ItemDefinition definition, Player player) {
@@ -681,27 +684,5 @@ public final class ItemEventRouter implements Listener {
         // Recreate and drop custom item if custom_block_drop is configured
         dropCustomBlockItem(block, id, blockPDC);
         return true;
-    }
-
-    private RecipeDefinition findSmithingRecipe(ItemStack template, ItemStack base, ItemStack addition) {
-        var recipeService = HaoHanItemCore.get().getRecipeService();
-        if (recipeService == null)
-            return null;
-
-        for (RecipeDefinition recipe : recipeService.all()) {
-            if (recipe.getType() != RecipeType.SMITHING) {
-                continue;
-            }
-            List<Ingredient> ingredients = recipe.getIngredients();
-            if (ingredients.size() < 3)
-                continue;
-
-            if (matchIngredient(ingredients.get(0), template) &&
-                    matchIngredient(ingredients.get(1), base) &&
-                    matchIngredient(ingredients.get(2), addition)) {
-                return recipe;
-            }
-        }
-        return null;
     }
 }

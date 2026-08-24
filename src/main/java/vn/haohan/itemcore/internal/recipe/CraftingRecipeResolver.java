@@ -26,12 +26,17 @@ import org.bukkit.persistence.PersistentDataType;
 import java.util.*;
 
 /**
- * Bộ phân giải và xử lý công thức chế tạo thông minh (Auto-Craft Smart Resolver).
+ * Bộ phân giải và xử lý công thức chế tạo thông minh (Auto-Craft Smart
+ * Resolver).
  * 
- * <p>Giải quyết triệt để vấn đề:
- * Khi người chơi bấm vào công thức trong Recipe Book của Minecraft, Paper sẽ kích hoạt
- * sự kiện PlayerRecipeBookClickEvent. Resolver sẽ can thiệp huỷ bỏ cơ chế bốc đồ mặc
- * định của Minecraft (tránh bốc nhầm sắt vanilla vào bàn chế tạo) và tự động bốc đúng
+ * <p>
+ * Giải quyết triệt để vấn đề:
+ * Khi người chơi bấm vào công thức trong Recipe Book của Minecraft, Paper sẽ
+ * kích hoạt
+ * sự kiện PlayerRecipeBookClickEvent. Resolver sẽ can thiệp huỷ bỏ cơ chế bốc
+ * đồ mặc
+ * định của Minecraft (tránh bốc nhầm sắt vanilla vào bàn chế tạo) và tự động
+ * bốc đúng
  * Custom Items từ kho đồ của người chơi đặt vào bàn chế tạo.
  */
 public final class CraftingRecipeResolver {
@@ -40,13 +45,20 @@ public final class CraftingRecipeResolver {
     private final ItemService itemService;
     private final RecipeService recipeService;
     private final ItemFactory itemFactory;
+    private final RecipeIngredientMatcher matcher;
 
     public CraftingRecipeResolver(ItemRegistry itemRegistry, ItemService itemService,
-                                  RecipeService recipeService, ItemFactory itemFactory) {
+            RecipeService recipeService, ItemFactory itemFactory) {
+        this(itemRegistry, itemService, recipeService, itemFactory, new RecipeIngredientMatcher(itemService));
+    }
+
+    public CraftingRecipeResolver(ItemRegistry itemRegistry, ItemService itemService,
+            RecipeService recipeService, ItemFactory itemFactory, RecipeIngredientMatcher matcher) {
         this.itemRegistry = itemRegistry;
         this.itemService = itemService;
         this.recipeService = recipeService;
         this.itemFactory = itemFactory;
+        this.matcher = matcher != null ? matcher : new RecipeIngredientMatcher(itemService);
     }
 
     /**
@@ -175,7 +187,8 @@ public final class CraftingRecipeResolver {
         // Kiểm tra nguyên liệu trong túi đồ
         for (var entry : neededCustomItems.entrySet()) {
             if (countCustomItems(playerInv, entry.getKey()) < entry.getValue()) {
-                player.sendActionBar(Component.text("Thiếu nguyên liệu: " + getDisplayName(entry.getKey()), NamedTextColor.RED));
+                player.sendActionBar(
+                        Component.text("Thiếu nguyên liệu: " + getDisplayName(entry.getKey()), NamedTextColor.RED));
                 return;
             }
         }
@@ -246,13 +259,15 @@ public final class CraftingRecipeResolver {
                     neededCustomItems.put(itemIng.id(), neededCustomItems.getOrDefault(itemIng.id(), 0) + ing.amount());
                 }
             } else if (ing instanceof Ingredient.MaterialIngredient matIng) {
-                neededMaterials.put(matIng.material(), neededMaterials.getOrDefault(matIng.material(), 0) + ing.amount());
+                neededMaterials.put(matIng.material(),
+                        neededMaterials.getOrDefault(matIng.material(), 0) + ing.amount());
             }
         }
 
         for (var entry : neededCustomItems.entrySet()) {
             if (countCustomItems(playerInv, entry.getKey()) < entry.getValue()) {
-                player.sendActionBar(Component.text("Thiếu nguyên liệu: " + getDisplayName(entry.getKey()), NamedTextColor.RED));
+                player.sendActionBar(
+                        Component.text("Thiếu nguyên liệu: " + getDisplayName(entry.getKey()), NamedTextColor.RED));
                 return;
             }
         }
@@ -269,7 +284,8 @@ public final class CraftingRecipeResolver {
         int slotIndex = 0;
         for (Ingredient ing : ingredients) {
             for (int i = 0; i < ing.amount(); i++) {
-                if (slotIndex >= gridSize) break;
+                if (slotIndex >= gridSize)
+                    break;
                 if (ing instanceof Ingredient.ItemIngredient itemIng) {
                     if (itemIng.isVanilla()) {
                         Material mat = parseVanillaMaterial(itemIng.id());
@@ -296,7 +312,7 @@ public final class CraftingRecipeResolver {
         boolean modified = false;
         for (int i = 0; i < currentMatrix.length; i++) {
             ItemStack item = currentMatrix[i];
-            if (item != null && !item.getType().isAir()) {
+            if (!RecipeIngredientMatcher.isAir(item)) {
                 HashMap<Integer, ItemStack> leftover = playerInv.addItem(item);
                 for (ItemStack drop : leftover.values()) {
                     player.getWorld().dropItemNaturally(player.getLocation(), drop);
@@ -312,7 +328,7 @@ public final class CraftingRecipeResolver {
 
     private boolean isMatrixEmpty(ItemStack[] matrix) {
         for (ItemStack item : matrix) {
-            if (item != null && !item.getType().isAir()) {
+            if (!RecipeIngredientMatcher.isAir(item)) {
                 return false;
             }
         }
@@ -320,7 +336,7 @@ public final class CraftingRecipeResolver {
     }
 
     private boolean tryResolveShaped(CraftingInventory inventory, ItemStack[] matrix,
-                                     Player player, ShapedRecipeDefinition shaped) {
+            Player player, ShapedRecipeDefinition shaped) {
         int gridRows = matrix.length == 4 ? 2 : 3;
         int gridCols = matrix.length == 4 ? 2 : 3;
 
@@ -350,47 +366,26 @@ public final class CraftingRecipeResolver {
                         if (inPattern) {
                             char ch = pattern.get(r - dr).charAt(c - dc);
                             if (ch == ' ') {
-                                if (slotItem != null && !slotItem.getType().isAir()) {
+                                if (!RecipeIngredientMatcher.isAir(slotItem)) {
                                     matched = false;
                                     break;
                                 }
                             } else {
                                 Ingredient ing = shaped.getIngredientMap().get(ch);
-                                if (ing == null) {
-                                    matched = false;
-                                    break;
-                                }
-
-                                if (ing instanceof Ingredient.ItemIngredient itemIng) {
-                                    if (itemIng.isVanilla()) {
-                                        if (!matchVanillaItem(slotItem, itemIng.id())) {
-                                            matched = false;
-                                            break;
-                                        }
-                                    } else {
-                                        if (!matchesCustomItem(slotItem, itemIng.id())) {
-                                            matched = false;
-                                            break;
-                                        }
-                                    }
-                                } else if (ing instanceof Ingredient.MaterialIngredient matIng) {
-                                    if (!matchMaterial(slotItem, matIng.material())) {
-                                        matched = false;
-                                        break;
-                                    }
-                                } else {
+                                if (ing == null || !matcher.matches(ing, slotItem)) {
                                     matched = false;
                                     break;
                                 }
                             }
                         } else {
-                            if (slotItem != null && !slotItem.getType().isAir()) {
+                            if (!RecipeIngredientMatcher.isAir(slotItem)) {
                                 matched = false;
                                 break;
                             }
                         }
                     }
-                    if (!matched) break;
+                    if (!matched)
+                        break;
                 }
 
                 if (matched) {
@@ -406,12 +401,12 @@ public final class CraftingRecipeResolver {
     }
 
     private boolean tryResolveShapeless(CraftingInventory inventory, ItemStack[] matrix,
-                                        Player player, RecipeDefinition recipe) {
+            Player player, RecipeDefinition recipe) {
         List<Ingredient> required = recipe.getIngredients();
         List<ItemStack> nonNullSlots = new ArrayList<>();
 
         for (ItemStack item : matrix) {
-            if (item != null && !item.getType().isAir()) {
+            if (!RecipeIngredientMatcher.isAir(item)) {
                 nonNullSlots.add(item);
             }
         }
@@ -436,24 +431,13 @@ public final class CraftingRecipeResolver {
         for (Ingredient ing : expandedReq) {
             boolean matched = false;
             for (int j = 0; j < nonNullSlots.size(); j++) {
-                if (usedSlot[j]) continue;
+                if (usedSlot[j])
+                    continue;
                 ItemStack slotItem = nonNullSlots.get(j);
-                if (ing instanceof Ingredient.ItemIngredient itemIng) {
-                    if (itemIng.isVanilla() && matchVanillaItem(slotItem, itemIng.id())) {
-                        usedSlot[j] = true;
-                        matched = true;
-                        break;
-                    } else if (!itemIng.isVanilla() && matchesCustomItem(slotItem, itemIng.id())) {
-                        usedSlot[j] = true;
-                        matched = true;
-                        break;
-                    }
-                } else if (ing instanceof Ingredient.MaterialIngredient matIng) {
-                    if (matchMaterial(slotItem, matIng.material())) {
-                        usedSlot[j] = true;
-                        matched = true;
-                        break;
-                    }
+                if (matcher.matches(ing, slotItem)) {
+                    usedSlot[j] = true;
+                    matched = true;
+                    break;
                 }
             }
 
@@ -469,46 +453,21 @@ public final class CraftingRecipeResolver {
     }
 
     public boolean matchesCustomItem(ItemStack item, String targetId) {
-        if (item == null || !item.hasItemMeta()) {
-            return false;
-        }
-        if (itemService.isItem(item, targetId)) {
-            return true;
-        }
-        ItemMeta meta = item.getItemMeta();
-        if (meta == null) return false;
-        PersistentDataContainer pdc = meta.getPersistentDataContainer();
-        for (NamespacedKey k : pdc.getKeys()) {
-            if (k.getKey().equals("custom_item_id") || k.getKey().equals("item_id")) {
-                String val = pdc.get(k, PersistentDataType.STRING);
-                if (val != null) {
-                    if (val.equals(targetId)) return true;
-                    if (targetId.endsWith(":" + val)) return true;
-                    if (val.endsWith(":" + targetId)) return true;
-                }
-            }
-        }
-        return false;
+        return matcher.matchesCustomItem(item, targetId);
     }
 
     private boolean matchVanillaItem(ItemStack item, String vanillaId) {
-        if (item == null || item.getType().isAir() || itemService.isCustomItem(item)) {
-            return false;
-        }
-        String matName = vanillaId.substring("minecraft:".length()).toUpperCase(Locale.ROOT);
-        return item.getType().name().equals(matName);
+        return matcher.matchVanillaItem(item, vanillaId);
     }
 
     private boolean matchMaterial(ItemStack item, Material material) {
-        return item != null && !item.getType().isAir()
-                && item.getType() == material
-                && !itemService.isCustomItem(item);
+        return matcher.matchMaterial(item, material);
     }
 
     private int countCustomItems(PlayerInventory inv, String customId) {
         int count = 0;
         for (ItemStack stack : inv.getContents()) {
-            if (stack != null && !stack.getType().isAir() && matchesCustomItem(stack, customId)) {
+            if (!RecipeIngredientMatcher.isAir(stack) && matchesCustomItem(stack, customId)) {
                 count += stack.getAmount();
             }
         }
@@ -518,7 +477,7 @@ public final class CraftingRecipeResolver {
     private int countMaterials(PlayerInventory inv, Material material) {
         int count = 0;
         for (ItemStack stack : inv.getContents()) {
-            if (stack != null && !stack.getType().isAir()
+            if (!RecipeIngredientMatcher.isAir(stack)
                     && stack.getType() == material
                     && !itemService.isCustomItem(stack)) {
                 count += stack.getAmount();
@@ -532,7 +491,7 @@ public final class CraftingRecipeResolver {
         ItemStack sample = null;
         for (int i = 0; i < inv.getSize(); i++) {
             ItemStack stack = inv.getItem(i);
-            if (stack != null && !stack.getType().isAir() && matchesCustomItem(stack, customId)) {
+            if (!RecipeIngredientMatcher.isAir(stack) && matchesCustomItem(stack, customId)) {
                 if (sample == null) {
                     sample = stack.clone();
                     sample.setAmount(amount);
@@ -557,7 +516,7 @@ public final class CraftingRecipeResolver {
         int remaining = amount;
         for (int i = 0; i < inv.getSize(); i++) {
             ItemStack stack = inv.getItem(i);
-            if (stack != null && !stack.getType().isAir()
+            if (!RecipeIngredientMatcher.isAir(stack)
                     && stack.getType() == material
                     && !itemService.isCustomItem(stack)) {
                 int stackAmount = stack.getAmount();

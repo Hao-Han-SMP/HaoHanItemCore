@@ -4,6 +4,7 @@ import vn.haohan.itemcore.api.item.ItemDefinition;
 import vn.haohan.itemcore.api.item.ItemType;
 import vn.haohan.itemcore.api.recipe.Ingredient;
 import vn.haohan.itemcore.api.recipe.ItemResult;
+import vn.haohan.itemcore.api.recipe.RecipeDefinition;
 import vn.haohan.itemcore.api.recipe.ShapedRecipeDefinition;
 import vn.haohan.itemcore.internal.item.DefaultItemRegistry;
 import vn.haohan.itemcore.internal.recipe.CraftingRecipeResolver;
@@ -79,5 +80,22 @@ class CraftingRecipeResolverTest {
         // Verify resolver can find custom recipes by NamespacedKey
         assertNotNull(resolver.findRecipeByKey(org.bukkit.NamespacedKey.fromString("haohanmetallurgy:embersteel_pickaxe")));
         assertNotNull(resolver.findRecipeByKey(new org.bukkit.NamespacedKey("minecraft", "haohanmetallurgy_embersteel_pickaxe")));
+    }
+
+    @Test
+    void testShapelessRecipeRegistered() {
+        recipeRegistry.register(new RecipeDefinition(
+                "haohanmetallurgy:embersteel_blend",
+                vn.haohan.itemcore.api.recipe.RecipeType.SHAPELESS,
+                List.of(
+                        new Ingredient.ItemIngredient("haohanmetallurgy:embersteel_ingot", 1),
+                        new Ingredient.MaterialIngredient(Material.BLAZE_POWDER, 1)
+                ),
+                new ItemResult("haohanmetallurgy:embersteel_blend", 2)
+        ));
+
+        var recipes = recipeService.findByResult("haohanmetallurgy:embersteel_blend");
+        assertEquals(1, recipes.size());
+        assertEquals(vn.haohan.itemcore.api.recipe.RecipeType.SHAPELESS, recipes.get(0).getType());
     }
 }
