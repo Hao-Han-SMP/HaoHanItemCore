@@ -3,11 +3,14 @@ package vn.haohan.itemcore.internal.gui;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 
-/** Shared menu icons backed by minecraft:paper custom model data. */
+/** Shared menu icons backed by haohan:icon item model and custom model data. */
 final class MenuIcon {
+    private static final NamespacedKey ICON_MODEL = NamespacedKey.fromString("haohan:icon");
+
     static final int PREVIOUS_ACTIVE = 900001;
     static final int PREVIOUS_DISABLED = 900002;
     static final int NEXT_ACTIVE = 900003;
@@ -29,6 +32,10 @@ final class MenuIcon {
         ItemStack item = new ItemStack(Material.PAPER, 1);
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
+            try {
+                meta.setItemModel(ICON_MODEL);
+            } catch (Throwable ignored) {
+            }
             meta.setCustomModelData(customModelData);
             if (displayName != null) {
                 if (!displayName.hasDecoration(TextDecoration.ITALIC)) {
