@@ -2,6 +2,16 @@ package vn.haohan.itemcore;
 
 import vn.haohan.itemcore.api.HaoHanItemCore;
 import vn.haohan.itemcore.api.recipe.RecipeDefinition;
+import vn.haohan.itemcore.api.block.CustomBlockDefinition;
+import vn.haohan.itemcore.api.block.CustomBlockModel;
+import vn.haohan.itemcore.api.item.ItemDefinition;
+import vn.haohan.itemcore.internal.block.BlockDisplayRenderer;
+import vn.haohan.itemcore.internal.block.CustomBlockEventListener;
+import vn.haohan.itemcore.internal.block.CustomBlockStorage;
+import vn.haohan.itemcore.internal.block.CustomBlockVisibilityManager;
+import vn.haohan.itemcore.internal.block.DefaultCustomBlockRegistry;
+import vn.haohan.itemcore.internal.block.DefaultCustomBlockService;
+import vn.haohan.itemcore.internal.block.VirtualEntityIdManager;
 import vn.haohan.itemcore.internal.command.ItemCoreCommand;
 import vn.haohan.itemcore.internal.config.ItemConfigLoader;
 import vn.haohan.itemcore.internal.config.RecipeConfigLoader;
@@ -45,6 +55,18 @@ public final class HaoHanItemCorePlugin extends JavaPlugin {
     private RecipeConfigLoader recipeConfigLoader;
     private DefaultIconTextureRegistry iconTextureRegistry;
 
+    // CustomBlock subsystem
+    private DefaultCustomBlockRegistry customBlockRegistry;
+    private CustomBlockStorage customBlockStorage;
+    private VirtualEntityIdManager virtualEntityIdManager;
+    private BlockDisplayRenderer blockDisplayRenderer;
+    private CustomBlockVisibilityManager customBlockVisibilityManager;
+    private DefaultCustomBlockService customBlockService;
+    private CustomBlockEventListener customBlockEventListener;
+    private vn.haohan.itemcore.internal.block.CustomBlockMiningManager customBlockMiningManager;
+    private org.bukkit.scheduler.BukkitTask miningTickerTask;
+    private com.github.retrooper.packetevents.event.PacketListenerCommon miningPacketListenerHandle;
+
     @Override
     public void onLoad() {
         Logger log = getLogger();
@@ -59,10 +81,21 @@ public final class HaoHanItemCorePlugin extends JavaPlugin {
         recipeAdapter = new BukkitRecipeAdapter(this, itemRegistry, itemFactory);
         recipeRegistry.setRecipeAdapter(recipeAdapter);
 
+        // Initialize custom block subsystem
+        customBlockRegistry = new DefaultCustomBlockRegistry(log);
+        customBlockStorage = new CustomBlockStorage(this);
+        virtualEntityIdManager = new VirtualEntityIdManager();
+        blockDisplayRenderer = new BlockDisplayRenderer();
+        customBlockVisibilityManager = new CustomBlockVisibilityManager(
+                customBlockStorage, customBlockRegistry, virtualEntityIdManager, blockDisplayRenderer, log);
+        customBlockService = new DefaultCustomBlockService(
+                customBlockRegistry, customBlockStorage, customBlockVisibilityManager, this);
+
         // Set singleton
         HaoHanItemCore.setInstance(new HaoHanItemCore(
                 itemRegistry, itemFactory, itemService,
-                recipeRegistry, recipeService, iconTextureRegistry));
+                recipeRegistry, recipeService, iconTextureRegistry,
+                customBlockService));
 
         log.info("HaoHanItemCore loaded. Registries initialized.");
     }
@@ -80,6 +113,20 @@ public final class HaoHanItemCorePlugin extends JavaPlugin {
         // Register event listeners
         ItemEventRouter eventRouter = new ItemEventRouter(itemRegistry, recipeAdapter, this);
         getServer().getPluginManager().registerEvents(eventRouter, this);
+
+        customBlockEventListener = new CustomBlockEventListener(
+                customBlockService, customBlockStorage, customBlockVisibilityManager, itemRegistry, this);
+        getServer().getPluginManager().registerEvents(customBlockEventListener, this);
+
+        // Initialize CustomBlockMiningManager & register PacketEvents listener
+        customBlockMiningManager = new vn.haohan.itemcore.internal.block.CustomBlockMiningManager(customBlockService, this);
+        customBlockService.setMiningManager(customBlockMiningManager);
+        if (com.github.retrooper.packetevents.PacketEvents.getAPI() != null) {
+            miningPacketListenerHandle = com.github.retrooper.packetevents.PacketEvents.getAPI().getEventManager().registerListener(
+                    customBlockMiningManager,
+                    com.github.retrooper.packetevents.event.PacketListenerPriority.NORMAL);
+        }
+        miningTickerTask = getServer().getScheduler().runTaskTimer(this, customBlockMiningManager::tick, 1L, 1L);
 
         // Create GUI handlers
         RecipeViewerGUI recipeViewer = new RecipeViewerGUI(this, itemService, recipeService, itemRegistry);
@@ -104,12 +151,30 @@ public final class HaoHanItemCorePlugin extends JavaPlugin {
         log.info("  HaoHanItemCore v" + getPluginMeta().getVersion() + " enabled!");
         log.info("  Items: " + itemRegistry.size());
         log.info("  Recipes: " + recipeRegistry.size());
+        log.info("  CustomBlocks: " + customBlockRegistry.size());
         log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     }
 
     @Override
     public void onDisable() {
+        if (miningTickerTask != null) {
+            miningTickerTask.cancel();
+        }
+        if (customBlockMiningManager != null) {
+            customBlockMiningManager.clearAllSessions();
+            if (miningPacketListenerHandle != null && com.github.retrooper.packetevents.PacketEvents.getAPI() != null) {
+                try {
+                    com.github.retrooper.packetevents.PacketEvents.getAPI().getEventManager().unregisterListener(miningPacketListenerHandle);
+                } catch (Throwable ignored) {}
+            }
+        }
         recipeAdapter.unregisterAll();
+        if (customBlockVisibilityManager != null) {
+            customBlockVisibilityManager.shutdown();
+        }
+        if (customBlockStorage != null) {
+            customBlockStorage.clearCache();
+        }
         HaoHanItemCore.setInstance(null);
         getLogger().info("HaoHanItemCore disabled.");
     }
@@ -124,12 +189,14 @@ public final class HaoHanItemCorePlugin extends JavaPlugin {
         itemRegistry.clear();
         recipeRegistry.clear();
         iconTextureRegistry.clear();
+        customBlockRegistry.clear();
 
         // Reload
         loadAllConfigs();
 
         getLogger().info("HaoHanItemCore reloaded! Items: " + itemRegistry.size() +
-                ", Recipes: " + recipeRegistry.size());
+                ", Recipes: " + recipeRegistry.size() +
+                ", CustomBlocks: " + customBlockRegistry.size());
     }
 
     /**
@@ -155,6 +222,64 @@ public final class HaoHanItemCorePlugin extends JavaPlugin {
                 recipeRegistry.register(recipe);
             } catch (Exception e) {
                 log.warning("Failed to register recipe: " + recipe.getId() + " — " + e.getMessage());
+            }
+        }
+
+        // Auto-register custom blocks from item definitions
+        for (ItemDefinition itemDef : itemRegistry.all()) {
+            Object cbId = itemDef.getProperties().get("custom_block_id");
+            if (cbId instanceof String customBlockId) {
+                if (!customBlockRegistry.has(customBlockId)) {
+                    org.bukkit.block.data.BlockData blockData = null;
+                    Object modelObj = itemDef.getProperties().get("custom_block_model");
+                    if (modelObj instanceof String modelStr) {
+                        try {
+                            blockData = org.bukkit.Bukkit.createBlockData(modelStr);
+                        } catch (Exception ignored) {}
+                    }
+                    if (blockData == null) {
+                        blockData = org.bukkit.Bukkit.createBlockData(org.bukkit.Material.STONE);
+                    }
+                    String dropId = itemDef.getId();
+                    Object dropObj = itemDef.getProperties().get("custom_block_drop");
+                    if (dropObj instanceof String d) {
+                        dropId = d;
+                    }
+
+                    CustomBlockDefinition.Builder builder = CustomBlockDefinition.builder(customBlockId)
+                            .model(new CustomBlockModel(blockData))
+                            .dropItemId(dropId);
+
+                    Object hardnessObj = itemDef.getProperties().get("custom_block_hardness");
+                    if (hardnessObj instanceof Number num) {
+                        builder.hardness(num.floatValue());
+                    } else if (hardnessObj instanceof Boolean bool) {
+                        builder.hardness(bool);
+                    }
+
+                    if (Boolean.TRUE.equals(itemDef.getProperties().get("custom_block_unbreakable"))) {
+                        builder.unbreakable();
+                    }
+                    if (Boolean.TRUE.equals(itemDef.getProperties().get("custom_block_instant_break"))) {
+                        builder.instantBreak();
+                    }
+
+                    Object silkTouchObj = itemDef.getProperties().get("custom_block_silk_touch_drop");
+                    if (silkTouchObj instanceof String silkDropId) {
+                        builder.dropProvider(vn.haohan.itemcore.api.block.BlockDropProvider.builder()
+                                .defaultDrop(dropId)
+                                .silkTouchDrop(silkDropId)
+                                .build());
+                    } else if (Boolean.TRUE.equals(itemDef.getProperties().get("custom_block_silk_touch_drops_self"))) {
+                        builder.dropProvider(vn.haohan.itemcore.api.block.BlockDropProvider.builder()
+                                .defaultDrop(dropId)
+                                .silkTouchDropsSelf()
+                                .build());
+                    }
+
+                    CustomBlockDefinition blockDef = builder.build();
+                    customBlockRegistry.register(blockDef);
+                }
             }
         }
     }
