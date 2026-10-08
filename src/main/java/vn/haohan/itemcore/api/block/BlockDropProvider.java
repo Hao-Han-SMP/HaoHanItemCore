@@ -139,10 +139,13 @@ public interface BlockDropProvider {
 
         private static ItemStack createItem(String id, int amount) {
             if (id == null) return null;
-            var core = HaoHanItemCore.get();
-            if (core != null && core.getItemService() != null) {
-                return core.getItemService().create(id, amount);
-            }
+            try {
+                var core = HaoHanItemCore.get();
+                if (core != null && core.getItemService() != null) {
+                    return core.getItemService().create(id, amount);
+                }
+            } catch (IllegalStateException ignored) {}
+
             Material mat = Material.matchMaterial(id.startsWith("minecraft:") ? id.substring(10) : id);
             if (mat != null) {
                 return new ItemStack(mat, amount);

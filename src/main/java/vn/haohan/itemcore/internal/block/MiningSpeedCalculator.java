@@ -4,7 +4,7 @@ import org.bukkit.Material;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.potion.PotionEffectType;
+import org.bukkit.potion.PotionEffect;
 import vn.haohan.itemcore.api.HaoHanItemCore;
 import vn.haohan.itemcore.api.block.CustomBlockDefinition;
 import vn.haohan.itemcore.api.block.ToolTier;
@@ -51,19 +51,21 @@ public final class MiningSpeedCalculator {
             }
 
             // Custom item speed property support
-            var core = HaoHanItemCore.get();
-            if (core != null && core.getItemService() != null) {
-                String customId = core.getItemService().getId(tool);
-                if (customId != null) {
-                    ItemDefinition itemDef = core.getItemService().getDefinition(customId);
-                    if (itemDef != null) {
-                        Object speedProp = itemDef.getProperties().get("mining_speed");
-                        if (speedProp instanceof Number num) {
-                            speedMultiplier += num.floatValue();
+            try {
+                var core = HaoHanItemCore.get();
+                if (core != null && core.getItemService() != null) {
+                    String customId = core.getItemService().getId(tool);
+                    if (customId != null) {
+                        ItemDefinition itemDef = core.getItemService().getDefinition(customId);
+                        if (itemDef != null) {
+                            Object speedProp = itemDef.getProperties().get("mining_speed");
+                            if (speedProp instanceof Number num) {
+                                speedMultiplier += num.floatValue();
+                            }
                         }
                     }
                 }
-            }
+            } catch (IllegalStateException ignored) {}
 
             // Efficiency enchantment
             int efficiencyLevel = getEfficiencyLevel(tool);
@@ -74,20 +76,20 @@ public final class MiningSpeedCalculator {
 
         if (player != null) {
             try {
-                if (player.hasPotionEffect(PotionEffectType.HASTE)) {
-                    var effect = player.getPotionEffect(PotionEffectType.HASTE);
-                    int amp = effect != null ? effect.getAmplifier() : 0;
-                    speedMultiplier *= (1.0f + 0.2f * (amp + 1));
-                }
-                if (player.hasPotionEffect(PotionEffectType.MINING_FATIGUE)) {
-                    var effect = player.getPotionEffect(PotionEffectType.MINING_FATIGUE);
-                    int amp = effect != null ? effect.getAmplifier() : 0;
-                    speedMultiplier *= (float) Math.pow(0.3, Math.min(amp + 1, 4));
+                for (PotionEffect effect : player.getActivePotionEffects()) {
+                    if (effect != null && effect.getType() != null) {
+                        String name = effect.getType().getName();
+                        if ("HASTE".equalsIgnoreCase(name) || "FAST_DIGGING".equalsIgnoreCase(name)) {
+                            speedMultiplier *= (1.0f + 0.2f * (effect.getAmplifier() + 1));
+                        } else if ("MINING_FATIGUE".equalsIgnoreCase(name) || "SLOW_DIGGING".equalsIgnoreCase(name)) {
+                            speedMultiplier *= (float) Math.pow(0.3, Math.min(effect.getAmplifier() + 1, 4));
+                        }
+                    }
                 }
             } catch (Throwable ignored) {}
 
             try {
-                if (player.isInWater() && !player.hasPotionEffect(PotionEffectType.CONDUIT_POWER)) {
+                if (player.isInWater()) {
                     speedMultiplier /= 5.0f;
                 }
             } catch (Throwable ignored) {}
