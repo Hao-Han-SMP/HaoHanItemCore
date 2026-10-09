@@ -320,8 +320,9 @@ Thay thế hoàn toàn hệ thống NoteBlock cũ bằng kiến trúc **Physical
 
 - **Zero Server-Side Entity Ticking:** 0 Bukkit `BlockDisplay` entity được sinh ra trên server. 100% hiển thị thông qua PacketEvents virtual packet (`WrapperPlayServerSpawnEntity`, `WrapperPlayServerEntityMetadata`, `WrapperPlayServerDestroyEntities`).
 - **Scale Chống Z-Fighting:** Áp dụng scale nghiêm ngặt `1.00005f` trên cả 3 trục cùng translation offset `(-0.000025f, -0.000025f, -0.000025f)` triệt tiêu hoàn toàn z-fighting và rung lắc viền khối.
-- **Zero-Packet Policy khi di chuyển nội chunk:** Di chuyển bên trong cùng một chunk (intra-chunk) gửi **chính xác 0 packet** và thực hiện 0 lần quét không gian. Chỉ khi bước qua ranh giới chunk mới tính toán chunk delta để gửi spawn/destroy display.
-- **Lưu trữ nhị phân siêu gọn:** Tọa độ chunk và local coordinate được bit-packed, nén nhị phân trong PersistentDataContainer (PDC) của Chunk, lưu trữ O(1) in-memory index và tự động giải phóng khi chunk unload để chống tràn RAM.
+- **Tự động hiển thị qua PacketEvents CHUNK_DATA:** Bắt trực tiếp gói tin `CHUNK_DATA` khi server gửi chunk cho client (khi login, teleport, restart hay di chuyển). Client luôn nhận được BlockDisplay ngay lập tức, triệt tiêu lỗi mất texture sau khi restart server.
+- **Lưu trữ tức thì trong Chunk PDC:** Dữ liệu custom block được đồng bộ nhị phân ngay lập tức vào `PersistentDataContainer` (PDC) của Chunk khi đặt/phá khối, đảm bảo an toàn 100% qua mọi lần server reload / restart.
+- **Tính toán tốc độ đào chuẩn xác theo loại công cụ (`ToolType`):** Chỉ công cụ phù hợp với khối (mặc định suy luận từ blockstate hoặc cấu hình `toolType`) mới được hưởng hệ số nhân cấp bậc (`ToolTier`: Gỗ 2x, Sắt 6x, Kim cương 8x,...) và phù phép `Efficiency`. Các công cụ sai loại như Kiếm, Cuốc đất trên quặng sẽ bị khóa ở tốc độ tay 1.0x, ngăn chặn hoàn toàn việc đào bằng kiếm nhanh hơn cúp.
 - **Bảo toàn NoteBlock:** NoteBlock vanilla hoạt động bình thường 100%, không còn bị chiếm dụng hay can thiệp âm thanh.
 
 ### Đăng ký qua Code
@@ -332,7 +333,8 @@ CustomBlockModel model = new CustomBlockModel(Bukkit.createBlockData(Material.CO
 CustomBlockDefinition def = CustomBlockDefinition.builder("haohan:ruby_ore")
     .model(model)
     .hardness(3.0f) // 3.0 giây thời gian đào cơ bản (hoặc .unbreakable() / .instantBreak())
-    .miningCondition(MiningCondition.requiresTool(ToolType.PICKAXE, ToolTier.IRON)) // Yêu cầu tối thiểu cúp Sắt
+    .toolType(ToolType.PICKAXE) // Yêu cầu loại công cụ đào hiệu quả (PICKAXE, AXE, SHOVEL, HOE, SWORD, ANY)
+    .miningCondition(MiningCondition.requiresTool(ToolType.PICKAXE, ToolTier.IRON)) // Yêu cầu tối thiểu cúp Sắt để rơi đồ
     .dropProvider(BlockDropProvider.builder()
         .defaultDrop("haohan:ruby", 1)           // Đào bằng cúp thường rơi Ruby
         .silkTouchDrop("haohan:ruby_ore")        // Đào có Silk Touch rơi quặng Ruby
