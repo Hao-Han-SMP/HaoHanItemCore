@@ -66,6 +66,7 @@ public final class HaoHanItemCorePlugin extends JavaPlugin {
     private vn.haohan.itemcore.internal.block.CustomBlockMiningManager customBlockMiningManager;
     private org.bukkit.scheduler.BukkitTask miningTickerTask;
     private com.github.retrooper.packetevents.event.PacketListenerCommon miningPacketListenerHandle;
+    private com.github.retrooper.packetevents.event.PacketListenerCommon chunkPacketListenerHandle;
 
     @Override
     public void onLoad() {
@@ -126,10 +127,15 @@ public final class HaoHanItemCorePlugin extends JavaPlugin {
         customBlockMiningManager = new vn.haohan.itemcore.internal.block.CustomBlockMiningManager(
                 customBlockService, virtualEntityIdManager, breakOverlayRenderer, this);
         customBlockService.setMiningManager(customBlockMiningManager);
+        vn.haohan.itemcore.internal.block.CustomBlockPacketListener chunkPacketListener =
+                new vn.haohan.itemcore.internal.block.CustomBlockPacketListener(customBlockVisibilityManager, log);
         if (com.github.retrooper.packetevents.PacketEvents.getAPI() != null) {
             miningPacketListenerHandle = com.github.retrooper.packetevents.PacketEvents.getAPI().getEventManager().registerListener(
                     customBlockMiningManager,
                     com.github.retrooper.packetevents.event.PacketListenerPriority.NORMAL);
+            chunkPacketListenerHandle = com.github.retrooper.packetevents.PacketEvents.getAPI().getEventManager().registerListener(
+                    chunkPacketListener,
+                    com.github.retrooper.packetevents.event.PacketListenerPriority.MONITOR);
         }
         miningTickerTask = getServer().getScheduler().runTaskTimer(this, customBlockMiningManager::tick, 1L, 1L);
 
@@ -170,6 +176,11 @@ public final class HaoHanItemCorePlugin extends JavaPlugin {
             if (miningPacketListenerHandle != null && com.github.retrooper.packetevents.PacketEvents.getAPI() != null) {
                 try {
                     com.github.retrooper.packetevents.PacketEvents.getAPI().getEventManager().unregisterListener(miningPacketListenerHandle);
+                } catch (Throwable ignored) {}
+            }
+            if (chunkPacketListenerHandle != null && com.github.retrooper.packetevents.PacketEvents.getAPI() != null) {
+                try {
+                    com.github.retrooper.packetevents.PacketEvents.getAPI().getEventManager().unregisterListener(chunkPacketListenerHandle);
                 } catch (Throwable ignored) {}
             }
         }
