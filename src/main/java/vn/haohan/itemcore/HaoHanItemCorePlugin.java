@@ -118,6 +118,9 @@ public final class HaoHanItemCorePlugin extends JavaPlugin {
                 customBlockService, customBlockStorage, customBlockVisibilityManager, itemRegistry, this);
         getServer().getPluginManager().registerEvents(customBlockEventListener, this);
 
+        // Preload any existing custom blocks from loaded server chunks
+        customBlockStorage.loadAll(getServer());
+
         // Initialize CustomBlockMiningManager & register PacketEvents listener
         vn.haohan.itemcore.internal.block.BlockBreakOverlayRenderer breakOverlayRenderer = new vn.haohan.itemcore.internal.block.BlockBreakOverlayRenderer(log);
         customBlockMiningManager = new vn.haohan.itemcore.internal.block.CustomBlockMiningManager(
@@ -175,6 +178,7 @@ public final class HaoHanItemCorePlugin extends JavaPlugin {
             customBlockVisibilityManager.shutdown();
         }
         if (customBlockStorage != null) {
+            customBlockStorage.saveAll(getServer());
             customBlockStorage.clearCache();
         }
         HaoHanItemCore.setInstance(null);

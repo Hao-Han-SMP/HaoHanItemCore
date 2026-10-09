@@ -84,6 +84,9 @@ public final class DefaultCustomBlockService implements CustomBlockService {
 
         // Record in spatial storage
         storage.set(world, location.getBlockX(), location.getBlockY(), location.getBlockZ(), customBlockId);
+        try {
+            storage.saveChunk(location.getChunk());
+        } catch (Throwable ignored) {}
 
         // Dispatch visual packet to viewers
         visibilityManager.handleBlockPlaced(location, def);
@@ -101,6 +104,9 @@ public final class DefaultCustomBlockService implements CustomBlockService {
         if (removedId == null) {
             return false;
         }
+        try {
+            storage.saveChunk(location.getChunk());
+        } catch (Throwable ignored) {}
 
         // Set physical block to AIR
         Block block = location.getBlock();
