@@ -119,7 +119,9 @@ public final class HaoHanItemCorePlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(customBlockEventListener, this);
 
         // Initialize CustomBlockMiningManager & register PacketEvents listener
-        customBlockMiningManager = new vn.haohan.itemcore.internal.block.CustomBlockMiningManager(customBlockService, this);
+        vn.haohan.itemcore.internal.block.BlockBreakOverlayRenderer breakOverlayRenderer = new vn.haohan.itemcore.internal.block.BlockBreakOverlayRenderer(log);
+        customBlockMiningManager = new vn.haohan.itemcore.internal.block.CustomBlockMiningManager(
+                customBlockService, virtualEntityIdManager, breakOverlayRenderer, this);
         customBlockService.setMiningManager(customBlockMiningManager);
         if (com.github.retrooper.packetevents.PacketEvents.getAPI() != null) {
             miningPacketListenerHandle = com.github.retrooper.packetevents.PacketEvents.getAPI().getEventManager().registerListener(
@@ -275,6 +277,16 @@ public final class HaoHanItemCorePlugin extends JavaPlugin {
                                 .defaultDrop(dropId)
                                 .silkTouchDropsSelf()
                                 .build());
+                    }
+
+                    Object toolTypeObj = itemDef.getProperties().get("custom_block_tool_type");
+                    if (toolTypeObj == null) {
+                        toolTypeObj = itemDef.getProperties().get("tool_type");
+                    }
+                    if (toolTypeObj instanceof String ttStr) {
+                        try {
+                            builder.toolType(vn.haohan.itemcore.api.block.ToolType.valueOf(ttStr.toUpperCase()));
+                        } catch (IllegalArgumentException ignored) {}
                     }
 
                     CustomBlockDefinition blockDef = builder.build();

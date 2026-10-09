@@ -83,4 +83,30 @@ public class MiningSpeedCalculatorTest {
         float drillProgress = MiningSpeedCalculator.calculateProgressPerTick(null, drill, block);
         assertEquals(0.325f, drillProgress, 0.0001f);
     }
+
+    @Test
+    public void testSwordAndWrongToolsDoNotMineFasterThanPickaxe() {
+        // 2 seconds base time = 40 ticks, requires PICKAXE
+        CustomBlockDefinition block = CustomBlockDefinition.builder("custom:ruby_ore")
+                .hardness(2.0f)
+                .toolType(vn.haohan.itemcore.api.block.ToolType.PICKAXE)
+                .build();
+
+        // Diamond Sword is NOT a pickaxe -> speed multiplier must be 1.0f (hand speed = 0.025f)
+        ItemStack diamondSword = TestItemService.mockItem(Material.DIAMOND_SWORD);
+        float swordProgress = MiningSpeedCalculator.calculateProgressPerTick(null, diamondSword, block);
+        assertEquals(0.025f, swordProgress, 0.0001f, "Diamond sword must not receive tool tier speed on a pickaxe block");
+
+        // Wooden Pickaxe speed = 2.0 -> 2.0 / 40 = 0.05 per tick (faster than diamond sword!)
+        ItemStack woodPick = TestItemService.mockItem(Material.WOODEN_PICKAXE);
+        float woodPickProgress = MiningSpeedCalculator.calculateProgressPerTick(null, woodPick, block);
+        assertEquals(0.05f, woodPickProgress, 0.0001f);
+        assertTrue(woodPickProgress > swordProgress, "Wooden pickaxe must mine faster than a diamond sword on a pickaxe block");
+
+        // Diamond Pickaxe speed = 8.0 -> 8.0 / 40 = 0.2 per tick
+        ItemStack diamondPick = TestItemService.mockItem(Material.DIAMOND_PICKAXE);
+        float diamondPickProgress = MiningSpeedCalculator.calculateProgressPerTick(null, diamondPick, block);
+        assertEquals(0.2f, diamondPickProgress, 0.0001f);
+    }
 }
+

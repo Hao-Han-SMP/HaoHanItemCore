@@ -25,6 +25,7 @@ public final class CustomBlockDefinition {
     private final float hardness;
     private final MiningCondition miningCondition;
     private final BlockDropProvider dropProvider;
+    private final ToolType toolType;
 
     private CustomBlockDefinition(Builder builder) {
         this.id = builder.id;
@@ -37,6 +38,7 @@ public final class CustomBlockDefinition {
         this.dropProvider = builder.dropProvider != null
                 ? builder.dropProvider
                 : BlockDropProvider.builder().defaultDrop(builder.dropItemId).build();
+        this.toolType = builder.toolType != null ? builder.toolType : inferToolType(this.model);
     }
 
     /**
@@ -93,6 +95,29 @@ public final class CustomBlockDefinition {
         return dropProvider;
     }
 
+    public ToolType getToolType() {
+        return toolType;
+    }
+
+    private static ToolType inferToolType(CustomBlockModel model) {
+        if (model != null && model.getBlockData() != null) {
+            Material mat = model.getBlockData().getMaterial();
+            if (mat != null) {
+                try {
+                    if (org.bukkit.Tag.MINEABLE_AXE.isTagged(mat)) return ToolType.AXE;
+                    if (org.bukkit.Tag.MINEABLE_SHOVEL.isTagged(mat)) return ToolType.SHOVEL;
+                    if (org.bukkit.Tag.MINEABLE_HOE.isTagged(mat)) return ToolType.HOE;
+                    if (org.bukkit.Tag.MINEABLE_PICKAXE.isTagged(mat)) return ToolType.PICKAXE;
+                } catch (Throwable ignored) {}
+                String name = mat.name();
+                if (name.endsWith("_LOG") || name.endsWith("_PLANKS") || name.endsWith("_WOOD")) return ToolType.AXE;
+                if (name.endsWith("_DIRT") || name.endsWith("_SAND") || name.endsWith("_GRAVEL")) return ToolType.SHOVEL;
+                if (name.endsWith("_LEAVES")) return ToolType.HOE;
+            }
+        }
+        return ToolType.PICKAXE;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -107,7 +132,7 @@ public final class CustomBlockDefinition {
 
     @Override
     public String toString() {
-        return "CustomBlockDefinition{id='" + id + "', baseBlock=" + baseBlock + ", model=" + model + ", hardness=" + hardness + "}";
+        return "CustomBlockDefinition{id='" + id + "', baseBlock=" + baseBlock + ", model=" + model + ", hardness=" + hardness + ", toolType=" + toolType + "}";
     }
 
     /**
@@ -121,6 +146,7 @@ public final class CustomBlockDefinition {
         private float hardness = 0.0f;
         private MiningCondition miningCondition;
         private BlockDropProvider dropProvider;
+        private ToolType toolType;
 
         private Builder(String id) {
             Objects.requireNonNull(id, "Custom block ID cannot be null");
@@ -181,6 +207,11 @@ public final class CustomBlockDefinition {
 
         public Builder dropProvider(BlockDropProvider dropProvider) {
             this.dropProvider = dropProvider;
+            return this;
+        }
+
+        public Builder toolType(ToolType toolType) {
+            this.toolType = toolType;
             return this;
         }
 

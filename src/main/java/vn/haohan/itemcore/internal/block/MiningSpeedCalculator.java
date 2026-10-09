@@ -8,6 +8,7 @@ import org.bukkit.potion.PotionEffect;
 import vn.haohan.itemcore.api.HaoHanItemCore;
 import vn.haohan.itemcore.api.block.CustomBlockDefinition;
 import vn.haohan.itemcore.api.block.ToolTier;
+import vn.haohan.itemcore.api.block.ToolType;
 import vn.haohan.itemcore.api.item.ItemDefinition;
 
 import java.util.Map;
@@ -38,39 +39,45 @@ public final class MiningSpeedCalculator {
         float speedMultiplier = 1.0f;
 
         if (tool != null && tool.getType() != Material.AIR) {
-            ToolTier tier = ToolTier.fromMaterial(tool.getType());
-            if (tier != null) {
-                speedMultiplier = switch (tier) {
-                    case WOOD -> 2.0f;
-                    case STONE -> 4.0f;
-                    case IRON -> 6.0f;
-                    case DIAMOND -> 8.0f;
-                    case NETHERITE -> 9.0f;
-                    case GOLD -> 12.0f;
-                };
-            }
+            ToolType requiredType = (definition != null) ? definition.getToolType() : null;
+            ToolType currentToolType = ToolType.fromMaterial(tool.getType());
+            boolean isEffectiveTool = (requiredType == null || requiredType == ToolType.ANY || requiredType == currentToolType);
 
-            // Custom item speed property support
-            try {
-                var core = HaoHanItemCore.get();
-                if (core != null && core.getItemService() != null) {
-                    String customId = core.getItemService().getId(tool);
-                    if (customId != null) {
-                        ItemDefinition itemDef = core.getItemService().getDefinition(customId);
-                        if (itemDef != null) {
-                            Object speedProp = itemDef.getProperties().get("mining_speed");
-                            if (speedProp instanceof Number num) {
-                                speedMultiplier += num.floatValue();
+            if (isEffectiveTool) {
+                ToolTier tier = ToolTier.fromMaterial(tool.getType());
+                if (tier != null) {
+                    speedMultiplier = switch (tier) {
+                        case WOOD -> 2.0f;
+                        case STONE -> 4.0f;
+                        case IRON -> 6.0f;
+                        case DIAMOND -> 8.0f;
+                        case NETHERITE -> 9.0f;
+                        case GOLD -> 12.0f;
+                    };
+                }
+
+                // Custom item speed property support
+                try {
+                    var core = HaoHanItemCore.get();
+                    if (core != null && core.getItemService() != null) {
+                        String customId = core.getItemService().getId(tool);
+                        if (customId != null) {
+                            ItemDefinition itemDef = core.getItemService().getDefinition(customId);
+                            if (itemDef != null) {
+                                Object speedProp = itemDef.getProperties().get("mining_speed");
+                                if (speedProp instanceof Number num) {
+                                    speedMultiplier += num.floatValue();
+                                }
                             }
                         }
                     }
-                }
-            } catch (IllegalStateException ignored) {}
+                } catch (IllegalStateException ignored) {}
 
-            // Efficiency enchantment
-            int efficiencyLevel = getEfficiencyLevel(tool);
-            if (efficiencyLevel > 0) {
-                speedMultiplier += (efficiencyLevel * efficiencyLevel + 1);
+                // Efficiency enchantment
+                int efficiencyLevel = getEfficiencyLevel(tool);
+                if (efficiencyLevel > 0) {
+                    speedMultiplier += (efficiencyLevel * efficiencyLevel + 1);
+                }
             }
         }
 
