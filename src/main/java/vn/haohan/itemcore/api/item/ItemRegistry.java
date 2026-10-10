@@ -57,6 +57,11 @@ public interface ItemRegistry {
     int size();
 
     /**
+     * Lấy ItemDefinition được đăng ký ghi đè cho Material vanilla tương ứng (nếu có).
+     */
+    ItemDefinition getVanillaOverwrite(org.bukkit.Material material);
+
+    /**
      * Xóa tất cả items.
      */
     void clear();

@@ -209,6 +209,11 @@ public final class ItemConfigLoader {
         if (section.contains("mining_speed")) {
             builder.miningSpeed((float) section.getDouble("mining_speed"));
         }
+        if (section.contains("overwrite-vanilla")) {
+            builder.overwriteVanilla(section.getBoolean("overwrite-vanilla"));
+        } else if (section.contains("overwrite_vanilla")) {
+            builder.overwriteVanilla(section.getBoolean("overwrite_vanilla"));
+        }
 
         if (!properties.isEmpty()) {
             builder.properties(properties);

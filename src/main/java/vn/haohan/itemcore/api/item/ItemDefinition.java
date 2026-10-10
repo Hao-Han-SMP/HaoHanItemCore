@@ -36,6 +36,7 @@ public final class ItemDefinition {
     private final List<ItemInfoSection> infoSections;
     private final Set<ItemFlag> flags;
     private final boolean usable;
+    private final boolean overwriteVanilla;
 
     private ItemDefinition(Builder builder) {
         this.id = builder.id;
@@ -52,6 +53,7 @@ public final class ItemDefinition {
         this.infoSections = List.copyOf(builder.infoSections);
         this.flags = Set.copyOf(builder.flags);
         this.usable = builder.usable;
+        this.overwriteVanilla = builder.overwriteVanilla;
     }
 
     // --- Getters ---
@@ -106,6 +108,8 @@ public final class ItemDefinition {
 
     public boolean isUsable() { return usable; }
 
+    public boolean isVanillaOverwrite() { return overwriteVanilla; }
+
     /**
      * Kiểm tra ID có đúng format namespace:key không.
      */
@@ -139,10 +143,24 @@ public final class ItemDefinition {
         private List<ItemInfoSection> infoSections = new ArrayList<>();
         private Set<ItemFlag> flags = new HashSet<>();
         private boolean usable = true;
+        private boolean overwriteVanilla = false;
 
         private Builder(String id) {
             this.id = Objects.requireNonNull(id, "Item ID cannot be null");
             this.displayName = id; // Default display name = id
+            if (id.startsWith("minecraft:")) {
+                this.overwriteVanilla = true;
+                String key = id.substring("minecraft:".length());
+                Material matched = Material.matchMaterial(key);
+                if (matched != null) {
+                    this.material = matched;
+                }
+            }
+        }
+
+        public Builder overwriteVanilla(boolean overwriteVanilla) {
+            this.overwriteVanilla = overwriteVanilla;
+            return this;
         }
 
         public Builder material(Material material) {

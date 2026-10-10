@@ -15,6 +15,7 @@ import java.util.stream.Collectors;
 public final class DefaultItemRegistry implements ItemRegistry {
 
     private final Map<String, ItemDefinition> items = new ConcurrentHashMap<>();
+    private final Map<org.bukkit.Material, ItemDefinition> vanillaOverwrites = new ConcurrentHashMap<>();
     private final Logger logger;
 
     public DefaultItemRegistry(Logger logger) {
@@ -40,8 +41,13 @@ public final class DefaultItemRegistry implements ItemRegistry {
         }
 
         items.put(id, definition);
-        logger.info("[ItemRegistry] Registered: " + id +
-                " (Material: " + definition.getMaterial() + ", Type: " + definition.getType() + ")");
+        if (definition.isVanillaOverwrite()) {
+            vanillaOverwrites.put(definition.getMaterial(), definition);
+        }
+        if (logger != null) {
+            logger.info("[ItemRegistry] Registered: " + id +
+                    " (Material: " + definition.getMaterial() + ", Type: " + definition.getType() + ")");
+        }
     }
 
     @Override
@@ -67,7 +73,12 @@ public final class DefaultItemRegistry implements ItemRegistry {
     public void unregister(String id) {
         ItemDefinition removed = items.remove(id);
         if (removed != null) {
-            logger.info("[ItemRegistry] Unregistered: " + id);
+            if (removed.isVanillaOverwrite()) {
+                vanillaOverwrites.remove(removed.getMaterial());
+            }
+            if (logger != null) {
+                logger.info("[ItemRegistry] Unregistered: " + id);
+            }
         }
     }
 
@@ -100,8 +111,17 @@ public final class DefaultItemRegistry implements ItemRegistry {
     }
 
     @Override
+    public ItemDefinition getVanillaOverwrite(org.bukkit.Material material) {
+        if (material == null) return null;
+        return vanillaOverwrites.get(material);
+    }
+
+    @Override
     public void clear() {
         items.clear();
-        logger.info("[ItemRegistry] Cleared all items.");
+        vanillaOverwrites.clear();
+        if (logger != null) {
+            logger.info("[ItemRegistry] Cleared all items.");
+        }
     }
 }
