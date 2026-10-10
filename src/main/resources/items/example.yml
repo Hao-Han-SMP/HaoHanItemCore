@@ -112,4 +112,32 @@ example:
         hit: "minecraft:block.deepslate.hit"
         step: "minecraft:block.deepslate.step"
 
+  # Ví dụ Overwrite block gốc Minecraft (không dùng Barrier hay Block Display):
+  diamond_ore_overwrite:
+    material: DIAMOND_ORE
+    display-name: "§bDiamond Ore"
+    type: BLOCK
+    properties:
+      custom_block_id: "minecraft:diamond_ore"
+      custom_block_tool_type: "PICKAXE"
+      custom_block_required_tier: "netherite"
+      custom_block_hardness: 6.0
+      custom_block_drop: "minecraft:diamond"
+
+# Ví dụ Overwrite item gốc Minecraft (Cúp kim cương được ghi đè Tier và Lore):
+minecraft:
+  diamond_pickaxe:
+    material: DIAMOND_PICKAXE
+    display-name: "§bDiamond Pickaxe"
+    lore:
+      - "§8Tier: §c6 (Diamond)"
+      - "§7Vật phẩm game gốc đã được thiết lập thông số."
+    type: TOOL
+    tool_type: PICKAXE
+    tier: 6
+    mining_speed: 8.0
+    properties:
+      max_damage: 1561
+
+
 
