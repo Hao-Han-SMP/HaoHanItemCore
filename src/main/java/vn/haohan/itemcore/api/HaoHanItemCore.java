@@ -33,16 +33,35 @@ public final class HaoHanItemCore {
     private final RecipeRegistry recipeRegistry;
     private final RecipeService recipeService;
     private final IconTextureRegistry iconTextureRegistry;
+    private final vn.haohan.itemcore.api.block.CustomBlockService customBlockService;
+    private final vn.haohan.itemcore.api.block.ToolTierRegistry toolTierRegistry;
 
     public HaoHanItemCore(ItemRegistry itemRegistry, ItemFactory itemFactory, ItemService itemService,
-                      RecipeRegistry recipeRegistry, RecipeService recipeService,
-                      IconTextureRegistry iconTextureRegistry) {
+                          RecipeRegistry recipeRegistry, RecipeService recipeService,
+                          IconTextureRegistry iconTextureRegistry,
+                          vn.haohan.itemcore.api.block.CustomBlockService customBlockService,
+                          vn.haohan.itemcore.api.block.ToolTierRegistry toolTierRegistry) {
         this.itemRegistry = itemRegistry;
         this.itemFactory = itemFactory;
         this.itemService = itemService;
         this.recipeRegistry = recipeRegistry;
         this.recipeService = recipeService;
         this.iconTextureRegistry = iconTextureRegistry;
+        this.customBlockService = customBlockService;
+        this.toolTierRegistry = toolTierRegistry != null ? toolTierRegistry : new vn.haohan.itemcore.api.block.ToolTierRegistry();
+    }
+
+    public HaoHanItemCore(ItemRegistry itemRegistry, ItemFactory itemFactory, ItemService itemService,
+                          RecipeRegistry recipeRegistry, RecipeService recipeService,
+                          IconTextureRegistry iconTextureRegistry,
+                          vn.haohan.itemcore.api.block.CustomBlockService customBlockService) {
+        this(itemRegistry, itemFactory, itemService, recipeRegistry, recipeService, iconTextureRegistry, customBlockService, null);
+    }
+
+    public HaoHanItemCore(ItemRegistry itemRegistry, ItemFactory itemFactory, ItemService itemService,
+                          RecipeRegistry recipeRegistry, RecipeService recipeService,
+                          IconTextureRegistry iconTextureRegistry) {
+        this(itemRegistry, itemFactory, itemService, recipeRegistry, recipeService, iconTextureRegistry, null, null);
     }
 
     /**
@@ -90,4 +109,10 @@ public final class HaoHanItemCore {
 
     /** Registry nạp icon riêng lẻ hoặc cắt từ texture atlas. */
     public IconTextureRegistry getIconTextureRegistry() { return iconTextureRegistry; }
+
+    /** Service quản lý custom blocks (Barrier + BlockDisplay rendering). */
+    public vn.haohan.itemcore.api.block.CustomBlockService getCustomBlockService() { return customBlockService; }
+
+    /** Registry quản lý ToolTier chuẩn và custom. */
+    public vn.haohan.itemcore.api.block.ToolTierRegistry getToolTierRegistry() { return toolTierRegistry; }
 }

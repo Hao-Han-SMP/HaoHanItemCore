@@ -147,4 +147,19 @@ public final class DefaultCustomBlockService implements CustomBlockService {
     public CustomBlockVisibilityManager getVisibilityManager() {
         return visibilityManager;
     }
+
+    @Override
+    public float calculateMiningTimeSeconds(org.bukkit.entity.Player player, org.bukkit.inventory.ItemStack tool, CustomBlockDefinition definition) {
+        if (definition == null || definition.isUnbreakable()) {
+            return -1.0f;
+        }
+        if (definition.isInstantBreak()) {
+            return 0.0f;
+        }
+        float progressPerTick = MiningSpeedCalculator.calculateProgressPerTick(player, tool, definition);
+        if (progressPerTick <= 0.0f) {
+            return -1.0f;
+        }
+        return (1.0f / progressPerTick) / 20.0f;
+    }
 }
