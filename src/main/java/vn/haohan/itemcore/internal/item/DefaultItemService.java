@@ -2,6 +2,7 @@ package vn.haohan.itemcore.internal.item;
 
 import vn.haohan.itemcore.api.item.*;
 
+import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -98,16 +99,30 @@ public final class DefaultItemService implements ItemService {
 
     @Override
     public ItemStack validateAndUpdate(ItemStack item) {
-        if (item == null || item.getType().isAir())
+        if (item == null || item.getType() == Material.AIR || item.getAmount() <= 0)
             return item;
 
         String id = getId(item);
-        if (id == null)
-            return item;
+        ItemDefinition definition;
+        if (id != null) {
+            definition = registry.get(id);
+            if (definition == null)
+                return item;
+        } else {
+            definition = registry.getVanillaOverwrite(item.getType());
+            if (definition == null)
+                return item;
 
-        ItemDefinition definition = registry.get(id);
-        if (definition == null)
-            return item;
+            ItemMeta meta = item.getItemMeta();
+            if (meta != null) {
+                meta.getPersistentDataContainer().set(itemIdKey, PersistentDataType.STRING, definition.getId());
+                item.setItemMeta(meta);
+            }
+        }
+
+        for (var component : definition.getComponents()) {
+            component.apply(item, definition);
+        }
 
         item = DefaultItemFactory.applyComponents(item, definition, plugin);
         return item;

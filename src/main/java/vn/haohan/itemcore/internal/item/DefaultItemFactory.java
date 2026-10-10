@@ -177,7 +177,14 @@ public final class DefaultItemFactory implements ItemFactory {
     }
 
     private static boolean applyLore(ItemMeta meta, ItemDefinition definition) {
-        java.util.List<net.kyori.adventure.text.Component> targetLore = definition.getLore().stream()
+        List<String> rawLore = new java.util.ArrayList<>(definition.getLore());
+        definition.getInfoSections().forEach(section -> {
+            rawLore.add(section.title());
+            rawLore.addAll(section.lines());
+        });
+        definition.getComponents().forEach(component -> component.appendLore(rawLore));
+
+        java.util.List<net.kyori.adventure.text.Component> targetLore = rawLore.stream()
                 .map(line -> {
                     net.kyori.adventure.text.Component comp = LegacyComponentSerializer.legacySection()
                             .deserialize(line);
