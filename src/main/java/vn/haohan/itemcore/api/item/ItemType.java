@@ -12,5 +12,6 @@ public enum ItemType {
     FOOD,
     MACHINE_COMPONENT,
     CURRENCY,
+    BLOCK,
     SPECIAL
 }

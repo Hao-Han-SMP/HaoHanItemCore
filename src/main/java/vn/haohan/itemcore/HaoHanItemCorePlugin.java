@@ -2,6 +2,16 @@ package vn.haohan.itemcore;
 
 import vn.haohan.itemcore.api.HaoHanItemCore;
 import vn.haohan.itemcore.api.recipe.RecipeDefinition;
+import vn.haohan.itemcore.api.block.CustomBlockDefinition;
+import vn.haohan.itemcore.api.block.CustomBlockModel;
+import vn.haohan.itemcore.api.item.ItemDefinition;
+import vn.haohan.itemcore.internal.block.BlockDisplayRenderer;
+import vn.haohan.itemcore.internal.block.CustomBlockEventListener;
+import vn.haohan.itemcore.internal.block.CustomBlockStorage;
+import vn.haohan.itemcore.internal.block.CustomBlockVisibilityManager;
+import vn.haohan.itemcore.internal.block.DefaultCustomBlockRegistry;
+import vn.haohan.itemcore.internal.block.DefaultCustomBlockService;
+import vn.haohan.itemcore.internal.block.VirtualEntityIdManager;
 import vn.haohan.itemcore.internal.command.ItemCoreCommand;
 import vn.haohan.itemcore.internal.config.ItemConfigLoader;
 import vn.haohan.itemcore.internal.config.RecipeConfigLoader;
@@ -45,6 +55,21 @@ public final class HaoHanItemCorePlugin extends JavaPlugin {
     private RecipeConfigLoader recipeConfigLoader;
     private DefaultIconTextureRegistry iconTextureRegistry;
 
+    // CustomBlock subsystem
+    private DefaultCustomBlockRegistry customBlockRegistry;
+    private CustomBlockStorage customBlockStorage;
+    private VirtualEntityIdManager virtualEntityIdManager;
+    private BlockDisplayRenderer blockDisplayRenderer;
+    private CustomBlockVisibilityManager customBlockVisibilityManager;
+    private DefaultCustomBlockService customBlockService;
+    private CustomBlockEventListener customBlockEventListener;
+    private vn.haohan.itemcore.internal.block.CustomBlockMiningManager customBlockMiningManager;
+    private vn.haohan.itemcore.api.block.ToolTierRegistry toolTierRegistry;
+    private vn.haohan.itemcore.internal.config.ToolTierConfigLoader toolTierConfigLoader;
+    private org.bukkit.scheduler.BukkitTask miningTickerTask;
+    private com.github.retrooper.packetevents.event.PacketListenerCommon miningPacketListenerHandle;
+    private com.github.retrooper.packetevents.event.PacketListenerCommon chunkPacketListenerHandle;
+
     @Override
     public void onLoad() {
         Logger log = getLogger();
@@ -59,10 +84,22 @@ public final class HaoHanItemCorePlugin extends JavaPlugin {
         recipeAdapter = new BukkitRecipeAdapter(this, itemRegistry, itemFactory);
         recipeRegistry.setRecipeAdapter(recipeAdapter);
 
+        // Initialize custom block subsystem
+        customBlockRegistry = new DefaultCustomBlockRegistry(log);
+        customBlockStorage = new CustomBlockStorage(this);
+        virtualEntityIdManager = new VirtualEntityIdManager();
+        blockDisplayRenderer = new BlockDisplayRenderer();
+        customBlockVisibilityManager = new CustomBlockVisibilityManager(
+                customBlockStorage, customBlockRegistry, virtualEntityIdManager, blockDisplayRenderer, log);
+        customBlockService = new DefaultCustomBlockService(
+                customBlockRegistry, customBlockStorage, customBlockVisibilityManager, this);
+        toolTierRegistry = new vn.haohan.itemcore.api.block.ToolTierRegistry();
+
         // Set singleton
         HaoHanItemCore.setInstance(new HaoHanItemCore(
                 itemRegistry, itemFactory, itemService,
-                recipeRegistry, recipeService, iconTextureRegistry));
+                recipeRegistry, recipeService, iconTextureRegistry,
+                customBlockService, toolTierRegistry));
 
         log.info("HaoHanItemCore loaded. Registries initialized.");
     }
@@ -80,6 +117,37 @@ public final class HaoHanItemCorePlugin extends JavaPlugin {
         // Register event listeners
         ItemEventRouter eventRouter = new ItemEventRouter(itemRegistry, recipeAdapter, this);
         getServer().getPluginManager().registerEvents(eventRouter, this);
+
+        // Sound packet suppression listener
+        vn.haohan.itemcore.internal.block.CustomBlockSoundPacketListener soundPacketListener =
+                new vn.haohan.itemcore.internal.block.CustomBlockSoundPacketListener();
+
+        customBlockEventListener = new CustomBlockEventListener(
+                customBlockService, customBlockStorage, customBlockVisibilityManager, itemRegistry, this, soundPacketListener);
+        getServer().getPluginManager().registerEvents(customBlockEventListener, this);
+
+        // Preload any existing custom blocks from loaded server chunks
+        customBlockStorage.loadAll(getServer());
+
+        // Initialize CustomBlockMiningManager & register PacketEvents listener
+        vn.haohan.itemcore.internal.block.BlockBreakOverlayRenderer breakOverlayRenderer = new vn.haohan.itemcore.internal.block.BlockBreakOverlayRenderer(log);
+        customBlockMiningManager = new vn.haohan.itemcore.internal.block.CustomBlockMiningManager(
+                customBlockService, virtualEntityIdManager, breakOverlayRenderer, this);
+        customBlockService.setMiningManager(customBlockMiningManager);
+        vn.haohan.itemcore.internal.block.CustomBlockPacketListener chunkPacketListener =
+                new vn.haohan.itemcore.internal.block.CustomBlockPacketListener(customBlockVisibilityManager, log);
+        if (com.github.retrooper.packetevents.PacketEvents.getAPI() != null) {
+            miningPacketListenerHandle = com.github.retrooper.packetevents.PacketEvents.getAPI().getEventManager().registerListener(
+                    customBlockMiningManager,
+                    com.github.retrooper.packetevents.event.PacketListenerPriority.NORMAL);
+            chunkPacketListenerHandle = com.github.retrooper.packetevents.PacketEvents.getAPI().getEventManager().registerListener(
+                    chunkPacketListener,
+                    com.github.retrooper.packetevents.event.PacketListenerPriority.MONITOR);
+            com.github.retrooper.packetevents.PacketEvents.getAPI().getEventManager().registerListener(
+                    soundPacketListener,
+                    com.github.retrooper.packetevents.event.PacketListenerPriority.HIGH);
+        }
+        miningTickerTask = getServer().getScheduler().runTaskTimer(this, customBlockMiningManager::tick, 1L, 1L);
 
         // Create GUI handlers
         RecipeViewerGUI recipeViewer = new RecipeViewerGUI(this, itemService, recipeService, itemRegistry);
@@ -104,12 +172,36 @@ public final class HaoHanItemCorePlugin extends JavaPlugin {
         log.info("  HaoHanItemCore v" + getPluginMeta().getVersion() + " enabled!");
         log.info("  Items: " + itemRegistry.size());
         log.info("  Recipes: " + recipeRegistry.size());
+        log.info("  CustomBlocks: " + customBlockRegistry.size());
         log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     }
 
     @Override
     public void onDisable() {
+        if (miningTickerTask != null) {
+            miningTickerTask.cancel();
+        }
+        if (customBlockMiningManager != null) {
+            customBlockMiningManager.clearAllSessions();
+            if (miningPacketListenerHandle != null && com.github.retrooper.packetevents.PacketEvents.getAPI() != null) {
+                try {
+                    com.github.retrooper.packetevents.PacketEvents.getAPI().getEventManager().unregisterListener(miningPacketListenerHandle);
+                } catch (Throwable ignored) {}
+            }
+            if (chunkPacketListenerHandle != null && com.github.retrooper.packetevents.PacketEvents.getAPI() != null) {
+                try {
+                    com.github.retrooper.packetevents.PacketEvents.getAPI().getEventManager().unregisterListener(chunkPacketListenerHandle);
+                } catch (Throwable ignored) {}
+            }
+        }
         recipeAdapter.unregisterAll();
+        if (customBlockVisibilityManager != null) {
+            customBlockVisibilityManager.shutdown();
+        }
+        if (customBlockStorage != null) {
+            customBlockStorage.saveAll(getServer());
+            customBlockStorage.clearCache();
+        }
         HaoHanItemCore.setInstance(null);
         getLogger().info("HaoHanItemCore disabled.");
     }
@@ -124,12 +216,14 @@ public final class HaoHanItemCorePlugin extends JavaPlugin {
         itemRegistry.clear();
         recipeRegistry.clear();
         iconTextureRegistry.clear();
+        customBlockRegistry.clear();
 
         // Reload
         loadAllConfigs();
 
         getLogger().info("HaoHanItemCore reloaded! Items: " + itemRegistry.size() +
-                ", Recipes: " + recipeRegistry.size());
+                ", Recipes: " + recipeRegistry.size() +
+                ", CustomBlocks: " + customBlockRegistry.size());
     }
 
     /**
@@ -137,6 +231,13 @@ public final class HaoHanItemCorePlugin extends JavaPlugin {
      */
     private void loadAllConfigs() {
         Logger log = getLogger();
+
+        // Load custom tool tiers
+        toolTierConfigLoader = new vn.haohan.itemcore.internal.config.ToolTierConfigLoader(log);
+        File tiersFile = new File(getDataFolder(), "tiers.yml");
+        if (tiersFile.exists()) {
+            toolTierConfigLoader.loadFile(tiersFile, toolTierRegistry);
+        }
 
         // Load items first (recipes depend on items)
         itemConfigLoader = new ItemConfigLoader(log);
@@ -155,6 +256,14 @@ public final class HaoHanItemCorePlugin extends JavaPlugin {
                 recipeRegistry.register(recipe);
             } catch (Exception e) {
                 log.warning("Failed to register recipe: " + recipe.getId() + " — " + e.getMessage());
+            }
+        }
+
+        // Auto-register custom blocks from item definitions
+        for (ItemDefinition itemDef : itemRegistry.all()) {
+            CustomBlockDefinition blockDef = vn.haohan.itemcore.internal.config.CustomBlockConfigParser.parseCustomBlock(itemDef);
+            if (blockDef != null && !customBlockRegistry.has(blockDef.getId())) {
+                customBlockRegistry.register(blockDef);
             }
         }
     }

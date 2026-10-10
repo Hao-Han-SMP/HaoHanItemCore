@@ -275,7 +275,9 @@ Một số **property key** được `DefaultItemFactory` xử lý tự động 
 | `max_damage` | `int` | Đặt MaxDamage (độ bền) cho item Damageable. |
 | `jukebox_playable` | `String` (NamespacedKey) | Gắn component `jukebox_playable` — dùng cho đĩa nhạc custom. Ví dụ: `"haohan:my_song"`. |
 | `equippable_asset_id` | `String` (NamespacedKey) | Gắn `minecraft:equippable` với custom armor model asset. Slot tự xác định theo Material suffix. Ví dụ: `"haohan:spacesuit"`. |
-| `custom_block_data` | `String` (blockstate) | Gắn `minecraft:block_state` để client dự đoán block state khi đặt. Dùng cho custom block qua NoteBlock. |
+| `custom_block_id` | `String` (ID) | Gắn ID CustomBlock để engine kích hoạt hệ thống Barrier + BlockDisplay khi đặt xuống. |
+| `custom_block_model` | `String` (BlockState) | Khai báo visual blockstate hiển thị trên BlockDisplay (Ví dụ: `"minecraft:redstone_block"`). |
+| `custom_block_drop` | `String` (ID) | ID custom item rơi ra khi phá/nổ custom block này. |
 
 ### Ví dụ
 
@@ -286,10 +288,12 @@ ItemDefinition.builder("haohan:spacesuit_helmet")
     .property("equippable_asset_id", "haohan:spacesuit")
     .build();
 
-// Custom block qua NoteBlock
+// Custom block qua Barrier + BlockDisplay
 ItemDefinition.builder("haohan:anorthosite_ore")
-    .material(Material.NOTE_BLOCK)
-    .property("custom_block_data", "minecraft:note_block[note=24,instrument=pling,powered=true]")
+    .material(Material.BARRIER)
+    .property("custom_block_id", "haohan:anorthosite_ore")
+    .property("custom_block_model", "minecraft:stone")
+    .property("custom_block_drop", "haohan:anorthosite_ore")
     .build();
 
 // Đĩa nhạc custom
@@ -308,36 +312,55 @@ ItemDefinition.builder("haohan:oxygen_tank")
 
 ---
 
-## 11. Custom Block System (NoteBlock)
+## 11. Custom Block System (Barrier + Virtual BlockDisplay Engine)
 
-Tạo **Custom Block** bằng cách chiếm dụng block state của `minecraft:note_block`.
+Thay thế hoàn toàn hệ thống NoteBlock cũ bằng kiến trúc **Physical Barrier (`Material.BARRIER`) + PacketEvents Client-side Virtual BlockDisplay**.
 
-### Tính năng
+### Điểm đột phá kiến trúc
 
-- Texture tùy chỉnh qua resource pack.
-- **Không flicker** khi đặt xuống (client dự đoán state ngay lập tức).
-- Block state không bị thay đổi bởi tương tác vật lý.
-- Vẫn cho phép đặt block xung quanh bình thường.
+- **Zero Server-Side Entity Ticking:** 0 Bukkit `BlockDisplay` entity được sinh ra trên server. 100% hiển thị thông qua PacketEvents virtual packet (`WrapperPlayServerSpawnEntity`, `WrapperPlayServerEntityMetadata`, `WrapperPlayServerDestroyEntities`).
+- **Scale Chống Z-Fighting:** Áp dụng scale nghiêm ngặt `1.00005f` trên cả 3 trục cùng translation offset `(-0.000025f, -0.000025f, -0.000025f)` triệt tiêu hoàn toàn z-fighting và rung lắc viền khối.
+- **Tự động hiển thị qua PacketEvents CHUNK_DATA:** Bắt trực tiếp gói tin `CHUNK_DATA` khi server gửi chunk cho client (khi login, teleport, restart hay di chuyển). Client luôn nhận được BlockDisplay ngay lập tức, triệt tiêu lỗi mất texture sau khi restart server.
+- **Lưu trữ tức thì trong Chunk PDC:** Dữ liệu custom block được đồng bộ nhị phân ngay lập tức vào `PersistentDataContainer` (PDC) của Chunk khi đặt/phá khối, đảm bảo an toàn 100% qua mọi lần server reload / restart.
+- **Tính toán tốc độ đào chuẩn xác theo loại công cụ (`ToolType`):** Chỉ công cụ phù hợp với khối (mặc định suy luận từ blockstate hoặc cấu hình `toolType`) mới được hưởng hệ số nhân cấp bậc (`ToolTier`: Gỗ 2x, Sắt 6x, Kim cương 8x,...) và phù phép `Efficiency`. Các công cụ sai loại như Kiếm, Cuốc đất trên quặng sẽ bị khóa ở tốc độ tay 1.0x, ngăn chặn hoàn toàn việc đào bằng kiếm nhanh hơn cúp.
+- **Bảo toàn NoteBlock:** NoteBlock vanilla hoạt động bình thường 100%, không còn bị chiếm dụng hay can thiệp âm thanh.
 
-### Cách hoạt động
-
-Engine lắng nghe:
-- **`BlockPlaceEvent` (HIGH)**: Cưỡng bức block state đúng + gửi `sendBlockChange()` cho player.
-- **`PlayerInteractEvent`** (NoteBlock): Nếu player gảy note → schedule 0-tick reset về custom state.
-- **`BlockPhysicsEvent`** (NoteBlock): Nếu physics thay đổi state → restore cuối tick.
-
-### Đăng ký
+### Đăng ký qua Code
 
 ```java
-ItemDefinition.builder("haohan:anorthosite_ore")
-    .material(Material.NOTE_BLOCK)
-    .displayName("§7Anorthosite Ore")
-    .type(ItemType.SPECIAL)
-    .property("custom_block_data", "minecraft:note_block[note=24,instrument=pling,powered=true]")
+CustomBlockModel model = new CustomBlockModel(Bukkit.createBlockData(Material.COPPER_BLOCK));
+
+CustomBlockDefinition def = CustomBlockDefinition.builder("haohan:ruby_ore")
+    .model(model)
+    .hardness(3.0f) // 3.0 giây thời gian đào cơ bản (hoặc .unbreakable() / .instantBreak())
+    .toolType(ToolType.PICKAXE) // Yêu cầu loại công cụ đào hiệu quả (PICKAXE, AXE, SHOVEL, HOE, SWORD, ANY)
+    .miningCondition(MiningCondition.requiresTool(ToolType.PICKAXE, ToolTier.IRON)) // Yêu cầu tối thiểu cúp Sắt để rơi đồ
+    .dropProvider(BlockDropProvider.builder()
+        .defaultDrop("haohan:ruby", 1)           // Đào bằng cúp thường rơi Ruby
+        .silkTouchDrop("haohan:ruby_ore")        // Đào có Silk Touch rơi quặng Ruby
+        .fortune(true)                           // Có Fortune tăng số lượng Ruby
+        .build())
     .build();
+
+HaoHanItemCore.get().getCustomBlockService().getRegistry().register(def);
 ```
 
-> ⚠️ Tất cả `NotePlayEvent` bị cancel — toàn bộ note_block đều tắt âm thanh. Đây là trade-off khi dùng note_block làm custom block.
+### Đặt và Phá Block qua API
+
+```java
+CustomBlockService blockService = HaoHanItemCore.get().getCustomBlockService();
+
+// Đặt custom block tại location
+blockService.placeBlock(location, "haohan:copper_casing");
+
+// Kiểm tra và lấy ID
+if (blockService.isCustomBlock(block)) {
+    String blockId = blockService.getCustomBlockId(block);
+}
+
+// Phá bỏ custom block
+blockService.removeBlock(location);
+```
 
 ---
 
@@ -479,6 +502,6 @@ public class ModItems {
 2. Kiểm tra file `equipment/<asset_id>.json` và texture tồn tại trong resource pack.
 3. Với item có từ trước update: mở inventory và click item một lần để trigger upgrade.
 
-**Q: Custom block flicker texture?** → Đảm bảo property `custom_block_data` khai báo đúng format blockstate. Engine tự gửi block change và cập nhật state ngay trong cùng tick khi đặt.
+**Q: Custom block có bị flicker / z-fighting không?** → Không. Engine áp dụng scale `1.00005f` và offset translation `(-0.000025f, -0.000025f, -0.000025f)` trên client-side BlockDisplay, đảm bảo hình ảnh bao bọc chuẩn xác khối barrier và triệt tiêu z-fighting hoàn toàn.
 
 **Q: MACHINE recipe hoạt động thế nào?** → Engine chỉ lưu definition, không đăng ký Bukkit. Plugin con tự xử lý việc kiểm tra và thực thi recipe.

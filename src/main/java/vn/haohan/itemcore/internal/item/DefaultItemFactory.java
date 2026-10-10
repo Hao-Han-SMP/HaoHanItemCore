@@ -158,10 +158,6 @@ public final class DefaultItemFactory implements ItemFactory {
         // Apply ItemStack-level components
         applyEquippableComponent(itemStack, definition, plugin);
 
-        // Ensure NMS BLOCK_STATE component is stripped so the client doesn't show
-        // raw block state properties (instrument, note, powered) in the item tooltip.
-        itemStack = removeBlockStateComponent(itemStack);
-
         return itemStack;
     }
 
@@ -288,7 +284,7 @@ public final class DefaultItemFactory implements ItemFactory {
             shouldHide = true;
         } else if (hideVal == null) {
             // Automatically hide additional tooltips for custom block definitions
-            if (definition.getProperties().containsKey("custom_block_data")) {
+            if (definition.getProperties().containsKey("custom_block_id") || definition.getProperties().containsKey("custom_block_data")) {
                 shouldHide = true;
             }
         }
@@ -385,36 +381,6 @@ public final class DefaultItemFactory implements ItemFactory {
             }
         }
         return false;
-    }
-
-    private static ItemStack removeBlockStateComponent(ItemStack itemStack) {
-        try {
-            Class<?> craftItemStackClass = Class.forName("org.bukkit.craftbukkit.inventory.CraftItemStack");
-            java.lang.reflect.Method asNMSCopy = craftItemStackClass.getMethod("asNMSCopy", ItemStack.class);
-            java.lang.reflect.Method asBukkitCopy = craftItemStackClass.getMethod("asBukkitCopy",
-                    asNMSCopy.getReturnType());
-
-            Object nmsStack = asNMSCopy.invoke(null, itemStack);
-            if (nmsStack == null) {
-                return itemStack;
-            }
-
-            Class<?> dataComponentsClass = Class.forName("net.minecraft.core.component.DataComponents");
-            java.lang.reflect.Field blockStateField = dataComponentsClass.getField("BLOCK_STATE");
-            Object blockStateComponentType = blockStateField.get(null);
-
-            java.lang.reflect.Method hasMethod = nmsStack.getClass().getMethod("has", blockStateField.getType());
-            boolean hasBlockState = (boolean) hasMethod.invoke(nmsStack, blockStateComponentType);
-
-            if (hasBlockState) {
-                java.lang.reflect.Method removeMethod = nmsStack.getClass().getMethod("remove",
-                        blockStateField.getType());
-                removeMethod.invoke(nmsStack, blockStateComponentType);
-                return (ItemStack) asBukkitCopy.invoke(null, nmsStack);
-            }
-        } catch (Throwable ignored) {
-        }
-        return itemStack;
     }
 
     public static org.bukkit.inventory.EquipmentSlot getEquipmentSlotFromMaterial(org.bukkit.Material material) {
