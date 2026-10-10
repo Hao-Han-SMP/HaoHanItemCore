@@ -35,7 +35,7 @@ public interface BlockDropProvider {
         private int minAmount = 1;
         private int maxAmount = 1;
         private String silkTouchItemId;
-        private boolean silkTouchDropsSelf = false;
+        private boolean silkTouchDropsSelf = true;
         private boolean fortuneEnabled = false;
         private final List<DropRule> customRules = new ArrayList<>();
 
@@ -60,7 +60,11 @@ public interface BlockDropProvider {
         }
 
         public Builder silkTouchDropsSelf() {
-            this.silkTouchDropsSelf = true;
+            return silkTouchDropsSelf(true);
+        }
+
+        public Builder silkTouchDropsSelf(boolean dropsSelf) {
+            this.silkTouchDropsSelf = dropsSelf;
             return this;
         }
 

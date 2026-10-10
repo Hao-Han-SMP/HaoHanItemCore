@@ -15,6 +15,7 @@ import org.mockito.Mockito;
 import vn.haohan.itemcore.api.block.CustomBlockDefinition;
 import vn.haohan.itemcore.api.block.CustomBlockService;
 import vn.haohan.itemcore.internal.block.CustomBlockMiningManager;
+import vn.haohan.itemcore.internal.block.VirtualEntityIdManager;
 import vn.haohan.itemcore.recipe.TestItemService;
 
 import java.util.ArrayList;
@@ -27,6 +28,8 @@ import static org.junit.jupiter.api.Assertions.*;
 public class CustomBlockMiningManagerTest {
 
     private CustomBlockService blockService;
+    private VirtualEntityIdManager idManager;
+    private BlockBreakOverlayRendererTest.TestBlockBreakOverlayRenderer overlayRenderer;
     private CustomBlockMiningManager miningManager;
     private Player mockPlayer;
     private World mockWorld;
@@ -36,7 +39,9 @@ public class CustomBlockMiningManagerTest {
     @BeforeEach
     public void setUp() {
         blockService = Mockito.mock(CustomBlockService.class);
-        miningManager = new CustomBlockMiningManager(blockService, null);
+        idManager = new VirtualEntityIdManager();
+        overlayRenderer = new BlockBreakOverlayRendererTest.TestBlockBreakOverlayRenderer();
+        miningManager = new CustomBlockMiningManager(blockService, idManager, overlayRenderer, null);
         sentStages = new ArrayList<>();
         miningManager.setAnimationObserver((player, loc, stage) -> sentStages.add(stage));
 
@@ -88,10 +93,12 @@ public class CustomBlockMiningManagerTest {
         // Start digging
         miningManager.handleDiggingAction(mockPlayer, DiggingAction.START_DIGGING, new Vector3i(1, 64, 1), loc);
         assertTrue(miningManager.hasActiveSession(mockPlayer.getUniqueId()));
+        assertEquals(1, overlayRenderer.spawnCount.get(), "Overlay crack entity should be spawned upon start digging");
 
         // Cancel digging
         miningManager.handleDiggingAction(mockPlayer, DiggingAction.CANCELLED_DIGGING, new Vector3i(1, 64, 1), loc);
         assertFalse(miningManager.hasActiveSession(mockPlayer.getUniqueId()));
+        assertEquals(1, overlayRenderer.destroyCount.get(), "Overlay crack entity should be destroyed upon cancel digging");
 
         // Should have sent stage -1 reset packet
         assertEquals(1, sentStages.size());
@@ -110,15 +117,55 @@ public class CustomBlockMiningManagerTest {
 
         miningManager.handleDiggingAction(mockPlayer, DiggingAction.START_DIGGING, new Vector3i(1, 64, 1), loc);
         assertTrue(miningManager.hasActiveSession(mockPlayer.getUniqueId()));
+        assertEquals(1, overlayRenderer.spawnCount.get());
 
         // Tick 1
         miningManager.tick();
         assertTrue(miningManager.hasActiveSession(mockPlayer.getUniqueId()));
         assertFalse(sentStages.isEmpty());
+        assertTrue(overlayRenderer.updateCount.get() > 0, "Overlay crack stage should be updated during mining tick");
 
         // Tick 2: reaches >= 1.0f -> breaks
         miningManager.tick();
         assertFalse(miningManager.hasActiveSession(mockPlayer.getUniqueId()));
+        assertEquals(1, overlayRenderer.destroyCount.get(), "Overlay crack entity should be destroyed upon mining completion");
         Mockito.verify(blockService).removeCustomBlock(loc);
+    }
+
+    @Test
+    public void testStartDiggingDisallowedWithBareHandWhenBlockRequiresPickaxe() {
+        Location loc = new Location(mockWorld, 1, 64, 1);
+        CustomBlockDefinition ore = CustomBlockDefinition.builder("custom:iron_ore")
+                .hardness(5.0f)
+                .mineableWith(vn.haohan.itemcore.api.block.ToolType.PICKAXE, vn.haohan.itemcore.api.block.ToolTier.IRON)
+                .build();
+        Mockito.when(blockService.getCustomBlock(Mockito.any())).thenReturn(Optional.of(ore));
+        Mockito.when(blockService.isCustomBlock(Mockito.any())).thenReturn(true);
+
+        // Player holds AIR (bare hand) -> Should NOT create session
+        miningManager.handleDiggingAction(mockPlayer, DiggingAction.START_DIGGING, new Vector3i(1, 64, 1), loc);
+
+        assertFalse(miningManager.hasActiveSession(mockPlayer.getUniqueId()), "Session must not start with bare hand on a pickaxe-only block");
+        assertEquals(0, overlayRenderer.spawnCount.get(), "Crack overlay must not spawn");
+    }
+
+    @Test
+    public void testStartDiggingDisallowedWithWrongTool() {
+        Location loc = new Location(mockWorld, 1, 64, 1);
+        CustomBlockDefinition ore = CustomBlockDefinition.builder("custom:iron_ore")
+                .hardness(5.0f)
+                .mineableWith(vn.haohan.itemcore.api.block.ToolType.PICKAXE, vn.haohan.itemcore.api.block.ToolTier.IRON)
+                .build();
+        Mockito.when(blockService.getCustomBlock(Mockito.any())).thenReturn(Optional.of(ore));
+        Mockito.when(blockService.isCustomBlock(Mockito.any())).thenReturn(true);
+
+        // Player holds Diamond Sword -> Should NOT create session
+        ItemStack sword = TestItemService.mockItem(Material.DIAMOND_SWORD);
+        Mockito.when(mockPlayer.getInventory().getItemInMainHand()).thenReturn(sword);
+
+        miningManager.handleDiggingAction(mockPlayer, DiggingAction.START_DIGGING, new Vector3i(1, 64, 1), loc);
+
+        assertFalse(miningManager.hasActiveSession(mockPlayer.getUniqueId()), "Session must not start with sword on a pickaxe-only block");
+        assertEquals(0, overlayRenderer.spawnCount.get(), "Crack overlay must not spawn");
     }
 }

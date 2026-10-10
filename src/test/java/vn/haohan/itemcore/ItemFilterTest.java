@@ -39,11 +39,13 @@ class ItemFilterTest {
 
         // 3. Custom Block item
         ItemDefinition block = ItemDefinition.builder("haohan:anorthosite_ore")
-                .material(Material.NOTE_BLOCK)
-                .property("custom_block_data", "minecraft:note_block[note=24,instrument=pling,powered=true]")
+                .material(Material.BARRIER)
+                .type(ItemType.BLOCK)
+                .property("custom_block_id", "haohan:anorthosite_ore")
                 .build();
         assertTrue(ItemCategory.CUSTOM_BLOCKS.matches(block));
         assertFalse(ItemCategory.FOOD.matches(block));
+        assertFalse(ItemCategory.SPECIAL.matches(block));
 
         // 4. Armor item
         ItemDefinition armor = ItemDefinition.builder("haohan:spacesuit_helmet")

@@ -2,31 +2,40 @@ package vn.haohan.itemcore.api.block;
 
 import org.bukkit.Material;
 
+import java.util.Objects;
+
 /**
- * Standard tool tiers ordered by mining power.
+ * Standard or custom tool tier with level and mining speed multiplier.
  */
-public enum ToolTier {
-    WOOD(1),
-    GOLD(1),
-    STONE(2),
-    IRON(3),
-    DIAMOND(4),
-    NETHERITE(5);
+public interface ToolTier {
 
-    private final int level;
+    String name();
 
-    ToolTier(int level) {
-        this.level = level;
+    int level();
+
+    float baseMultiplier();
+
+    default int getLevel() {
+        return level();
     }
 
-    public int getLevel() {
-        return level;
+    default float getBaseMultiplier() {
+        return baseMultiplier();
     }
 
-    /**
-     * Resolves the ToolTier from a vanilla material, or null if not a recognized tool.
-     */
-    public static ToolTier fromMaterial(Material material) {
+    ToolTier WOOD = of("wood", 1, 2.0f);
+    ToolTier GOLD = of("gold", 1, 12.0f);
+    ToolTier STONE = of("stone", 2, 4.0f);
+    ToolTier IRON = of("iron", 3, 6.0f);
+    ToolTier DIAMOND = of("diamond", 4, 8.0f);
+    ToolTier NETHERITE = of("netherite", 5, 9.0f);
+
+    static ToolTier of(String name, int level, float baseMultiplier) {
+        Objects.requireNonNull(name, "Tier name cannot be null");
+        return new SimpleToolTier(name.toLowerCase(), level, baseMultiplier);
+    }
+
+    static ToolTier fromMaterial(Material material) {
         if (material == null) return null;
         String name = material.name();
         if (name.startsWith("WOODEN_")) return WOOD;
@@ -36,5 +45,16 @@ public enum ToolTier {
         if (name.startsWith("DIAMOND_")) return DIAMOND;
         if (name.startsWith("NETHERITE_")) return NETHERITE;
         return null;
+    }
+
+    record SimpleToolTier(String name, int level, float baseMultiplier) implements ToolTier {
+        public SimpleToolTier {
+            Objects.requireNonNull(name, "Tier name cannot be null");
+        }
+
+        @Override
+        public String toString() {
+            return "ToolTier{" + name + ", level=" + level + ", mult=" + baseMultiplier + "}";
+        }
     }
 }

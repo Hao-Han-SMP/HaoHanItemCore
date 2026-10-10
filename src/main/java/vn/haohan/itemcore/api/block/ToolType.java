@@ -11,10 +11,11 @@ public enum ToolType {
     SHOVEL,
     HOE,
     SWORD,
+    HAND,
     ANY;
 
     public static ToolType fromMaterial(Material material) {
-        if (material == null) return null;
+        if (material == null || material == Material.AIR) return HAND;
         String name = material.name();
         if (name.endsWith("_PICKAXE")) return PICKAXE;
         if (name.endsWith("_AXE") && !name.endsWith("_PICKAXE")) return AXE;

@@ -242,6 +242,30 @@ public final class ItemDefinition {
             return this;
         }
 
+        public Builder tier(int tier) {
+            this.components.add(new TierComponent(tier));
+            this.properties.put("tier", tier);
+            return this;
+        }
+
+        public Builder tier(String tierName, int tier) {
+            this.components.add(new TierComponent(tierName, tier));
+            this.properties.put("tier", tierName);
+            return this;
+        }
+
+        public Builder toolType(vn.haohan.itemcore.api.block.ToolType toolType) {
+            if (toolType != null) {
+                this.properties.put("tool_type", toolType.name());
+            }
+            return this;
+        }
+
+        public Builder miningSpeed(float speed) {
+            this.properties.put("mining_speed", speed);
+            return this;
+        }
+
         public Builder addFlag(ItemFlag flag) {
             this.flags.add(Objects.requireNonNull(flag));
             return this;

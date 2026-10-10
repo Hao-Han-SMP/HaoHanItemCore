@@ -184,11 +184,33 @@ public final class ItemConfigLoader {
 
         // Properties
         ConfigurationSection propsSection = section.getConfigurationSection("properties");
+        Map<String, Object> properties = new HashMap<>();
         if (propsSection != null) {
-            Map<String, Object> properties = new HashMap<>();
             for (String propKey : propsSection.getKeys(false)) {
                 properties.put(propKey, propsSection.get(propKey));
             }
+        }
+
+        // Support root-level tier, tool_type, mining_speed
+        if (section.contains("tier")) {
+            if (section.isInt("tier")) {
+                builder.tier(section.getInt("tier"));
+            } else {
+                String tierName = section.getString("tier");
+                builder.tier(tierName, 1);
+            }
+        }
+        if (section.contains("tool_type")) {
+            try {
+                vn.haohan.itemcore.api.block.ToolType tt = vn.haohan.itemcore.api.block.ToolType.valueOf(section.getString("tool_type").toUpperCase(java.util.Locale.ROOT));
+                builder.toolType(tt);
+            } catch (Exception ignored) {}
+        }
+        if (section.contains("mining_speed")) {
+            builder.miningSpeed((float) section.getDouble("mining_speed"));
+        }
+
+        if (!properties.isEmpty()) {
             builder.properties(properties);
         }
 

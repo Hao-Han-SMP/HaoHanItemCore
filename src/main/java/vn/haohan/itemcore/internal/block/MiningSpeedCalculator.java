@@ -1,6 +1,8 @@
 package vn.haohan.itemcore.internal.block;
 
 import org.bukkit.Material;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeModifier;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
@@ -8,9 +10,9 @@ import org.bukkit.potion.PotionEffect;
 import vn.haohan.itemcore.api.HaoHanItemCore;
 import vn.haohan.itemcore.api.block.CustomBlockDefinition;
 import vn.haohan.itemcore.api.block.ToolTier;
-import vn.haohan.itemcore.api.block.ToolType;
 import vn.haohan.itemcore.api.item.ItemDefinition;
 
+import java.util.Collection;
 import java.util.Map;
 
 /**
@@ -36,51 +38,72 @@ public final class MiningSpeedCalculator {
             return 1.0f;
         }
 
+        boolean isEffective = definition.isEffectiveTool(tool);
+        if (!isEffective) {
+            return 0.0f;
+        }
+
         float speedMultiplier = 1.0f;
 
-        if (tool != null && tool.getType() != Material.AIR) {
-            ToolType requiredType = (definition != null) ? definition.getToolType() : null;
-            ToolType currentToolType = ToolType.fromMaterial(tool.getType());
-            boolean isEffectiveTool = (requiredType == null || requiredType == ToolType.ANY || requiredType == currentToolType);
-
-            if (isEffectiveTool) {
-                ToolTier tier = ToolTier.fromMaterial(tool.getType());
-                if (tier != null) {
-                    speedMultiplier = switch (tier) {
-                        case WOOD -> 2.0f;
-                        case STONE -> 4.0f;
-                        case IRON -> 6.0f;
-                        case DIAMOND -> 8.0f;
-                        case NETHERITE -> 9.0f;
-                        case GOLD -> 12.0f;
-                    };
+        // Tool multipliers (tier, custom mining_speed, paper attribute modifiers, efficiency enchantments)
+        // only apply if the block has preferred tools configured.
+        // If no preferred tools are defined, all tools and bare hand mine at the exact configured base speed (speedMultiplier = 1.0f).
+        if (definition.hasPreferredTools() && tool != null && tool.getType() != null && tool.getType() != Material.AIR) {
+            // 1. ToolTier base multiplier
+            ToolTier tier = null;
+            try {
+                var core = HaoHanItemCore.get();
+                if (core != null && core.getToolTierRegistry() != null) {
+                    tier = core.getToolTierRegistry().findTier(tool);
                 }
+            } catch (Throwable ignored) {}
+            if (tier == null) {
+                tier = ToolTier.fromMaterial(tool.getType());
+            }
+            if (tier != null) {
+                speedMultiplier = tier.baseMultiplier();
+            }
 
-                // Custom item speed property support
-                try {
-                    var core = HaoHanItemCore.get();
-                    if (core != null && core.getItemService() != null) {
-                        String customId = core.getItemService().getId(tool);
-                        if (customId != null) {
-                            ItemDefinition itemDef = core.getItemService().getDefinition(customId);
-                            if (itemDef != null) {
-                                Object speedProp = itemDef.getProperties().get("mining_speed");
-                                if (speedProp instanceof Number num) {
-                                    speedMultiplier += num.floatValue();
-                                }
+            // 2. Custom item YAML properties mining_speed
+            try {
+                var core = HaoHanItemCore.get();
+                if (core != null && core.getItemService() != null) {
+                    String customId = core.getItemService().getId(tool);
+                    if (customId != null) {
+                        ItemDefinition itemDef = core.getItemService().getDefinition(customId);
+                        if (itemDef != null) {
+                            Object speedProp = itemDef.getProperties().get("mining_speed");
+                            if (speedProp instanceof Number num) {
+                                speedMultiplier += num.floatValue();
                             }
                         }
                     }
-                } catch (IllegalStateException ignored) {}
-
-                // Efficiency enchantment
-                int efficiencyLevel = getEfficiencyLevel(tool);
-                if (efficiencyLevel > 0) {
-                    speedMultiplier += (efficiencyLevel * efficiencyLevel + 1);
                 }
+            } catch (Throwable ignored) {}
+
+            // 3. Paper AttributeModifier for Attribute.PLAYER_MINING_EFFICIENCY or Attribute.SUBMERGED_MINING_SPEED
+            if (tool.hasItemMeta()) {
+                try {
+                    Attribute miningEffAttr = Attribute.valueOf("PLAYER_MINING_EFFICIENCY");
+                    if (miningEffAttr != null) {
+                        Collection<AttributeModifier> modifiers = tool.getItemMeta().getAttributeModifiers(miningEffAttr);
+                        if (modifiers != null) {
+                            for (AttributeModifier mod : modifiers) {
+                                speedMultiplier += (float) mod.getAmount();
+                            }
+                        }
+                    }
+                } catch (Throwable ignored) {}
+            }
+
+            // 4. Efficiency enchantment bonus
+            int efficiencyLevel = getEfficiencyLevel(tool);
+            if (efficiencyLevel > 0) {
+                speedMultiplier += (efficiencyLevel * efficiencyLevel + 1);
             }
         }
 
+        // Environmental modifiers apply to both effective and non-effective tools (bù thêm thời gian đào)
         if (player != null) {
             try {
                 for (PotionEffect effect : player.getActivePotionEffects()) {

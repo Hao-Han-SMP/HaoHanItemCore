@@ -94,4 +94,18 @@ public class BlockDropProviderTest {
         assertEquals(1, drops.size());
         assertEquals(5, drops.get(0).getAmount());
     }
+
+    @Test
+    public void testDefaultProviderDropsSelfWithSilkTouch() {
+        // BlockDropProvider with just defaultDrop should automatically drop itself when mined with Silk Touch
+        BlockDropProvider provider = BlockDropProvider.builder()
+                .defaultDrop("custom:ruby", 1)
+                .build();
+
+        ItemStack silkPick = TestItemService.mockItem(Material.DIAMOND_PICKAXE);
+        List<ItemStack> drops = provider.getDrops(createContextWithSilkTouch(silkPick));
+
+        assertEquals(1, drops.size());
+        assertEquals("custom:ruby_ore", itemService.getId(drops.get(0)));
+    }
 }

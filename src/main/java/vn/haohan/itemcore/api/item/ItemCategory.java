@@ -12,7 +12,7 @@ public enum ItemCategory {
     TOOLS("Công cụ", Material.DIAMOND_PICKAXE, "Cuốc, rìu, xẻng, kéo, cần câu, công cụ khai khoáng"),
     WEAPONS("Vũ khí", Material.DIAMOND_SWORD, "Kiếm, cung, nỏ, đinh ba, mace, vũ khí chiến đấu"),
     ARMOR("Giáp & Trang bị", Material.NETHERITE_CHESTPLATE, "Mũ, áo giáp, quần, giày, giáp sói, đồ mặc"),
-    CUSTOM_BLOCKS("Custom Block", Material.NOTE_BLOCK, "Các khối block tùy chỉnh, NoteBlock, machine blocks"),
+    CUSTOM_BLOCKS("Custom Block", Material.BARRIER, "Các khối block tùy chỉnh, Barrier + BlockDisplay"),
     MATERIALS("Nguyên liệu", Material.EMERALD, "Quặng, thỏi kim loại, đá quý, mảnh vỡ, tài nguyên"),
     FOOD("Thức ăn", Material.GOLDEN_APPLE, "Thực phẩm, nước uống, đồ tiêu hao hồi phục"),
     MACHINES("Máy móc & Linh kiện", Material.REDSTONE, "Linh kiện máy móc, vi mạch, công nghệ"),
@@ -55,7 +55,7 @@ public enum ItemCategory {
 
         return switch (this) {
             case ALL -> true;
-            case CUSTOM_BLOCKS -> isCustomBlock(def, mat, matName);
+            case CUSTOM_BLOCKS -> type == ItemType.BLOCK || isCustomBlock(def, mat, matName);
             case TOOLS -> isTool(def, type, matName);
             case WEAPONS -> isWeapon(def, type, matName);
             case ARMOR -> isArmor(def, type, matName);
@@ -63,23 +63,23 @@ public enum ItemCategory {
             case FOOD -> type == ItemType.FOOD || isFood(matName);
             case MACHINES -> type == ItemType.MACHINE_COMPONENT;
             case CURRENCY -> type == ItemType.CURRENCY;
-            case SPECIAL -> type == ItemType.SPECIAL || (!isTool(def, type, matName) && !isWeapon(def, type, matName) && !isArmor(def, type, matName) && !isCustomBlock(def, mat, matName));
+            case SPECIAL -> (type == ItemType.SPECIAL || (!isTool(def, type, matName) && !isWeapon(def, type, matName) && !isArmor(def, type, matName))) && !isCustomBlock(def, mat, matName);
         };
     }
 
     private static boolean isCustomBlock(ItemDefinition def, Material mat, String matName) {
-        if (def.getProperties().containsKey("custom_block_data") ||
-            def.getProperties().containsKey("is_block") ||
-            def.getProperties().containsKey("block_type") ||
-            def.getProperties().containsKey("custom_block_drop")) {
+        if (def.getType() == ItemType.BLOCK) {
             return true;
         }
-        if (mat == Material.NOTE_BLOCK || mat == Material.PLAYER_HEAD || mat == Material.PLAYER_WALL_HEAD) {
-            if (def.getProperties().containsKey("custom_block_data")) {
-                return true;
-            }
+        if (mat == Material.BARRIER) {
+            return true;
         }
-        return false;
+        return def.getProperties().containsKey("custom_block_id") ||
+               def.getProperties().containsKey("custom_block_model") ||
+               def.getProperties().containsKey("custom_block_data") ||
+               def.getProperties().containsKey("is_block") ||
+               def.getProperties().containsKey("block_type") ||
+               def.getProperties().containsKey("custom_block_drop");
     }
 
     private static boolean isTool(ItemDefinition def, ItemType type, String matName) {
