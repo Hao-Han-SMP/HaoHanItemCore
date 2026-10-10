@@ -118,8 +118,12 @@ public final class HaoHanItemCorePlugin extends JavaPlugin {
         ItemEventRouter eventRouter = new ItemEventRouter(itemRegistry, recipeAdapter, this);
         getServer().getPluginManager().registerEvents(eventRouter, this);
 
+        // Sound packet suppression listener
+        vn.haohan.itemcore.internal.block.CustomBlockSoundPacketListener soundPacketListener =
+                new vn.haohan.itemcore.internal.block.CustomBlockSoundPacketListener();
+
         customBlockEventListener = new CustomBlockEventListener(
-                customBlockService, customBlockStorage, customBlockVisibilityManager, itemRegistry, this);
+                customBlockService, customBlockStorage, customBlockVisibilityManager, itemRegistry, this, soundPacketListener);
         getServer().getPluginManager().registerEvents(customBlockEventListener, this);
 
         // Preload any existing custom blocks from loaded server chunks
@@ -139,6 +143,9 @@ public final class HaoHanItemCorePlugin extends JavaPlugin {
             chunkPacketListenerHandle = com.github.retrooper.packetevents.PacketEvents.getAPI().getEventManager().registerListener(
                     chunkPacketListener,
                     com.github.retrooper.packetevents.event.PacketListenerPriority.MONITOR);
+            com.github.retrooper.packetevents.PacketEvents.getAPI().getEventManager().registerListener(
+                    soundPacketListener,
+                    com.github.retrooper.packetevents.event.PacketListenerPriority.HIGH);
         }
         miningTickerTask = getServer().getScheduler().runTaskTimer(this, customBlockMiningManager::tick, 1L, 1L);
 

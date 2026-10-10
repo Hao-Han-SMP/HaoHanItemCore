@@ -56,6 +56,23 @@ public final class CustomBlockEventListener implements Listener {
     private final ItemRegistry itemRegistry;
     private final Plugin plugin;
     private final NamespacedKey itemIdKey;
+    private final CustomBlockSoundPacketListener soundPacketListener;
+
+    public CustomBlockEventListener(
+            CustomBlockService customBlockService,
+            CustomBlockStorage storage,
+            CustomBlockVisibilityManager visibilityManager,
+            ItemRegistry itemRegistry,
+            Plugin plugin,
+            CustomBlockSoundPacketListener soundPacketListener) {
+        this.customBlockService = Objects.requireNonNull(customBlockService, "customBlockService cannot be null");
+        this.storage = Objects.requireNonNull(storage, "storage cannot be null");
+        this.visibilityManager = Objects.requireNonNull(visibilityManager, "visibilityManager cannot be null");
+        this.itemRegistry = itemRegistry;
+        this.plugin = Objects.requireNonNull(plugin, "plugin cannot be null");
+        this.itemIdKey = new NamespacedKey(plugin, "item_id");
+        this.soundPacketListener = soundPacketListener;
+    }
 
     public CustomBlockEventListener(
             CustomBlockService customBlockService,
@@ -63,12 +80,7 @@ public final class CustomBlockEventListener implements Listener {
             CustomBlockVisibilityManager visibilityManager,
             ItemRegistry itemRegistry,
             Plugin plugin) {
-        this.customBlockService = Objects.requireNonNull(customBlockService, "customBlockService cannot be null");
-        this.storage = Objects.requireNonNull(storage, "storage cannot be null");
-        this.visibilityManager = Objects.requireNonNull(visibilityManager, "visibilityManager cannot be null");
-        this.itemRegistry = itemRegistry;
-        this.plugin = Objects.requireNonNull(plugin, "plugin cannot be null");
-        this.itemIdKey = new NamespacedKey(plugin, "item_id");
+        this(customBlockService, storage, visibilityManager, itemRegistry, plugin, null);
     }
 
     // --- Block Placement ---
@@ -90,9 +102,27 @@ public final class CustomBlockEventListener implements Listener {
         Block block = event.getBlockPlaced();
         Location loc = block.getLocation();
 
+        // Suppress barrier sound packet to avoid double sound
+        if (soundPacketListener != null) {
+            soundPacketListener.markRecentPlacement(loc);
+        }
+
         // Mutate block to Barrier and register
         block.setType(Material.BARRIER, false);
         customBlockService.placeCustomBlock(loc, customBlockId);
+
+        // Play custom block place sound
+        customBlockService.getRegistry().get(customBlockId).ifPresent(placedDef -> {
+            if (placedDef.getSoundGroup() != null && placedDef.getSoundGroup().getPlaceSound() != null) {
+                placedDef.getSoundGroup().getPlaceSound().play(loc.clone().add(0.5, 0.5, 0.5));
+            }
+        });
+
+        if (soundPacketListener != null) {
+            org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                soundPacketListener.clearRecentPlacement(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
+            }, 5L);
+        }
     }
 
     private String resolveCustomBlockId(String itemId) {
@@ -122,6 +152,20 @@ public final class CustomBlockEventListener implements Listener {
         if (optDef.isEmpty()) return;
         CustomBlockDefinition def = optDef.get();
 
+        // Creative players can break custom blocks directly
+        if (event.getPlayer().getGameMode() == GameMode.CREATIVE) {
+            event.setDropItems(false);
+            customBlockService.removeCustomBlock(block.getLocation());
+            return;
+        }
+
+        // Survival players must use an effective tool
+        ItemStack tool = event.getPlayer().getInventory().getItemInMainHand();
+        if (!def.isEffectiveTool(tool)) {
+            event.setCancelled(true);
+            return;
+        }
+
         // Cancel default Barrier particles and drops
         event.setDropItems(false);
 
@@ -129,12 +173,7 @@ public final class CustomBlockEventListener implements Listener {
         Location loc = block.getLocation();
         customBlockService.removeCustomBlock(loc);
 
-        // Creative players should not drop items
-        if (event.getPlayer().getGameMode() == GameMode.CREATIVE) {
-            return;
-        }
-
-        dropCustomBlockItem(loc, def, event.getPlayer(), event.getPlayer().getInventory().getItemInMainHand());
+        dropCustomBlockItem(loc, def, event.getPlayer(), tool);
     }
 
     private void dropCustomBlockItem(Location loc, CustomBlockDefinition def, Player player, ItemStack tool) {
@@ -208,29 +247,59 @@ public final class CustomBlockEventListener implements Listener {
         Block clicked = event.getClickedBlock();
         if (clicked == null) return;
 
+        // Custom block interaction hook (onInteract)
+        if (customBlockService.isCustomBlock(clicked)) {
+            Optional<CustomBlockDefinition> optDef = customBlockService.getCustomBlock(clicked);
+            if (optDef.isPresent()) {
+                CustomBlockDefinition def = optDef.get();
+                if (def.getInteractHandler() != null) {
+                    try {
+                        def.getInteractHandler().onInteract(new vn.haohan.itemcore.api.block.CustomBlockInteractContext(
+                                event.getPlayer(), clicked, event.getItem(),
+                                event.getHand() != null ? event.getHand() : EquipmentSlot.HAND,
+                                event.getAction()
+                        ));
+                    } catch (Throwable t) {
+                        plugin.getLogger().warning("Error executing custom block interact action for " + def.getId() + ": " + t.getMessage());
+                    }
+                }
+            }
+        }
+
         // Prevent interacting into existing custom blocks when not sneaking
         if (customBlockService.isCustomBlock(clicked) && !event.getPlayer().isSneaking()) {
             event.setUseInteractedBlock(org.bukkit.event.Event.Result.DENY);
         }
 
-        // Support survival/adventure placement for BARRIER-based custom block items
-        handleBarrierPlacement(event, clicked);
+        // Support placing custom blocks or regular blocks against custom block
+        handlePlacementAgainstCustomBlock(event, clicked);
     }
 
-    private void handleBarrierPlacement(PlayerInteractEvent event, Block clicked) {
+    private void handlePlacementAgainstCustomBlock(PlayerInteractEvent event, Block clicked) {
+        if (!customBlockService.isCustomBlock(clicked)) return;
+
         ItemStack item = event.getItem();
-        if (item == null || item.getType() != Material.BARRIER || !item.hasItemMeta()) return;
+        if (item == null || item.getType().isAir()) return;
 
-        PersistentDataContainer pdc = item.getItemMeta().getPersistentDataContainer();
-        if (!pdc.has(itemIdKey, PersistentDataType.STRING)) return;
-        String itemId = pdc.get(itemIdKey, PersistentDataType.STRING);
-        if (itemId == null) return;
+        Material itemType = item.getType();
+        String customBlockId = null;
 
-        String customBlockId = resolveCustomBlockId(itemId);
-        if (customBlockId == null) return;
+        if (item.hasItemMeta()) {
+            PersistentDataContainer pdc = item.getItemMeta().getPersistentDataContainer();
+            if (pdc.has(itemIdKey, PersistentDataType.STRING)) {
+                String itemId = pdc.get(itemIdKey, PersistentDataType.STRING);
+                if (itemId != null) {
+                    customBlockId = resolveCustomBlockId(itemId);
+                }
+            }
+        }
+
+        // Must be either a custom block or a placeable block
+        if (customBlockId == null && !itemType.isBlock()) {
+            return;
+        }
 
         Player player = event.getPlayer();
-        // Creative mode can rely on vanilla BlockPlaceEvent if allowed or this fallback
         BlockFace face = event.getBlockFace();
         Block target = clicked.isReplaceable() ? clicked : clicked.getRelative(face);
 
@@ -252,9 +321,39 @@ public final class CustomBlockEventListener implements Listener {
             return;
         }
 
-        // Mutate block to Barrier and register
-        target.setType(Material.BARRIER, false);
-        customBlockService.placeCustomBlock(target.getLocation(), customBlockId);
+        if (customBlockId != null) {
+            // Suppress barrier sound packet to avoid double sound
+            if (soundPacketListener != null) {
+                soundPacketListener.markRecentPlacement(target.getLocation());
+            }
+
+            // Mutate block to Barrier and register custom block
+            target.setType(Material.BARRIER, false);
+            customBlockService.placeCustomBlock(target.getLocation(), customBlockId);
+
+            // Play custom block place sound
+            customBlockService.getRegistry().get(customBlockId).ifPresentOrElse(placedDef -> {
+                if (placedDef.getSoundGroup() != null && placedDef.getSoundGroup().getPlaceSound() != null) {
+                    placedDef.getSoundGroup().getPlaceSound().play(target.getLocation().add(0.5, 0.5, 0.5));
+                } else {
+                    target.getWorld().playSound(target.getLocation().add(0.5, 0.5, 0.5), Sound.BLOCK_STONE_PLACE, 1.0f, 0.8f);
+                }
+            }, () -> {
+                target.getWorld().playSound(target.getLocation().add(0.5, 0.5, 0.5), Sound.BLOCK_STONE_PLACE, 1.0f, 0.8f);
+            });
+
+            if (soundPacketListener != null) {
+                Location tLoc = target.getLocation();
+                org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    soundPacketListener.clearRecentPlacement(tLoc.getBlockX(), tLoc.getBlockY(), tLoc.getBlockZ());
+                }, 5L);
+            }
+        } else {
+            // Place regular vanilla block
+            target.setBlockData(itemType.createBlockData(), true);
+            Sound placeSound = target.getBlockData().getSoundGroup().getPlaceSound();
+            target.getWorld().playSound(target.getLocation().add(0.5, 0.5, 0.5), placeSound, 1.0f, 0.8f);
+        }
 
         // Deduct item if in survival/adventure
         if (player.getGameMode() != GameMode.CREATIVE) {
@@ -264,17 +363,39 @@ public final class CustomBlockEventListener implements Listener {
         if (event.getHand() != null) {
             player.swingHand(event.getHand());
         }
-        target.getWorld().playSound(target.getLocation().add(0.5, 0.5, 0.5), Sound.BLOCK_STONE_PLACE, 1.0f, 0.8f);
         event.setCancelled(true);
     }
 
     // --- Player Movement & Spatial Culling ---
-
+ 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onPlayerMove(PlayerMoveEvent event) {
         Location from = event.getFrom();
         Location to = event.getTo();
         if (to == null) return;
+
+        // Step hook & step sound trigger when player moves onto a different block
+        if (from.getBlockX() != to.getBlockX() || from.getBlockY() != to.getBlockY() || from.getBlockZ() != to.getBlockZ()) {
+            Block blockUnder = to.clone().subtract(0, 0.2, 0).getBlock();
+            if (customBlockService.isCustomBlock(blockUnder)) {
+                customBlockService.getCustomBlock(blockUnder).ifPresent(def -> {
+                    // Play step sound
+                    if (def.getSoundGroup() != null && def.getSoundGroup().getStepSound() != null) {
+                        def.getSoundGroup().getStepSound().play(event.getPlayer(), blockUnder.getLocation());
+                    }
+                    // Trigger step callback
+                    if (def.getStepHandler() != null) {
+                        try {
+                            def.getStepHandler().onStep(new vn.haohan.itemcore.api.block.CustomBlockStepContext(
+                                    event.getPlayer(), blockUnder, from, to
+                            ));
+                        } catch (Throwable t) {
+                            plugin.getLogger().warning("Error executing custom block step action for " + def.getId() + ": " + t.getMessage());
+                        }
+                    }
+                });
+            }
+        }
 
         int fromChunkX = from.getBlockX() >> 4;
         int fromChunkZ = from.getBlockZ() >> 4;

@@ -14,13 +14,24 @@ public final class BlockMiningSession {
     private final Player player;
     private final Location blockLocation;
     private final CustomBlockDefinition definition;
+    private final int crackEntityId;
     private float progress = 0.0f;
     private int lastStage = -1;
+    private int miningTicks = 0;
 
-    public BlockMiningSession(Player player, Location blockLocation, CustomBlockDefinition definition) {
+    public BlockMiningSession(Player player, Location blockLocation, CustomBlockDefinition definition, int crackEntityId) {
         this.player = Objects.requireNonNull(player, "player cannot be null");
         this.blockLocation = Objects.requireNonNull(blockLocation, "blockLocation cannot be null");
         this.definition = Objects.requireNonNull(definition, "definition cannot be null");
+        this.crackEntityId = crackEntityId;
+    }
+
+    public BlockMiningSession(Player player, Location blockLocation, CustomBlockDefinition definition) {
+        this(player, blockLocation, definition, -1);
+    }
+
+    public int getCrackEntityId() {
+        return crackEntityId;
     }
 
     public Player getPlayer() {
@@ -41,6 +52,10 @@ public final class BlockMiningSession {
 
     public void addProgress(float delta) {
         this.progress += delta;
+    }
+
+    public int incrementAndGetMiningTicks() {
+        return ++this.miningTicks;
     }
 
     public int getLastStage() {

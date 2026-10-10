@@ -42,15 +42,27 @@ public class CustomBlockMiningManager implements PacketListener {
     }
 
     private final CustomBlockService customBlockService;
+    private final VirtualEntityIdManager idManager;
+    private final BlockBreakOverlayRenderer overlayRenderer;
     private final Plugin plugin;
     private final Logger logger;
     private final ConcurrentHashMap<UUID, BlockMiningSession> sessions = new ConcurrentHashMap<>();
     private AnimationObserver animationObserver;
 
-    public CustomBlockMiningManager(CustomBlockService customBlockService, Plugin plugin) {
+    public CustomBlockMiningManager(
+            CustomBlockService customBlockService,
+            VirtualEntityIdManager idManager,
+            BlockBreakOverlayRenderer overlayRenderer,
+            Plugin plugin) {
         this.customBlockService = Objects.requireNonNull(customBlockService, "customBlockService cannot be null");
+        this.idManager = idManager;
+        this.overlayRenderer = overlayRenderer;
         this.plugin = plugin;
         this.logger = plugin != null ? plugin.getLogger() : Logger.getLogger(CustomBlockMiningManager.class.getName());
+    }
+
+    public CustomBlockMiningManager(CustomBlockService customBlockService, Plugin plugin) {
+        this(customBlockService, null, null, plugin);
     }
 
     public void setAnimationObserver(AnimationObserver observer) {
@@ -65,12 +77,18 @@ public class CustomBlockMiningManager implements PacketListener {
         BlockMiningSession session = sessions.remove(playerUuid);
         if (session != null) {
             sendBreakAnimation(session.getPlayer(), session.getBlockLocation(), -1);
+            if (overlayRenderer != null && session.getCrackEntityId() != -1) {
+                destroyCrackOverlay(session.getPlayer(), session.getBlockLocation(), session.getCrackEntityId());
+            }
         }
     }
 
     public void clearAllSessions() {
         for (BlockMiningSession session : sessions.values()) {
             sendBreakAnimation(session.getPlayer(), session.getBlockLocation(), -1);
+            if (overlayRenderer != null && session.getCrackEntityId() != -1) {
+                destroyCrackOverlay(session.getPlayer(), session.getBlockLocation(), session.getCrackEntityId());
+            }
         }
         sessions.clear();
     }
@@ -113,13 +131,23 @@ public class CustomBlockMiningManager implements PacketListener {
                 return; // Unbreakable, cannot be mined
             }
 
+            ItemStack tool = player.getInventory().getItemInMainHand();
+            if (!def.isEffectiveTool(tool)) {
+                return; // Disallow mining if tool or bare hand is not allowed
+            }
+
             if (def.isInstantBreak()) {
                 breakCustomBlock(player, loc, def);
                 return;
             }
 
             // Start progressive mining session
-            sessions.put(player.getUniqueId(), new BlockMiningSession(player, loc, def));
+            int crackEntityId = idManager != null ? idManager.allocateRawId() : -1;
+            sessions.put(player.getUniqueId(), new BlockMiningSession(player, loc, def, crackEntityId));
+
+            if (overlayRenderer != null && crackEntityId != -1) {
+                spawnCrackOverlay(player, loc, crackEntityId, 0);
+            }
 
         } else if (action == DiggingAction.CANCELLED_DIGGING) {
             cancelSession(player.getUniqueId());
@@ -145,22 +173,47 @@ public class CustomBlockMiningManager implements PacketListener {
                     || !customBlockService.isCustomBlock(loc.getBlock())) {
                 it.remove();
                 sendBreakAnimation(player, loc, -1);
+                if (overlayRenderer != null && session.getCrackEntityId() != -1) {
+                    destroyCrackOverlay(player, loc, session.getCrackEntityId());
+                }
                 continue;
             }
 
             ItemStack tool = player.getInventory().getItemInMainHand();
+            if (!def.isEffectiveTool(tool)) {
+                it.remove();
+                sendBreakAnimation(player, loc, -1);
+                if (overlayRenderer != null && session.getCrackEntityId() != -1) {
+                    destroyCrackOverlay(player, loc, session.getCrackEntityId());
+                }
+                continue;
+            }
+
             float delta = MiningSpeedCalculator.calculateProgressPerTick(player, tool, def);
             session.addProgress(delta);
+
+            // Play mining hit sound every 4 ticks (~0.2s like vanilla mining)
+            if (session.incrementAndGetMiningTicks() % 4 == 0) {
+                if (def.getSoundGroup() != null && def.getSoundGroup().getHitSound() != null) {
+                    def.getSoundGroup().getHitSound().play(loc.clone().add(0.5, 0.5, 0.5));
+                }
+            }
 
             int stage = Math.min(9, (int) (session.getProgress() * 9.0f));
             if (stage != session.getLastStage()) {
                 session.setLastStage(stage);
                 sendBreakAnimation(player, loc, stage);
+                if (overlayRenderer != null && session.getCrackEntityId() != -1) {
+                    updateCrackOverlay(player, loc, session.getCrackEntityId(), stage);
+                }
             }
 
             if (session.getProgress() >= 1.0f) {
                 it.remove();
                 sendBreakAnimation(player, loc, -1);
+                if (overlayRenderer != null && session.getCrackEntityId() != -1) {
+                    destroyCrackOverlay(player, loc, session.getCrackEntityId());
+                }
                 breakCustomBlock(player, loc, def);
             }
         }
@@ -185,7 +238,11 @@ public class CustomBlockMiningManager implements PacketListener {
         // Sounds and particles
         if (loc.getWorld() != null) {
             try {
-                loc.getWorld().playSound(loc.clone().add(0.5, 0.5, 0.5), Sound.BLOCK_STONE_BREAK, 1.0f, 0.8f);
+                if (def.getSoundGroup() != null && def.getSoundGroup().getBreakSound() != null) {
+                    def.getSoundGroup().getBreakSound().play(loc.clone().add(0.5, 0.5, 0.5));
+                } else {
+                    loc.getWorld().playSound(loc.clone().add(0.5, 0.5, 0.5), Sound.BLOCK_STONE_BREAK, 1.0f, 0.8f);
+                }
                 if (def.getModel() != null && def.getModel().getBlockData() != null) {
                     loc.getWorld().spawnParticle(org.bukkit.Particle.BLOCK, loc.clone().add(0.5, 0.5, 0.5), 20, 0.3, 0.3, 0.3, def.getModel().getBlockData());
                 }
@@ -227,6 +284,42 @@ public class CustomBlockMiningManager implements PacketListener {
                 }
             } catch (Exception e) {
                 logger.log(Level.WARNING, "Failed to send BlockBreakAnimation packet for player " + player.getName(), e);
+            }
+        }
+    }
+
+    private void spawnCrackOverlay(Player player, Location loc, int crackEntityId, int stage) {
+        overlayRenderer.spawnCrack(player, crackEntityId, loc, stage);
+        if (loc.getWorld() != null) {
+            for (Player other : loc.getWorld().getPlayers()) {
+                if (other.equals(player)) continue;
+                if (other.getLocation().distanceSquared(loc) <= 1024) {
+                    overlayRenderer.spawnCrack(other, crackEntityId, loc, stage);
+                }
+            }
+        }
+    }
+
+    private void updateCrackOverlay(Player player, Location loc, int crackEntityId, int stage) {
+        overlayRenderer.updateCrack(player, crackEntityId, stage);
+        if (loc.getWorld() != null) {
+            for (Player other : loc.getWorld().getPlayers()) {
+                if (other.equals(player)) continue;
+                if (other.getLocation().distanceSquared(loc) <= 1024) {
+                    overlayRenderer.updateCrack(other, crackEntityId, stage);
+                }
+            }
+        }
+    }
+
+    private void destroyCrackOverlay(Player player, Location loc, int crackEntityId) {
+        overlayRenderer.destroyCrack(player, crackEntityId);
+        if (loc.getWorld() != null) {
+            for (Player other : loc.getWorld().getPlayers()) {
+                if (other.equals(player)) continue;
+                if (other.getLocation().distanceSquared(loc) <= 1024) {
+                    overlayRenderer.destroyCrack(other, crackEntityId);
+                }
             }
         }
     }
