@@ -14,6 +14,7 @@ import org.bukkit.event.inventory.CraftItemEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerItemHeldEvent;
 import org.bukkit.event.inventory.PrepareSmithingEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -56,8 +57,14 @@ public final class ItemEventRouter implements Listener {
             Plugin plugin) {
         this.registry = registry;
         this.recipeAdapter = recipeAdapter;
-        this.itemIdKey = new NamespacedKey(plugin, DefaultItemFactory.ITEM_ID_KEY_NAME);
-        this.logger = plugin.getLogger();
+        NamespacedKey key;
+        try {
+            key = plugin != null ? new NamespacedKey(plugin, DefaultItemFactory.ITEM_ID_KEY_NAME) : new NamespacedKey("haohanitemcore", DefaultItemFactory.ITEM_ID_KEY_NAME);
+        } catch (Throwable t) {
+            key = new NamespacedKey("haohanitemcore", DefaultItemFactory.ITEM_ID_KEY_NAME);
+        }
+        this.itemIdKey = key;
+        this.logger = plugin != null ? plugin.getLogger() : Logger.getLogger("ItemEventRouter");
         this.plugin = plugin;
 
         var itemService = HaoHanItemCore.get().getItemService();
@@ -81,6 +88,7 @@ public final class ItemEventRouter implements Listener {
         if (item == null)
             return;
 
+        item = vn.haohan.itemcore.api.HaoHanItemCore.get().getItemService().validateAndUpdate(item);
         ItemDefinition definition = getDefinition(item);
         if (definition == null)
             return;
@@ -111,6 +119,9 @@ public final class ItemEventRouter implements Listener {
     @EventHandler(priority = EventPriority.NORMAL)
     public void onBlockBreak(BlockBreakEvent event) {
         ItemStack item = event.getPlayer().getInventory().getItemInMainHand();
+        if (item != null) {
+            item = vn.haohan.itemcore.api.HaoHanItemCore.get().getItemService().validateAndUpdate(item);
+        }
 
         ItemDefinition definition = getDefinition(item);
         if (definition == null || !definition.hasBehavior())
@@ -257,6 +268,18 @@ public final class ItemEventRouter implements Listener {
         vn.haohan.itemcore.api.HaoHanItemCore.get().getItemService().validateAndUpdate(item);
     }
 
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onPlayerItemHeld(PlayerItemHeldEvent event) {
+        Player player = event.getPlayer();
+        ItemStack item = player.getInventory().getItem(event.getNewSlot());
+        if (item != null) {
+            ItemStack updated = vn.haohan.itemcore.api.HaoHanItemCore.get().getItemService().validateAndUpdate(item);
+            if (updated != null && updated != item) {
+                player.getInventory().setItem(event.getNewSlot(), updated);
+            }
+        }
+    }
+
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onPlayerRecipeBookClick(com.destroystokyo.paper.event.player.PlayerRecipeBookClickEvent event) {
         if (craftingRecipeResolver != null) {
@@ -288,7 +311,10 @@ public final class ItemEventRouter implements Listener {
 
         ItemStack result = event.getInventory().getResult();
         if (result != null) {
-            vn.haohan.itemcore.api.HaoHanItemCore.get().getItemService().validateAndUpdate(result);
+            ItemStack updated = vn.haohan.itemcore.api.HaoHanItemCore.get().getItemService().validateAndUpdate(result);
+            if (updated != null && updated != result) {
+                event.getInventory().setResult(updated);
+            }
         }
     }
 
