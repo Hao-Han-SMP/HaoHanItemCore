@@ -1,0 +1,22 @@
+{
+  "model": {
+    "type": "minecraft:range_dispatch",
+    "property": "minecraft:custom_model_data",
+    "fallback": {
+      "type": "minecraft:model",
+      "model": "minecraft:item/paper"
+    },
+    "entries": [
+      { "threshold": 90000, "model": { "type": "minecraft:model", "model": "itemcore:block/destroy_stage_0" } },
+      { "threshold": 90001, "model": { "type": "minecraft:model", "model": "itemcore:block/destroy_stage_1" } },
+      { "threshold": 90002, "model": { "type": "minecraft:model", "model": "itemcore:block/destroy_stage_2" } },
+      { "threshold": 90003, "model": { "type": "minecraft:model", "model": "itemcore:block/destroy_stage_3" } },
+      { "threshold": 90004, "model": { "type": "minecraft:model", "model": "itemcore:block/destroy_stage_4" } },
+      { "threshold": 90005, "model": { "type": "minecraft:model", "model": "itemcore:block/destroy_stage_5" } },
+      { "threshold": 90006, "model": { "type": "minecraft:model", "model": "itemcore:block/destroy_stage_6" } },
+      { "threshold": 90007, "model": { "type": "minecraft:model", "model": "itemcore:block/destroy_stage_7" } },
+      { "threshold": 90008, "model": { "type": "minecraft:model", "model": "itemcore:block/destroy_stage_8" } },
+      { "threshold": 90009, "model": { "type": "minecraft:model", "model": "itemcore:block/destroy_stage_9" } }
+    ]
+  }
+}

@@ -30,7 +30,12 @@ Tài liệu này cung cấp chi tiết toàn diện về các lớp (classes), g
    - [5.2 `RecipeDefinition` & `ShapedRecipeDefinition`](#52-recipedefinition--shapedrecipedefinition)
    - [5.3 `RecipeRegistry`](#53-reciperegistry)
    - [5.4 `RecipeService`](#54-recipeservice)
-6. [Ví Dụ Tích Hợp Đầy Đủ (Full Integration Examples)](#6-ví-dụ-tích-hợp-đầy-đủ-full-integration-examples)
+6. [Hệ Thống Custom Block (Barrier + BlockDisplay)](#6-hệ-thống-custom-block-barrier--blockdisplay)
+   - [6.1 `CustomBlockDefinition` & Builder](#61-customblockdefinition--builder)
+   - [6.2 `CustomBlockModel`](#62-customblockmodel)
+   - [6.3 `CustomBlockRegistry`](#63-customblockregistry)
+   - [6.4 `CustomBlockService`](#64-customblockservice)
+7. [Ví Dụ Tích Hợp Đầy Đủ (Full Integration Examples)](#7-ví-dụ-tích-hợp-đầy-đủ-full-integration-examples)
 
 ---
 
@@ -55,6 +60,7 @@ HaoHanItemCore core = HaoHanItemCore.get();
 | `getItemService()` | `ItemService` | *Không có* | Truy cập service tổng hợp (Facade khuyến nghị dùng cho plugin ngoài). |
 | `getRecipeRegistry()` | `RecipeRegistry` | *Không có* | Truy cập registry quản lý công thức chế tạo (`RecipeDefinition`). |
 | `getRecipeService()` | `RecipeService` | *Không có* | Truy cập service tra cứu và tìm kiếm công thức chế tạo. |
+| `getCustomBlockService()` | `CustomBlockService` | *Không có* | Truy cập service quản lý Custom Block (Physical Barrier + Client BlockDisplay). |
 
 ---
 
@@ -151,8 +157,9 @@ Dưới đây là chi tiết các thuộc tính bạn có thể đăng ký khi x
 | `max_damage` | `int` | Thiết lập độ bền tối đa của item (chỉ áp dụng cho `Damageable`). |
 | `jukebox_playable` | `String` (Key) | Đăng ký đĩa nhạc jukebox custom (VD: `"haohan:space_theme"`). |
 | `equippable_asset_id` | `String` (Key) | Đăng ký model giáp hiển thị 3D trên nhân vật (VD: `"haohan:spacesuit"`). |
-| `custom_block_data` | `String` (BlockState) | Gắn `minecraft:block_state` cho client xử lý Custom Block (VD: `minecraft:note_block[note=1,instrument=harp]`). |
-| `custom_block_drop` | `String` (ID) | ID custom item sẽ rơi ra khi phá/nổ custom block này (mặc định nếu không khai báo sẽ không rơi ra gì). |
+| `custom_block_id` | `String` (ID) | Gắn ID CustomBlock để tự động đặt khối vật lý `Material.BARRIER` và kích hoạt client virtual `BlockDisplay`. |
+| `custom_block_model` | `String` (BlockState) | Khai báo visual blockstate hiển thị trên BlockDisplay (VD: `"minecraft:redstone_block"`). |
+| `custom_block_drop` | `String` (ID) | ID custom item sẽ rơi ra khi phá/nổ custom block này (mặc định nếu không khai báo sẽ rơi ra chính item đặt). |
 
 ---
 
@@ -480,7 +487,81 @@ Service hỗ trợ tra cứu công thức chế tạo cho GUI hoặc hệ thốn
 
 ---
 
-## 6. Ví Dụ Tích Hợp Đầy Đủ (Full Integration Examples)
+## 6. Hệ Thống Custom Block (Barrier + BlockDisplay)
+
+Hệ thống Custom Block thế hệ mới hoàn toàn loại bỏ NoteBlock, sử dụng khối vật lý **`Material.BARRIER`** kết hợp với ảo hóa hiển thị **Client-side Virtual `BlockDisplay`** thông qua PacketEvents.
+
+### 6.1 `CustomBlockDefinition` & Builder
+
+Định nghĩa bất biến chứa thông tin khối, model hiển thị, item rơi ra và thuộc tính tùy biến.
+
+```java
+CustomBlockModel model = new CustomBlockModel(Bukkit.createBlockData(Material.IRON_BLOCK));
+
+CustomBlockDefinition def = CustomBlockDefinition.builder("haohan:iron_crate")
+        .model(model)
+        .dropItemId("haohan:iron_crate")
+        .property("hardness", 5.0f)
+        .build();
+```
+
+| Phương thức Builder | Kiểu đối số | Mô tả |
+| :--- | :--- | :--- |
+| `CustomBlockDefinition.builder(id)` | `String` | Khởi tạo builder với ID định danh duy nhất (bắt buộc). |
+| `.model(model)` | `CustomBlockModel` | Thiết lập model hiển thị `BlockDisplay` phía client. |
+| `.dropItemId(itemId)` | `String` | ID của custom item sẽ rơi ra khi phá khối (mặc định nếu null sẽ rơi ra chính item đặt). |
+| `.property(key, value)` | `String, Object` | Gắn thuộc tính bổ sung (độ cứng, cúp yêu cầu, v.v.). |
+| `.properties(map)` | `Map<String, Object>` | Gắn danh sách thuộc tính bổ sung. |
+| `.build()` | - | Xây dựng đối tượng `CustomBlockDefinition` bất biến. |
+
+---
+
+### 6.2 `CustomBlockModel`
+
+Xác định blockstate hoặc material hiển thị của client-side virtual BlockDisplay. Tự động áp dụng scale chuẩn **`1.00005f`** và translation offset **`-0.000025f`** để triệt tiêu hoàn toàn z-fighting.
+
+```java
+// Khởi tạo từ Bukkit BlockData
+CustomBlockModel model1 = new CustomBlockModel(Bukkit.createBlockData(Material.COPPER_BLOCK));
+
+// Hoặc khởi tạo nhanh qua Material
+CustomBlockModel model2 = CustomBlockModel.of(Material.GOLD_BLOCK);
+```
+
+---
+
+### 6.3 `CustomBlockRegistry`
+
+Registry quản lý tập trung và tra cứu toàn bộ định nghĩa custom block đã đăng ký trên server. Thread-safe 100%.
+
+```java
+CustomBlockRegistry registry = HaoHanItemCore.get().getCustomBlockService().getRegistry();
+
+// Đăng ký custom block
+registry.register(def);
+
+// Tra cứu định nghĩa
+Optional<CustomBlockDefinition> opt = registry.get("haohan:iron_crate");
+```
+
+---
+
+### 6.4 `CustomBlockService`
+
+Facade API cấp cao tương tác với thế giới game: đặt khối, phá khối, kiểm tra khối và quản lý hiển thị không gian.
+
+| Phương thức | Kiểu trả về | Tham số | Mô tả / Tác dụng |
+| :--- | :--- | :--- | :--- |
+| `isCustomBlock(block)` | `boolean` | `Block block` | Kiểm tra xem khối tại block có phải là custom block không (O(1)). |
+| `getCustomBlockId(block)` | `String` | `Block block` | Lấy ID định danh của custom block tại khối chỉ định. |
+| `getDefinition(block)` | `Optional<CustomBlockDefinition>` | `Block block` | Lấy `CustomBlockDefinition` của custom block tại vị trí. |
+| `placeBlock(location, id)` | `boolean` | `Location loc, String id` | Đặt khối vật lý BARRIER, lưu trữ dữ liệu và spawn BlockDisplay tới người xem xung quanh. |
+| `removeBlock(location)` | `boolean` | `Location loc` | Phá bỏ custom block, gỡ bỏ hiển thị trên client và dọn dẹp lưu trữ. |
+| `getRegistry()` | `CustomBlockRegistry` | *Không có* | Lấy registry quản lý định nghĩa custom block. |
+
+---
+
+## 7. Ví Dụ Tích Hợp Đầy Đủ (Full Integration Examples)
 
 ### Ví Dụ 1: Đăng Ký Item & Công Thức Chế Tạo Từ Plugin Khác
 
