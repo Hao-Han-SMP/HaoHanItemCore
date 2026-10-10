@@ -1,11 +1,10 @@
 package vn.haohan.itemcore.api.block;
 
 import org.bukkit.Material;
+import org.bukkit.inventory.ItemStack;
+import vn.haohan.itemcore.api.HaoHanItemCore;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 
 /**
  * Immutable definition of a custom block.
@@ -26,6 +25,11 @@ public final class CustomBlockDefinition {
     private final MiningCondition miningCondition;
     private final BlockDropProvider dropProvider;
     private final ToolType toolType;
+    private final Set<ToolType> harvestToolTypes;
+    private final ToolTier requiredTier;
+    private final CustomBlockSoundGroup soundGroup;
+    private final CustomBlockInteractHandler interactHandler;
+    private final CustomBlockStepHandler stepHandler;
 
     private CustomBlockDefinition(Builder builder) {
         this.id = builder.id;
@@ -34,19 +38,38 @@ public final class CustomBlockDefinition {
         this.properties = Collections.unmodifiableMap(new HashMap<>(builder.properties));
         this.dropItemId = builder.dropItemId;
         this.hardness = builder.hardness;
-        this.miningCondition = builder.miningCondition != null ? builder.miningCondition : MiningCondition.always();
+        this.harvestToolTypes = Collections.unmodifiableSet(new HashSet<>(builder.harvestToolTypes));
+        this.requiredTier = builder.requiredTier;
+        this.soundGroup = builder.soundGroup != null ? builder.soundGroup : CustomBlockSoundGroup.STONE;
+        this.interactHandler = builder.interactHandler;
+        this.stepHandler = builder.stepHandler;
+
+        // ToolType fallback for backwards compatibility
+        if (builder.toolType != null) {
+            this.toolType = builder.toolType;
+        } else if (!this.harvestToolTypes.isEmpty()) {
+            this.toolType = this.harvestToolTypes.iterator().next();
+        } else {
+            this.toolType = null;
+        }
+
+        // Auto-generate unified mining condition if none explicitly given
+        if (builder.miningCondition != null) {
+            this.miningCondition = builder.miningCondition;
+        } else if (hasPreferredTools()) {
+            this.miningCondition = context -> isEffectiveTool(context != null ? context.tool() : null);
+        } else {
+            this.miningCondition = MiningCondition.always();
+        }
+
         this.dropProvider = builder.dropProvider != null
                 ? builder.dropProvider
-                : BlockDropProvider.builder().defaultDrop(builder.dropItemId).build();
-        this.toolType = builder.toolType != null ? builder.toolType : inferToolType(this.model);
+                : BlockDropProvider.builder()
+                        .defaultDrop(builder.dropItemId)
+                        .silkTouchDropsSelf(builder.silkTouchDropsSelf)
+                        .build();
     }
 
-    /**
-     * Creates a new builder for a CustomBlockDefinition.
-     *
-     * @param id unique identifier of the custom block; must not be null or blank
-     * @return a new Builder instance
-     */
     public static Builder builder(String id) {
         return new Builder(id);
     }
@@ -99,23 +122,93 @@ public final class CustomBlockDefinition {
         return toolType;
     }
 
-    private static ToolType inferToolType(CustomBlockModel model) {
-        if (model != null && model.getBlockData() != null) {
-            Material mat = model.getBlockData().getMaterial();
-            if (mat != null) {
-                try {
-                    if (org.bukkit.Tag.MINEABLE_AXE.isTagged(mat)) return ToolType.AXE;
-                    if (org.bukkit.Tag.MINEABLE_SHOVEL.isTagged(mat)) return ToolType.SHOVEL;
-                    if (org.bukkit.Tag.MINEABLE_HOE.isTagged(mat)) return ToolType.HOE;
-                    if (org.bukkit.Tag.MINEABLE_PICKAXE.isTagged(mat)) return ToolType.PICKAXE;
-                } catch (Throwable ignored) {}
-                String name = mat.name();
-                if (name.endsWith("_LOG") || name.endsWith("_PLANKS") || name.endsWith("_WOOD")) return ToolType.AXE;
-                if (name.endsWith("_DIRT") || name.endsWith("_SAND") || name.endsWith("_GRAVEL")) return ToolType.SHOVEL;
-                if (name.endsWith("_LEAVES")) return ToolType.HOE;
+    public Set<ToolType> getHarvestToolTypes() {
+        return harvestToolTypes;
+    }
+
+    public ToolTier getRequiredTier() {
+        return requiredTier;
+    }
+
+    public CustomBlockSoundGroup getSoundGroup() {
+        return soundGroup;
+    }
+
+    public CustomBlockInteractHandler getInteractHandler() {
+        return interactHandler;
+    }
+
+    public CustomBlockStepHandler getStepHandler() {
+        return stepHandler;
+    }
+
+    /**
+     * Checks whether this block has preferred harvest tools or tier requirements configured.
+     * If false, all tools and bare hand mine this block at the exact configured base break time without tool multipliers.
+     */
+    public boolean hasPreferredTools() {
+        return toolType != null || !harvestToolTypes.isEmpty() || requiredTier != null;
+    }
+
+    /**
+     * Checks if the given tool satisfies the tool type and minimum tier required to effectively mine this block.
+     */
+    public boolean isEffectiveTool(ItemStack tool) {
+        if (!hasPreferredTools()) {
+            return true;
+        }
+
+        if (tool == null || tool.getType() == null || tool.getType() == Material.AIR) {
+            if (harvestToolTypes.isEmpty() && requiredTier == null) {
+                return true;
+            }
+            return (harvestToolTypes.contains(ToolType.HAND) || harvestToolTypes.contains(ToolType.ANY)) && requiredTier == null;
+        }
+
+        // 1. Tool type check
+        if (!harvestToolTypes.isEmpty() && !harvestToolTypes.contains(ToolType.ANY)) {
+            ToolType currentType = ToolType.fromMaterial(tool.getType());
+            // Try resolving custom tool type from item definition
+            try {
+                var core = HaoHanItemCore.get();
+                if (core != null && core.getItemService() != null) {
+                    String customId = core.getItemService().getId(tool);
+                    if (customId != null) {
+                        var def = core.getItemService().getDefinition(customId);
+                        if (def != null) {
+                            Object ttProp = def.getProperties().get("tool_type");
+                            if (ttProp instanceof String s) {
+                                currentType = ToolType.valueOf(s.toUpperCase(Locale.ROOT));
+                            }
+                        }
+                    }
+                }
+            } catch (Throwable ignored) {}
+
+            if (currentType == null || !harvestToolTypes.contains(currentType)) {
+                return false;
             }
         }
-        return ToolType.PICKAXE;
+
+        // 2. Tool tier check
+        if (requiredTier != null) {
+            ToolTier toolTier = null;
+            try {
+                var core = HaoHanItemCore.get();
+                if (core != null && core.getToolTierRegistry() != null) {
+                    toolTier = core.getToolTierRegistry().findTier(tool);
+                }
+            } catch (Throwable ignored) {}
+            if (toolTier == null) {
+                toolTier = ToolTier.fromMaterial(tool.getType());
+            }
+
+            if (toolTier == null || toolTier.level() < requiredTier.level()) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     @Override
@@ -132,7 +225,7 @@ public final class CustomBlockDefinition {
 
     @Override
     public String toString() {
-        return "CustomBlockDefinition{id='" + id + "', baseBlock=" + baseBlock + ", model=" + model + ", hardness=" + hardness + ", toolType=" + toolType + "}";
+        return "CustomBlockDefinition{id='" + id + "', hardness=" + hardness + ", harvestToolTypes=" + harvestToolTypes + ", requiredTier=" + requiredTier + "}";
     }
 
     /**
@@ -147,6 +240,12 @@ public final class CustomBlockDefinition {
         private MiningCondition miningCondition;
         private BlockDropProvider dropProvider;
         private ToolType toolType;
+        private final Set<ToolType> harvestToolTypes = new HashSet<>();
+        private ToolTier requiredTier;
+        private boolean silkTouchDropsSelf = true;
+        private CustomBlockSoundGroup soundGroup;
+        private CustomBlockInteractHandler interactHandler;
+        private CustomBlockStepHandler stepHandler;
 
         private Builder(String id) {
             Objects.requireNonNull(id, "Custom block ID cannot be null");
@@ -154,6 +253,21 @@ public final class CustomBlockDefinition {
                 throw new IllegalArgumentException("Custom block ID cannot be blank");
             }
             this.id = id;
+        }
+
+        public Builder soundGroup(CustomBlockSoundGroup soundGroup) {
+            this.soundGroup = soundGroup;
+            return this;
+        }
+
+        public Builder onInteract(CustomBlockInteractHandler handler) {
+            this.interactHandler = handler;
+            return this;
+        }
+
+        public Builder onStep(CustomBlockStepHandler handler) {
+            this.stepHandler = handler;
+            return this;
         }
 
         public Builder model(CustomBlockModel model) {
@@ -212,6 +326,39 @@ public final class CustomBlockDefinition {
 
         public Builder toolType(ToolType toolType) {
             this.toolType = toolType;
+            if (toolType != null) {
+                this.harvestToolTypes.add(toolType);
+            }
+            return this;
+        }
+
+        public Builder mineableWith(ToolType toolType, ToolTier minTier) {
+            if (toolType != null) {
+                this.harvestToolTypes.add(toolType);
+            }
+            this.requiredTier = minTier;
+            return this;
+        }
+
+        public Builder mineableWith(Collection<ToolType> toolTypes, ToolTier minTier) {
+            if (toolTypes != null) {
+                this.harvestToolTypes.addAll(toolTypes);
+            }
+            this.requiredTier = minTier;
+            return this;
+        }
+
+        public Builder mineableWith(ToolType toolType) {
+            return mineableWith(toolType, ToolTier.WOOD);
+        }
+
+        public Builder requiredTier(ToolTier minTier) {
+            this.requiredTier = minTier;
+            return this;
+        }
+
+        public Builder silkTouchDropsSelf(boolean dropsSelf) {
+            this.silkTouchDropsSelf = dropsSelf;
             return this;
         }
 
