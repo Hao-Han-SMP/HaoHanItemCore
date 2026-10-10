@@ -17,7 +17,7 @@
 8. [API cho Plugin khác](#8-api-cho-plugin-khác)
 9. [Item Behavior](#9-item-behavior)
 10. [Built-in Property Keys](#10-built-in-property-keys)
-11. [Custom Block System (NoteBlock)](#11-custom-block-system-noteblock)
+11. [Custom Block System (Barrier + BlockDisplay)](#11-custom-block-system-barrier--virtual-blockdisplay-engine)
 12. [Custom Armor Model System](#12-custom-armor-model-system)
 13. [Tự động Sanitization & Upgrade Item](#13-tự-động-sanitization--upgrade-item)
 14. [Ví dụ hoàn chỉnh — Plugin mẫu](#14-ví-dụ-hoàn-chỉnh--plugin-mẫu)
