@@ -64,6 +64,8 @@ public final class HaoHanItemCorePlugin extends JavaPlugin {
     private DefaultCustomBlockService customBlockService;
     private CustomBlockEventListener customBlockEventListener;
     private vn.haohan.itemcore.internal.block.CustomBlockMiningManager customBlockMiningManager;
+    private vn.haohan.itemcore.api.block.ToolTierRegistry toolTierRegistry;
+    private vn.haohan.itemcore.internal.config.ToolTierConfigLoader toolTierConfigLoader;
     private org.bukkit.scheduler.BukkitTask miningTickerTask;
     private com.github.retrooper.packetevents.event.PacketListenerCommon miningPacketListenerHandle;
     private com.github.retrooper.packetevents.event.PacketListenerCommon chunkPacketListenerHandle;
@@ -91,12 +93,13 @@ public final class HaoHanItemCorePlugin extends JavaPlugin {
                 customBlockStorage, customBlockRegistry, virtualEntityIdManager, blockDisplayRenderer, log);
         customBlockService = new DefaultCustomBlockService(
                 customBlockRegistry, customBlockStorage, customBlockVisibilityManager, this);
+        toolTierRegistry = new vn.haohan.itemcore.api.block.ToolTierRegistry();
 
         // Set singleton
         HaoHanItemCore.setInstance(new HaoHanItemCore(
                 itemRegistry, itemFactory, itemService,
                 recipeRegistry, recipeService, iconTextureRegistry,
-                customBlockService));
+                customBlockService, toolTierRegistry));
 
         log.info("HaoHanItemCore loaded. Registries initialized.");
     }
@@ -222,6 +225,13 @@ public final class HaoHanItemCorePlugin extends JavaPlugin {
     private void loadAllConfigs() {
         Logger log = getLogger();
 
+        // Load custom tool tiers
+        toolTierConfigLoader = new vn.haohan.itemcore.internal.config.ToolTierConfigLoader(log);
+        File tiersFile = new File(getDataFolder(), "tiers.yml");
+        if (tiersFile.exists()) {
+            toolTierConfigLoader.loadFile(tiersFile, toolTierRegistry);
+        }
+
         // Load items first (recipes depend on items)
         itemConfigLoader = new ItemConfigLoader(log);
         File itemsDir = new File(getDataFolder(), "items");
@@ -244,69 +254,9 @@ public final class HaoHanItemCorePlugin extends JavaPlugin {
 
         // Auto-register custom blocks from item definitions
         for (ItemDefinition itemDef : itemRegistry.all()) {
-            Object cbId = itemDef.getProperties().get("custom_block_id");
-            if (cbId instanceof String customBlockId) {
-                if (!customBlockRegistry.has(customBlockId)) {
-                    org.bukkit.block.data.BlockData blockData = null;
-                    Object modelObj = itemDef.getProperties().get("custom_block_model");
-                    if (modelObj instanceof String modelStr) {
-                        try {
-                            blockData = org.bukkit.Bukkit.createBlockData(modelStr);
-                        } catch (Exception ignored) {}
-                    }
-                    if (blockData == null) {
-                        blockData = org.bukkit.Bukkit.createBlockData(org.bukkit.Material.STONE);
-                    }
-                    String dropId = itemDef.getId();
-                    Object dropObj = itemDef.getProperties().get("custom_block_drop");
-                    if (dropObj instanceof String d) {
-                        dropId = d;
-                    }
-
-                    CustomBlockDefinition.Builder builder = CustomBlockDefinition.builder(customBlockId)
-                            .model(new CustomBlockModel(blockData))
-                            .dropItemId(dropId);
-
-                    Object hardnessObj = itemDef.getProperties().get("custom_block_hardness");
-                    if (hardnessObj instanceof Number num) {
-                        builder.hardness(num.floatValue());
-                    } else if (hardnessObj instanceof Boolean bool) {
-                        builder.hardness(bool);
-                    }
-
-                    if (Boolean.TRUE.equals(itemDef.getProperties().get("custom_block_unbreakable"))) {
-                        builder.unbreakable();
-                    }
-                    if (Boolean.TRUE.equals(itemDef.getProperties().get("custom_block_instant_break"))) {
-                        builder.instantBreak();
-                    }
-
-                    Object silkTouchObj = itemDef.getProperties().get("custom_block_silk_touch_drop");
-                    if (silkTouchObj instanceof String silkDropId) {
-                        builder.dropProvider(vn.haohan.itemcore.api.block.BlockDropProvider.builder()
-                                .defaultDrop(dropId)
-                                .silkTouchDrop(silkDropId)
-                                .build());
-                    } else if (Boolean.TRUE.equals(itemDef.getProperties().get("custom_block_silk_touch_drops_self"))) {
-                        builder.dropProvider(vn.haohan.itemcore.api.block.BlockDropProvider.builder()
-                                .defaultDrop(dropId)
-                                .silkTouchDropsSelf()
-                                .build());
-                    }
-
-                    Object toolTypeObj = itemDef.getProperties().get("custom_block_tool_type");
-                    if (toolTypeObj == null) {
-                        toolTypeObj = itemDef.getProperties().get("tool_type");
-                    }
-                    if (toolTypeObj instanceof String ttStr) {
-                        try {
-                            builder.toolType(vn.haohan.itemcore.api.block.ToolType.valueOf(ttStr.toUpperCase()));
-                        } catch (IllegalArgumentException ignored) {}
-                    }
-
-                    CustomBlockDefinition blockDef = builder.build();
-                    customBlockRegistry.register(blockDef);
-                }
+            CustomBlockDefinition blockDef = vn.haohan.itemcore.internal.config.CustomBlockConfigParser.parseCustomBlock(itemDef);
+            if (blockDef != null && !customBlockRegistry.has(blockDef.getId())) {
+                customBlockRegistry.register(blockDef);
             }
         }
     }

@@ -77,3 +77,39 @@ example:
     custom-model-data: 2002
     max-stack-size: 64
     type: MACHINE_COMPONENT
+
+  copper_casing:
+    material: BARRIER
+    display-name: "§6Copper Casing"
+    lore:
+      - "§7A sturdy reinforced copper block casing."
+    type: BLOCK
+    max-stack-size: 64
+    properties:
+      custom_block_id: "example:copper_casing"
+      custom_block_model: "minecraft:copper_block"
+      custom_block_drop: "example:copper_casing"
+      custom_block_sounds:
+        place: "minecraft:block.copper.place"
+        break: "minecraft:block.copper.break"
+        hit: "minecraft:block.copper.hit"
+        step: "minecraft:block.copper.step"
+
+  ruby_ore:
+    material: BARRIER
+    display-name: "§cRuby Ore"
+    lore:
+      - "§7A rare deepslate ore infused with ruby crystals."
+    type: BLOCK
+    max-stack-size: 64
+    properties:
+      custom_block_id: "example:ruby_ore"
+      custom_block_model: "minecraft:deepslate_redstone_ore"
+      custom_block_drop: "example:ruby_ore"
+      custom_block_sounds:
+        place: "minecraft:block.deepslate.place"
+        break: "minecraft:block.deepslate.break"
+        hit: "minecraft:block.deepslate.hit"
+        step: "minecraft:block.deepslate.step"
+
+
