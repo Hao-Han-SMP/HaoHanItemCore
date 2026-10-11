@@ -161,7 +161,9 @@ public final class CustomBlockEventListener implements Listener {
         // Creative players can break custom blocks directly
         if (event.getPlayer().getGameMode() == GameMode.CREATIVE) {
             event.setDropItems(false);
-            customBlockService.removeCustomBlock(block.getLocation());
+            if (!def.isVanillaOverwrite()) {
+                customBlockService.removeCustomBlock(block.getLocation());
+            }
             return;
         }
 
@@ -183,9 +185,17 @@ public final class CustomBlockEventListener implements Listener {
             event.setDropItems(false);
         }
 
-        // Remove from custom block system
+        // Cancel any pending mining session for the player
+        if (customBlockService instanceof DefaultCustomBlockService defaultService
+                && defaultService.getMiningManager() != null) {
+            defaultService.getMiningManager().cancelSession(event.getPlayer().getUniqueId());
+        }
+
+        // Remove from custom block system (only physical custom blocks, vanilla overwrites are naturally managed by Paper)
         Location loc = block.getLocation();
-        customBlockService.removeCustomBlock(loc);
+        if (!def.isVanillaOverwrite()) {
+            customBlockService.removeCustomBlock(loc);
+        }
 
         if (!useVanillaDrops) {
             dropCustomBlockItem(loc, def, event.getPlayer(), tool);
@@ -225,10 +235,19 @@ public final class CustomBlockEventListener implements Listener {
             Block block = it.next();
             if (customBlockService.isCustomBlock(block)) {
                 Optional<CustomBlockDefinition> optDef = customBlockService.getCustomBlock(block);
-                Location loc = block.getLocation();
-                customBlockService.removeCustomBlock(loc);
-                optDef.ifPresent(def -> dropCustomBlockItem(loc, def, null, null));
-                it.remove(); // Prevent vanilla barrier handling
+                if (optDef.isPresent()) {
+                    CustomBlockDefinition def = optDef.get();
+                    if (def.isVanillaOverwrite() && def.getDropItemId() == null) {
+                        // Let vanilla explosion handling deal with natural drops
+                        continue;
+                    }
+                    Location loc = block.getLocation();
+                    if (!def.isVanillaOverwrite()) {
+                        customBlockService.removeCustomBlock(loc);
+                    }
+                    dropCustomBlockItem(loc, def, null, null);
+                    it.remove(); // Prevent vanilla barrier handling
+                }
             }
         }
     }

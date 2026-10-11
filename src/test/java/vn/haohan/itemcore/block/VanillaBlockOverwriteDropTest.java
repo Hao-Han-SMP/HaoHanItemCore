@@ -81,6 +81,8 @@ public class VanillaBlockOverwriteDropTest {
         assertFalse(event.isCancelled());
         // For vanilla overwrite with no custom drop, vanilla drop items must NOT be cancelled
         assertTrue(event.isDropItems(), "Vanilla drops must remain enabled (isDropItems true) when no custom drop is configured");
+        // Must NOT set the physical vanilla block to AIR, which would destroy drops
+        Mockito.verify(block, Mockito.never()).setType(Mockito.any(), Mockito.anyBoolean());
     }
 
     @Test

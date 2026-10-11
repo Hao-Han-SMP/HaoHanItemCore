@@ -204,6 +204,11 @@ public class CustomBlockMiningManager implements PacketListener {
                 return;
             }
 
+            // Vanilla overwrite blocks with effective tools are mined naturally by the client and Paper
+            if (def.isVanillaOverwrite()) {
+                return;
+            }
+
             if (def.isInstantBreak() && delayTicks == 0) {
                 breakCustomBlock(player, loc, def);
                 return;
