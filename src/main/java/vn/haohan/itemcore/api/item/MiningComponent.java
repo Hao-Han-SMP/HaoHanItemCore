@@ -23,5 +23,5 @@ public record MiningComponent(int efficiency) implements ItemComponent {
     }
 
     @Override
-    public void appendLore(List<String> lore) { lore.add("&a+" + efficiency + " &bMining Efficiency"); }
+    public void appendLore(List<String> lore) { lore.add("§a+" + efficiency + " §bMining Efficiency"); }
 }

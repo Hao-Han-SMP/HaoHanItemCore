@@ -40,27 +40,29 @@ public final class DefaultCustomBlockService implements CustomBlockService {
     @Override
     public boolean isCustomBlock(Block block) {
         if (block == null) return false;
-        // Optimization: Physical custom blocks are always BARRIER
-        if (block.getType() != Material.BARRIER) {
-            return false;
+        if (block.getType() == Material.BARRIER) {
+            return storage.get(block.getWorld(), block.getX(), block.getY(), block.getZ()) != null;
         }
-        return getCustomBlockId(block) != null;
+        return registry.getByMaterial(block.getType()).isPresent();
     }
 
     @Override
     public Optional<CustomBlockDefinition> getCustomBlock(Block block) {
-        String id = getCustomBlockId(block);
-        if (id == null) return Optional.empty();
-        return registry.get(id);
+        if (block == null) return Optional.empty();
+        if (block.getType() == Material.BARRIER) {
+            String id = storage.get(block.getWorld(), block.getX(), block.getY(), block.getZ());
+            return id != null ? registry.get(id) : Optional.empty();
+        }
+        return registry.getByMaterial(block.getType());
     }
 
     @Override
     public String getCustomBlockId(Block block) {
         if (block == null) return null;
-        if (block.getType() != Material.BARRIER) {
-            return null;
+        if (block.getType() == Material.BARRIER) {
+            return storage.get(block.getWorld(), block.getX(), block.getY(), block.getZ());
         }
-        return storage.get(block.getWorld(), block.getX(), block.getY(), block.getZ());
+        return registry.getByMaterial(block.getType()).map(CustomBlockDefinition::getId).orElse(null);
     }
 
     @Override
@@ -102,6 +104,11 @@ public final class DefaultCustomBlockService implements CustomBlockService {
 
         String removedId = storage.remove(world, location.getBlockX(), location.getBlockY(), location.getBlockZ());
         if (removedId == null) {
+            Block block = location.getBlock();
+            if (registry.getByMaterial(block.getType()).isPresent()) {
+                block.setType(Material.AIR, false);
+                return true;
+            }
             return false;
         }
         try {

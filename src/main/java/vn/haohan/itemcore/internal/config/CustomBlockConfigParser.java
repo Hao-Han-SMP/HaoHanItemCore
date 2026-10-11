@@ -45,15 +45,19 @@ public final class CustomBlockConfigParser {
             } catch (Throwable ignored) {}
         }
 
-        String dropId = itemDef.getId();
+        String dropId = null;
         Object dropObj = itemDef.getProperties().get("custom_block_drop");
         if (dropObj instanceof String d) {
             dropId = d;
+        } else if (!itemDef.isVanillaOverwrite()) {
+            dropId = itemDef.getId();
         }
 
         CustomBlockDefinition.Builder builder = CustomBlockDefinition.builder(customBlockId)
-                .model(new CustomBlockModel(blockData))
-                .dropItemId(dropId);
+                .model(new CustomBlockModel(blockData));
+        if (dropId != null) {
+            builder.dropItemId(dropId);
+        }
 
         Object hardnessObj = itemDef.getProperties().get("custom_block_hardness");
         if (hardnessObj instanceof Number num) {
@@ -90,6 +94,23 @@ public final class CustomBlockConfigParser {
             try {
                 builder.toolType(ToolType.valueOf(ttStr.toUpperCase()));
             } catch (IllegalArgumentException ignored) {}
+        }
+
+        Object tierObj = itemDef.getProperties().get("custom_block_required_tier");
+        if (tierObj == null) {
+            tierObj = itemDef.getProperties().get("required_tier");
+        }
+        if (tierObj instanceof String tierName) {
+            vn.haohan.itemcore.api.block.ToolTier tier = null;
+            try {
+                var core = vn.haohan.itemcore.api.HaoHanItemCore.get();
+                if (core != null && core.getToolTierRegistry() != null) {
+                    tier = core.getToolTierRegistry().get(tierName).orElse(null);
+                }
+            } catch (Throwable ignored) {}
+            if (tier != null) {
+                builder.requiredTier(tier);
+            }
         }
 
         // --- Sound Group Parsing ---

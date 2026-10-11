@@ -41,12 +41,15 @@ public class CustomBlockMiningManager implements PacketListener {
         void onAnimation(Player player, Location location, int stage);
     }
 
+    public static final int CONSECUTIVE_MINING_DELAY_TICKS = 5;
+
     private final CustomBlockService customBlockService;
     private final VirtualEntityIdManager idManager;
     private final BlockBreakOverlayRenderer overlayRenderer;
     private final Plugin plugin;
     private final Logger logger;
     private final ConcurrentHashMap<UUID, BlockMiningSession> sessions = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<UUID, Long> consecutiveCooldowns = new ConcurrentHashMap<>();
     private AnimationObserver animationObserver;
 
     public CustomBlockMiningManager(
@@ -70,10 +73,12 @@ public class CustomBlockMiningManager implements PacketListener {
     }
 
     public boolean hasActiveSession(UUID playerUuid) {
-        return sessions.containsKey(playerUuid);
+        BlockMiningSession session = sessions.get(playerUuid);
+        return session != null && session.getDefinition().isEffectiveTool(session.getPlayer().getInventory().getItemInMainHand());
     }
 
     public void cancelSession(UUID playerUuid) {
+        consecutiveCooldowns.remove(playerUuid);
         BlockMiningSession session = sessions.remove(playerUuid);
         if (session != null) {
             sendBreakAnimation(session.getPlayer(), session.getBlockLocation(), -1);
@@ -84,6 +89,7 @@ public class CustomBlockMiningManager implements PacketListener {
     }
 
     public void clearAllSessions() {
+        consecutiveCooldowns.clear();
         for (BlockMiningSession session : sessions.values()) {
             sendBreakAnimation(session.getPlayer(), session.getBlockLocation(), -1);
             if (overlayRenderer != null && session.getCrackEntityId() != -1) {
@@ -95,21 +101,66 @@ public class CustomBlockMiningManager implements PacketListener {
 
     @Override
     public void onPacketReceive(PacketReceiveEvent event) {
-        if (event.getPacketType() != PacketType.Play.Client.PLAYER_DIGGING) {
-            return;
+        if (event.getPacketType() == PacketType.Play.Client.PLAYER_DIGGING) {
+            Object rawPlayer = event.getPlayer();
+            if (!(rawPlayer instanceof Player player)) {
+                return;
+            }
+
+            WrapperPlayClientPlayerDigging packet = new WrapperPlayClientPlayerDigging(event);
+            Vector3i blockPos = packet.getBlockPosition();
+            if (blockPos == null) return;
+
+            Location loc = new Location(player.getWorld(), blockPos.getX(), blockPos.getY(), blockPos.getZ());
+            handleDiggingAction(player, packet.getAction(), blockPos, loc);
+        } else if (event.getPacketType() == PacketType.Play.Client.HELD_ITEM_CHANGE) {
+            Object rawPlayer = event.getPlayer();
+            if (!(rawPlayer instanceof Player player)) {
+                return;
+            }
+
+            com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientHeldItemChange packet =
+                    new com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientHeldItemChange(event);
+            int newSlot = packet.getSlot();
+            if (newSlot >= 0 && newSlot <= 8) {
+                ItemStack newTool = player.getInventory().getItem(newSlot);
+                handleItemSwap(player, newTool);
+            }
         }
+    }
 
-        Object rawPlayer = event.getPlayer();
-        if (!(rawPlayer instanceof Player player)) {
-            return;
+    /**
+     * Handles tool swapping while mining a custom block.
+     * If the player swaps to an effective tool, upgrades the session to progressive mining.
+     * If the player swaps away to an ineffective tool, pauses progress and destroys overlay.
+     */
+    public void handleItemSwap(Player player, ItemStack newTool) {
+        if (player == null) return;
+        BlockMiningSession session = sessions.get(player.getUniqueId());
+        if (session == null) return;
+
+        CustomBlockDefinition def = session.getDefinition();
+        boolean nowEffective = def.isEffectiveTool(newTool);
+
+        if (nowEffective) {
+            session.resetInvalidToolState();
+            if (session.getCrackEntityId() == -1) {
+                int crackEntityId = -1;
+                if (!def.isVanillaOverwrite() && idManager != null) {
+                    crackEntityId = idManager.allocateRawId();
+                }
+                session.setCrackEntityId(crackEntityId);
+                if (!def.isVanillaOverwrite() && overlayRenderer != null && crackEntityId != -1) {
+                    int stage = Math.min(9, (int) (session.getProgress() * 9.0f));
+                    spawnCrackOverlay(player, session.getBlockLocation(), crackEntityId, stage);
+                }
+            }
+        } else {
+            if (overlayRenderer != null && session.getCrackEntityId() != -1) {
+                destroyCrackOverlay(player, session.getBlockLocation(), session.getCrackEntityId());
+                session.setCrackEntityId(-1);
+            }
         }
-
-        WrapperPlayClientPlayerDigging packet = new WrapperPlayClientPlayerDigging(event);
-        Vector3i blockPos = packet.getBlockPosition();
-        if (blockPos == null) return;
-
-        Location loc = new Location(player.getWorld(), blockPos.getX(), blockPos.getY(), blockPos.getZ());
-        handleDiggingAction(player, packet.getAction(), blockPos, loc);
     }
 
     public void handleDiggingAction(Player player, DiggingAction action, Vector3i blockPos, Location loc) {
@@ -132,20 +183,43 @@ public class CustomBlockMiningManager implements PacketListener {
             }
 
             ItemStack tool = player.getInventory().getItemInMainHand();
-            if (!def.isEffectiveTool(tool)) {
-                return; // Disallow mining if tool or bare hand is not allowed
+            boolean effectiveTool = def.isEffectiveTool(tool);
+
+            // Calculate consecutive delay if player previously broke a block in continuous mining
+            int delayTicks = 0;
+            Long cooldownUntil = consecutiveCooldowns.remove(player.getUniqueId());
+            if (cooldownUntil != null) {
+                long now = System.currentTimeMillis();
+                long remainingMillis = cooldownUntil - now;
+                if (remainingMillis > 0) {
+                    delayTicks = (int) Math.min(CONSECUTIVE_MINING_DELAY_TICKS, Math.ceil(remainingMillis / 50.0));
+                }
             }
 
-            if (def.isInstantBreak()) {
+            if (!effectiveTool) {
+                // If tool is not effective, track session to give warning after 0.75s (15 ticks)
+                BlockMiningSession session = new BlockMiningSession(player, loc, def, -1);
+                session.setDelayTicksRemaining(delayTicks);
+                sessions.put(player.getUniqueId(), session);
+                return;
+            }
+
+            if (def.isInstantBreak() && delayTicks == 0) {
                 breakCustomBlock(player, loc, def);
                 return;
             }
 
             // Start progressive mining session
-            int crackEntityId = idManager != null ? idManager.allocateRawId() : -1;
-            sessions.put(player.getUniqueId(), new BlockMiningSession(player, loc, def, crackEntityId));
+            int crackEntityId = -1;
+            // Only spawn crack overlay for barrier custom blocks, not vanilla overwrite blocks
+            if (!def.isVanillaOverwrite() && idManager != null) {
+                crackEntityId = idManager.allocateRawId();
+            }
+            BlockMiningSession session = new BlockMiningSession(player, loc, def, crackEntityId);
+            session.setDelayTicksRemaining(delayTicks);
+            sessions.put(player.getUniqueId(), session);
 
-            if (overlayRenderer != null && crackEntityId != -1) {
+            if (!def.isVanillaOverwrite() && overlayRenderer != null && crackEntityId != -1) {
                 spawnCrackOverlay(player, loc, crackEntityId, 0);
             }
 
@@ -180,20 +254,38 @@ public class CustomBlockMiningManager implements PacketListener {
             }
 
             ItemStack tool = player.getInventory().getItemInMainHand();
-            if (!def.isEffectiveTool(tool)) {
-                it.remove();
-                sendBreakAnimation(player, loc, -1);
-                if (overlayRenderer != null && session.getCrackEntityId() != -1) {
-                    destroyCrackOverlay(player, loc, session.getCrackEntityId());
+            boolean effectiveTool = def.isEffectiveTool(tool);
+
+            // Handle spontaneous tool switch if packet arrived or item changed in hand
+            if (effectiveTool && session.getCrackEntityId() == -1 && !def.isVanillaOverwrite() && idManager != null) {
+                int crackEntityId = idManager.allocateRawId();
+                session.setCrackEntityId(crackEntityId);
+                session.resetInvalidToolState();
+                if (overlayRenderer != null) {
+                    spawnCrackOverlay(player, loc, crackEntityId, session.getLastStage() >= 0 ? session.getLastStage() : 0);
                 }
+            }
+
+            if (!effectiveTool) {
+                int invalidTicks = session.incrementAndGetInvalidToolTicks();
+                if (invalidTicks >= 15 && !session.isWarnedInvalidTool()) {
+                    session.setWarnedInvalidTool(true);
+                    sendToolRequirementWarning(player, def);
+                }
+                // Do not progress mining for invalid tool
+                continue;
+            }
+
+            // Decrement consecutive mining delay if any
+            if (session.decrementDelayTicks()) {
                 continue;
             }
 
             float delta = MiningSpeedCalculator.calculateProgressPerTick(player, tool, def);
             session.addProgress(delta);
 
-            // Play mining hit sound every 4 ticks (~0.2s like vanilla mining)
-            if (session.incrementAndGetMiningTicks() % 4 == 0) {
+            // Play mining hit sound every 4 ticks (~0.2s like vanilla mining) for barrier custom blocks
+            if (!def.isVanillaOverwrite() && session.incrementAndGetMiningTicks() % 4 == 0) {
                 if (def.getSoundGroup() != null && def.getSoundGroup().getHitSound() != null) {
                     def.getSoundGroup().getHitSound().play(loc.clone().add(0.5, 0.5, 0.5));
                 }
@@ -214,6 +306,8 @@ public class CustomBlockMiningManager implements PacketListener {
                 if (overlayRenderer != null && session.getCrackEntityId() != -1) {
                     destroyCrackOverlay(player, loc, session.getCrackEntityId());
                 }
+                // Record consecutive mining delay for continuous mining next blocks (5 ticks = 250ms)
+                consecutiveCooldowns.put(player.getUniqueId(), System.currentTimeMillis() + (CONSECUTIVE_MINING_DELAY_TICKS * 50L));
                 breakCustomBlock(player, loc, def);
             }
         }
@@ -225,11 +319,26 @@ public class CustomBlockMiningManager implements PacketListener {
 
         boolean canHarvest = def.getMiningCondition().canHarvest(context);
         if (canHarvest) {
-            List<ItemStack> drops = def.getDropProvider().getDrops(context);
-            if (drops != null && loc.getWorld() != null) {
-                for (ItemStack drop : drops) {
-                    if (drop != null) {
-                        loc.getWorld().dropItemNaturally(loc, drop);
+            boolean useVanillaDrops = def.isVanillaOverwrite() && def.getDropItemId() == null;
+            if (useVanillaDrops) {
+                Block block = loc.getBlock();
+                if (loc.getWorld() != null && block != null) {
+                    java.util.Collection<ItemStack> vanillaDrops = block.getDrops(tool, player);
+                    if (vanillaDrops != null) {
+                        for (ItemStack drop : vanillaDrops) {
+                            if (drop != null) {
+                                loc.getWorld().dropItemNaturally(loc, drop);
+                            }
+                        }
+                    }
+                }
+            } else {
+                List<ItemStack> drops = def.getDropProvider().getDrops(context);
+                if (drops != null && loc.getWorld() != null) {
+                    for (ItemStack drop : drops) {
+                        if (drop != null) {
+                            loc.getWorld().dropItemNaturally(loc, drop);
+                        }
                     }
                 }
             }
@@ -322,5 +431,22 @@ public class CustomBlockMiningManager implements PacketListener {
                 }
             }
         }
+    }
+
+    public void sendToolRequirementWarning(Player player, CustomBlockDefinition def) {
+        if (player == null || def == null) return;
+        StringBuilder sb = new StringBuilder("§c[!] Bạn cần ");
+        if (def.getRequiredTier() != null) {
+            sb.append("công cụ cấp độ §e").append(def.getRequiredTier().name().toUpperCase()).append("§c ");
+        }
+        if (!def.getHarvestToolTypes().isEmpty()) {
+            sb.append("thuộc loại §e").append(def.getHarvestToolTypes()).append("§c ");
+        }
+        sb.append("để khai thác khối này!");
+
+        player.sendMessage(sb.toString());
+        try {
+            player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_BASS, 1.0f, 0.5f);
+        } catch (Throwable ignored) {}
     }
 }

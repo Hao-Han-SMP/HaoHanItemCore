@@ -24,5 +24,5 @@ public record DurabilityComponent(int maxDurability) implements ItemComponent {
     }
 
     @Override
-    public void appendLore(List<String> lore) { lore.add("&7Durability: &f" + maxDurability); }
+    public void appendLore(List<String> lore) { lore.add("§7Durability: §f" + maxDurability); }
 }

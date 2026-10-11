@@ -70,7 +70,13 @@ public final class CustomBlockEventListener implements Listener {
         this.visibilityManager = Objects.requireNonNull(visibilityManager, "visibilityManager cannot be null");
         this.itemRegistry = itemRegistry;
         this.plugin = Objects.requireNonNull(plugin, "plugin cannot be null");
-        this.itemIdKey = new NamespacedKey(plugin, "item_id");
+        NamespacedKey resolvedKey;
+        try {
+            resolvedKey = new NamespacedKey(plugin, "item_id");
+        } catch (Throwable t) {
+            resolvedKey = new NamespacedKey("haohanitemcore", "item_id");
+        }
+        this.itemIdKey = resolvedKey;
         this.soundPacketListener = soundPacketListener;
     }
 
@@ -163,17 +169,27 @@ public final class CustomBlockEventListener implements Listener {
         ItemStack tool = event.getPlayer().getInventory().getItemInMainHand();
         if (!def.isEffectiveTool(tool)) {
             event.setCancelled(true);
+            if (customBlockService instanceof DefaultCustomBlockService defaultService
+                    && defaultService.getMiningManager() != null) {
+                defaultService.getMiningManager().sendToolRequirementWarning(event.getPlayer(), def);
+            }
             return;
         }
 
-        // Cancel default Barrier particles and drops
-        event.setDropItems(false);
+        boolean useVanillaDrops = def.isVanillaOverwrite() && def.getDropItemId() == null;
+
+        // Cancel default drops only for non-vanilla drops
+        if (!useVanillaDrops) {
+            event.setDropItems(false);
+        }
 
         // Remove from custom block system
         Location loc = block.getLocation();
         customBlockService.removeCustomBlock(loc);
 
-        dropCustomBlockItem(loc, def, event.getPlayer(), tool);
+        if (!useVanillaDrops) {
+            dropCustomBlockItem(loc, def, event.getPlayer(), tool);
+        }
     }
 
     private void dropCustomBlockItem(Location loc, CustomBlockDefinition def, Player player, ItemStack tool) {
@@ -273,6 +289,15 @@ public final class CustomBlockEventListener implements Listener {
 
         // Support placing custom blocks or regular blocks against custom block
         handlePlacementAgainstCustomBlock(event, clicked);
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onPlayerItemHeld(org.bukkit.event.player.PlayerItemHeldEvent event) {
+        if (customBlockService instanceof DefaultCustomBlockService defaultService
+                && defaultService.getMiningManager() != null) {
+            ItemStack newItem = event.getPlayer().getInventory().getItem(event.getNewSlot());
+            defaultService.getMiningManager().handleItemSwap(event.getPlayer(), newItem);
+        }
     }
 
     private void handlePlacementAgainstCustomBlock(PlayerInteractEvent event, Block clicked) {

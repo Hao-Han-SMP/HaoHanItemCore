@@ -168,4 +168,70 @@ public class CustomBlockMiningManagerTest {
         assertFalse(miningManager.hasActiveSession(mockPlayer.getUniqueId()), "Session must not start with sword on a pickaxe-only block");
         assertEquals(0, overlayRenderer.spawnCount.get(), "Crack overlay must not spawn");
     }
+
+    @Test
+    public void testConsecutiveMiningAppliesDelay() {
+        Location loc1 = new Location(mockWorld, 1, 64, 1);
+        Location loc2 = new Location(mockWorld, 2, 64, 1);
+        CustomBlockDefinition soft = CustomBlockDefinition.builder("custom:soft")
+                .hardness(0.05f) // 1 tick break (0.05 * 20 = 1 tick)
+                .build();
+        Mockito.when(blockService.getCustomBlock(Mockito.any())).thenReturn(Optional.of(soft));
+        Mockito.when(blockService.isCustomBlock(Mockito.any())).thenReturn(true);
+
+        // Mine block 1
+        miningManager.handleDiggingAction(mockPlayer, DiggingAction.START_DIGGING, new Vector3i(1, 64, 1), loc1);
+        miningManager.tick(); // Breaks block 1
+        assertFalse(miningManager.hasActiveSession(mockPlayer.getUniqueId()), "Block 1 should break");
+
+        // Immediately start mining block 2 (consecutive mining without letting go of mouse)
+        miningManager.handleDiggingAction(mockPlayer, DiggingAction.START_DIGGING, new Vector3i(2, 64, 1), loc2);
+        assertTrue(miningManager.hasActiveSession(mockPlayer.getUniqueId()), "Session 2 should be active");
+
+        // First 5 ticks should be in consecutive mining delay (progress does NOT increase)
+        for (int i = 0; i < 5; i++) {
+            miningManager.tick();
+            assertTrue(miningManager.hasActiveSession(mockPlayer.getUniqueId()), "Session 2 should still be active during delay tick " + i);
+        }
+
+        // On tick 6 (after 5-tick delay), progress should apply and break block 2
+        miningManager.tick();
+        assertFalse(miningManager.hasActiveSession(mockPlayer.getUniqueId()), "Block 2 should break on tick after delay");
+    }
+
+    @Test
+    public void testHotbarSwappingFromInvalidToValidToolStartsMining() {
+        Location loc = new Location(mockWorld, 1, 64, 1);
+        CustomBlockDefinition ore = CustomBlockDefinition.builder("custom:iron_ore")
+                .hardness(0.4f) // 0.4 * 30 = 12 ticks base; Iron Pickaxe speedMultiplier = 6.0 -> 0.5 progress/tick -> 2 ticks
+                .mineableWith(vn.haohan.itemcore.api.block.ToolType.PICKAXE, vn.haohan.itemcore.api.block.ToolTier.IRON)
+                .build();
+        Mockito.when(blockService.getCustomBlock(Mockito.any())).thenReturn(Optional.of(ore));
+        Mockito.when(blockService.isCustomBlock(Mockito.any())).thenReturn(true);
+
+        // Player starts aiming at block with bare hand (invalid)
+        miningManager.handleDiggingAction(mockPlayer, DiggingAction.START_DIGGING, new Vector3i(1, 64, 1), loc);
+        // hasActiveSession returns false because hand is not effective tool
+        assertFalse(miningManager.hasActiveSession(mockPlayer.getUniqueId()));
+        assertEquals(0, overlayRenderer.spawnCount.get());
+
+        // Player swaps hotbar slot to an Iron Pickaxe while still holding left click
+        ItemStack ironPick = TestItemService.mockItem(Material.IRON_PICKAXE);
+        Mockito.when(mockPlayer.getInventory().getItemInMainHand()).thenReturn(ironPick);
+        miningManager.handleItemSwap(mockPlayer, ironPick);
+
+        // Session should now be active and effective, crack overlay spawned
+        assertTrue(miningManager.hasActiveSession(mockPlayer.getUniqueId()), "Session should become active after swapping to valid tool");
+        assertEquals(1, overlayRenderer.spawnCount.get(), "Crack overlay should spawn when tool becomes valid");
+
+        // Tick 1: reaches 0.5 progress
+        miningManager.tick();
+        assertTrue(miningManager.hasActiveSession(mockPlayer.getUniqueId()));
+
+        // Tick 2: reaches >= 1.0 progress -> breaks block
+        miningManager.tick();
+        assertFalse(miningManager.hasActiveSession(mockPlayer.getUniqueId()), "Block should break after mining completes");
+        Mockito.verify(blockService).removeCustomBlock(loc);
+    }
 }
+

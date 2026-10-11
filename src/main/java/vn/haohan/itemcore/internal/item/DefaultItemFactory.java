@@ -66,25 +66,6 @@ public final class DefaultItemFactory implements ItemFactory {
             throw new IllegalStateException("Cannot get ItemMeta for material: " + definition.getMaterial());
         }
 
-        // Display name (legacy color code support)
-        Component displayName = LegacyComponentSerializer.legacySection()
-                .deserialize(definition.getDisplayName());
-        meta.displayName(displayName);
-
-        // Lore, including structured sections and component-provided lines.
-        List<String> lore = new java.util.ArrayList<>(definition.getLore());
-        definition.getInfoSections().forEach(section -> {
-            lore.add(section.title());
-            lore.addAll(section.lines());
-        });
-        definition.getComponents().forEach(component -> component.appendLore(lore));
-        if (!lore.isEmpty()) {
-            List<Component> loreComponents = lore.stream()
-                    .map(line -> LegacyComponentSerializer.legacySection().deserialize(line))
-                    .collect(Collectors.toList());
-            meta.lore(loreComponents);
-        }
-
         // Custom Model Data
         if (definition.getCustomModelData() != null) {
             meta.setCustomModelData(definition.getCustomModelData());
@@ -114,7 +95,6 @@ public final class DefaultItemFactory implements ItemFactory {
         PersistentDataContainer pdc = meta.getPersistentDataContainer();
         pdc.set(itemIdKey, PersistentDataType.STRING, definition.getId());
 
-        // Set the meta first so that subsequent component settings are not overwritten
         itemStack.setItemMeta(meta);
         for (var component : definition.getComponents()) {
             component.apply(itemStack, definition);

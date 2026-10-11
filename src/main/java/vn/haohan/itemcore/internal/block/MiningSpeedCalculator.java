@@ -33,8 +33,8 @@ public final class MiningSpeedCalculator {
             return 1.0f;
         }
 
-        float baseTicks = definition.getBreakTimeSeconds() * 20.0f;
-        if (baseTicks <= 0.0f) {
+        float hardness = definition.getHardness();
+        if (hardness <= 0.0f) {
             return 1.0f;
         }
 
@@ -43,28 +43,21 @@ public final class MiningSpeedCalculator {
             return 0.0f;
         }
 
+        // Vanilla Minecraft damage per tick:
+        // damage = speedMultiplier / (hardness * 30.0f) khi có thể harvest block.
+        // Nếu block không yêu cầu preferred tool, thời gian đào = hardness * 20.0f (breakTimeSeconds)
+        float baseTicks = definition.hasPreferredTools() ? (hardness * 30.0f) : (definition.getBreakTimeSeconds() * 20.0f);
+        if (baseTicks <= 0.0f) {
+            return 1.0f;
+        }
+
         float speedMultiplier = 1.0f;
 
-        // Tool multipliers (tier, custom mining_speed, paper attribute modifiers, efficiency enchantments)
-        // only apply if the block has preferred tools configured.
-        // If no preferred tools are defined, all tools and bare hand mine at the exact configured base speed (speedMultiplier = 1.0f).
+        // Tool multipliers (tier base speed, custom mining_speed, efficiency enchantments/attributes)
+        // only apply if the block has preferred tools configured and tool is valid.
         if (definition.hasPreferredTools() && tool != null && tool.getType() != null && tool.getType() != Material.AIR) {
-            // 1. ToolTier base multiplier
-            ToolTier tier = null;
-            try {
-                var core = HaoHanItemCore.get();
-                if (core != null && core.getToolTierRegistry() != null) {
-                    tier = core.getToolTierRegistry().findTier(tool);
-                }
-            } catch (Throwable ignored) {}
-            if (tier == null) {
-                tier = ToolTier.fromMaterial(tool.getType());
-            }
-            if (tier != null) {
-                speedMultiplier = tier.baseMultiplier();
-            }
-
-            // 2. Custom item YAML properties mining_speed
+            // 1. Base Tool Speed: Custom mining_speed overrides or sets base multiplier; otherwise ToolTier
+            Float customSpeed = null;
             try {
                 var core = HaoHanItemCore.get();
                 if (core != null && core.getItemService() != null) {
@@ -74,18 +67,47 @@ public final class MiningSpeedCalculator {
                         if (itemDef != null) {
                             Object speedProp = itemDef.getProperties().get("mining_speed");
                             if (speedProp instanceof Number num) {
-                                speedMultiplier += num.floatValue();
+                                customSpeed = num.floatValue();
                             }
                         }
                     }
                 }
             } catch (Throwable ignored) {}
 
-            // 3. Paper AttributeModifier for Attribute.PLAYER_MINING_EFFICIENCY or Attribute.SUBMERGED_MINING_SPEED
-            if (tool.hasItemMeta()) {
+            if (customSpeed != null && customSpeed > 0.0f) {
+                speedMultiplier = customSpeed;
+            } else {
+                ToolTier tier = null;
                 try {
-                    Attribute miningEffAttr = Attribute.valueOf("PLAYER_MINING_EFFICIENCY");
-                    if (miningEffAttr != null) {
+                    var core = HaoHanItemCore.get();
+                    if (core != null && core.getToolTierRegistry() != null) {
+                        tier = core.getToolTierRegistry().findTier(tool);
+                    }
+                } catch (Throwable ignored) {}
+                if (tier == null) {
+                    tier = ToolTier.fromMaterial(tool.getType());
+                }
+                if (tier != null) {
+                    speedMultiplier = tier.baseMultiplier();
+                }
+            }
+
+            // 2. Efficiency enchantment bonus: level * level + 1 (Vanilla Minecraft)
+            int efficiencyLevel = getEfficiencyLevel(tool);
+            if (efficiencyLevel > 0) {
+                speedMultiplier += (efficiencyLevel * efficiencyLevel + 1);
+            }
+
+            // 3. Mining Efficiency Attribute bonus (nếu có modifier bổ sung trên tool hoặc player)
+            try {
+                Attribute miningEffAttr = Attribute.valueOf("PLAYER_MINING_EFFICIENCY");
+                if (miningEffAttr != null) {
+                    if (player != null && player.getAttribute(miningEffAttr) != null) {
+                        double val = player.getAttribute(miningEffAttr).getValue();
+                        if (val > 0.0) {
+                            speedMultiplier += (float) val;
+                        }
+                    } else if (tool.hasItemMeta()) {
                         Collection<AttributeModifier> modifiers = tool.getItemMeta().getAttributeModifiers(miningEffAttr);
                         if (modifiers != null) {
                             for (AttributeModifier mod : modifiers) {
@@ -93,18 +115,23 @@ public final class MiningSpeedCalculator {
                             }
                         }
                     }
-                } catch (Throwable ignored) {}
-            }
-
-            // 4. Efficiency enchantment bonus
-            int efficiencyLevel = getEfficiencyLevel(tool);
-            if (efficiencyLevel > 0) {
-                speedMultiplier += (efficiencyLevel * efficiencyLevel + 1);
-            }
+                }
+            } catch (Throwable ignored) {}
         }
 
-        // Environmental modifiers apply to both effective and non-effective tools (bù thêm thời gian đào)
+        // Environmental & Player Attribute modifiers
         if (player != null) {
+            // Player block break speed attribute multiplier (Paper 1.21: player.block_break_speed, default 1.0)
+            try {
+                Attribute breakSpeedAttr = Attribute.valueOf("PLAYER_BLOCK_BREAK_SPEED");
+                if (breakSpeedAttr != null && player.getAttribute(breakSpeedAttr) != null) {
+                    double breakSpeed = player.getAttribute(breakSpeedAttr).getValue();
+                    if (breakSpeed > 0.0) {
+                        speedMultiplier *= (float) breakSpeed;
+                    }
+                }
+            } catch (Throwable ignored) {}
+
             try {
                 for (PotionEffect effect : player.getActivePotionEffects()) {
                     if (effect != null && effect.getType() != null) {

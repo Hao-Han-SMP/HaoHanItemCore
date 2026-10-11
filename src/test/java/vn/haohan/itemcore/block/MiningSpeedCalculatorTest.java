@@ -71,46 +71,53 @@ public class MiningSpeedCalculatorTest {
 
     @Test
     public void testToolSpeedMultiplierWhenPreferredToolSpecified() {
-        // 2 seconds base time = 40 ticks, requires PICKAXE
+        // Hardness 1.5 (Stone), requires PICKAXE -> Vanilla base ticks = 1.5 * 30 = 45 ticks
         CustomBlockDefinition block = CustomBlockDefinition.builder("custom:stone")
-                .hardness(2.0f)
+                .hardness(1.5f)
                 .mineableWith(vn.haohan.itemcore.api.block.ToolType.PICKAXE)
                 .build();
 
-        // Diamond pickaxe speed = 8.0 -> 8.0 / 40 = 0.2 per tick
+        // Diamond pickaxe speed = 8.0 -> 8.0 / 45 = 0.17777778 per tick (takes 6 ticks)
         ItemStack diamondPick = TestItemService.mockItem(Material.DIAMOND_PICKAXE);
         float diamondProgress = MiningSpeedCalculator.calculateProgressPerTick(null, diamondPick, block);
-        assertEquals(0.2f, diamondProgress, 0.0001f);
+        assertEquals(8.0f / 45.0f, diamondProgress, 0.0001f);
 
-        // Netherite pickaxe speed = 9.0 -> 9.0 / 40 = 0.225 per tick
+        // Iron pickaxe speed = 6.0 -> 6.0 / 45 = 0.13333333 per tick (takes 8 ticks)
+        ItemStack ironPick = TestItemService.mockItem(Material.IRON_PICKAXE);
+        float ironProgress = MiningSpeedCalculator.calculateProgressPerTick(null, ironPick, block);
+        assertEquals(6.0f / 45.0f, ironProgress, 0.0001f);
+
+        // Netherite pickaxe speed = 9.0 -> 9.0 / 45 = 0.2 per tick (takes 5 ticks)
         ItemStack netheritePick = TestItemService.mockItem(Material.NETHERITE_PICKAXE);
         float netheriteProgress = MiningSpeedCalculator.calculateProgressPerTick(null, netheritePick, block);
-        assertEquals(0.225f, netheriteProgress, 0.0001f);
+        assertEquals(9.0f / 45.0f, netheriteProgress, 0.0001f);
     }
 
     @Test
-    public void testCustomItemMiningBonus() {
-        CustomBlockDefinition block = CustomBlockDefinition.builder("custom:ore")
-                .hardness(2.0f)
+    public void testCustomItemMiningSpeedOverridesTierWithoutDoubleStacking() {
+        // Hardness 1.5 (Stone), requires PICKAXE
+        CustomBlockDefinition block = CustomBlockDefinition.builder("custom:stone")
+                .hardness(1.5f)
                 .mineableWith(vn.haohan.itemcore.api.block.ToolType.PICKAXE)
                 .build();
 
-        // Custom drill with extra mining_speed property = 5.0
+        // Custom drill on DIAMOND_PICKAXE with mining_speed property = 8.0 (như Metallurgy)
         itemRegistry.register(ItemDefinition.builder("custom:drill")
                 .material(Material.DIAMOND_PICKAXE)
                 .displayName("Drill")
-                .property("mining_speed", 5.0)
+                .property("mining_speed", 8.0)
                 .build());
 
         ItemStack drill = itemService.create("custom:drill");
-        // Base diamond pick = 8.0 + custom 5.0 = 13.0 -> 13.0 / 40 = 0.325 per tick
+        // Base diamond pick = 8.0, custom mining_speed = 8.0 -> Phải KHÔNG bị cộng dồn thành 16.0!
+        // Tốc độ phải đúng là 8.0 -> 8.0 / 45 = 0.17777778 per tick
         float drillProgress = MiningSpeedCalculator.calculateProgressPerTick(null, drill, block);
-        assertEquals(0.325f, drillProgress, 0.0001f);
+        assertEquals(8.0f / 45.0f, drillProgress, 0.0001f);
     }
 
     @Test
     public void testSwordAndWrongToolsDoNotMineFasterThanPickaxe() {
-        // 2 seconds base time = 40 ticks, requires PICKAXE
+        // Hardness 2.0, requires PICKAXE -> Base ticks = 2.0 * 30 = 60 ticks
         CustomBlockDefinition block = CustomBlockDefinition.builder("custom:ruby_ore")
                 .hardness(2.0f)
                 .mineableWith(vn.haohan.itemcore.api.block.ToolType.PICKAXE, ToolTier.WOOD)
@@ -121,21 +128,21 @@ public class MiningSpeedCalculatorTest {
         float swordProgress = MiningSpeedCalculator.calculateProgressPerTick(null, diamondSword, block);
         assertEquals(0.0f, swordProgress, 0.0001f, "Diamond sword cannot mine a block requiring pickaxe");
 
-        // Wooden Pickaxe speed = 2.0 -> 2.0 / 40 = 0.05 per tick
+        // Wooden Pickaxe speed = 2.0 -> 2.0 / 60 = 0.03333333 per tick
         ItemStack woodPick = TestItemService.mockItem(Material.WOODEN_PICKAXE);
         float woodPickProgress = MiningSpeedCalculator.calculateProgressPerTick(null, woodPick, block);
-        assertEquals(0.05f, woodPickProgress, 0.0001f);
+        assertEquals(2.0f / 60.0f, woodPickProgress, 0.0001f);
         assertTrue(woodPickProgress > swordProgress);
 
-        // Diamond Pickaxe speed = 8.0 -> 8.0 / 40 = 0.2 per tick
+        // Diamond Pickaxe speed = 8.0 -> 8.0 / 60 = 0.13333333 per tick
         ItemStack diamondPick = TestItemService.mockItem(Material.DIAMOND_PICKAXE);
         float diamondPickProgress = MiningSpeedCalculator.calculateProgressPerTick(null, diamondPick, block);
-        assertEquals(0.2f, diamondPickProgress, 0.0001f);
+        assertEquals(8.0f / 60.0f, diamondPickProgress, 0.0001f);
     }
 
     @Test
     public void testTierRequirementSpeedEnforcement() {
-        // Block requires IRON pickaxe (tier 3) or higher, hardness 5.0s (100 ticks)
+        // Block requires IRON pickaxe (tier 3) or higher, hardness 5.0 (150 ticks)
         CustomBlockDefinition block = CustomBlockDefinition.builder("custom:deep_ore")
                 .hardness(5.0f)
                 .mineableWith(vn.haohan.itemcore.api.block.ToolType.PICKAXE, ToolTier.IRON)
@@ -155,14 +162,55 @@ public class MiningSpeedCalculatorTest {
         float stoneProgress = MiningSpeedCalculator.calculateProgressPerTick(null, stonePick, block);
         assertEquals(0.0f, stoneProgress, 0.0001f);
 
-        // 4. Iron Pickaxe (Tier 3) -> Effective! Base multiplier 6.0x -> 6.0 / 100 = 0.06 per tick
+        // 4. Iron Pickaxe (Tier 3) -> Effective! Base multiplier 6.0x -> 6.0 / 150 = 0.04 per tick
         ItemStack ironPick = TestItemService.mockItem(Material.IRON_PICKAXE);
         float ironProgress = MiningSpeedCalculator.calculateProgressPerTick(null, ironPick, block);
-        assertEquals(0.06f, ironProgress, 0.0001f);
+        assertEquals(6.0f / 150.0f, ironProgress, 0.0001f);
 
-        // 5. Diamond Pickaxe (Tier 4) -> Effective! Base multiplier 8.0x -> 8.0 / 100 = 0.08 per tick
+        // 5. Diamond Pickaxe (Tier 4) -> Effective! Base multiplier 8.0x -> 8.0 / 150 = 0.05333333 per tick
         ItemStack diamondPick = TestItemService.mockItem(Material.DIAMOND_PICKAXE);
         float diamondProgress = MiningSpeedCalculator.calculateProgressPerTick(null, diamondPick, block);
-        assertEquals(0.08f, diamondProgress, 0.0001f);
+        assertEquals(8.0f / 150.0f, diamondProgress, 0.0001f);
+    }
+
+    @Test
+    public void testMetallurgyOresAndPickaxesIntegration() {
+        // Mô phỏng Borax Ore (Hardness 3.0), yêu cầu Pickaxe Tier STONE (speed 4.0)
+        CustomBlockDefinition boraxOre = CustomBlockDefinition.builder("metallurgy:borax_ore")
+                .hardness(3.0f)
+                .mineableWith(vn.haohan.itemcore.api.block.ToolType.PICKAXE, ToolTier.STONE)
+                .build();
+
+        // 1. Wooden Pickaxe -> Không đủ tier (cần Stone) -> 0.0f
+        ItemStack woodPick = TestItemService.mockItem(Material.WOODEN_PICKAXE);
+        assertEquals(0.0f, MiningSpeedCalculator.calculateProgressPerTick(null, woodPick, boraxOre), 0.0001f);
+
+        // 2. Stone Pickaxe (Tier Stone, speed 4.0) -> Base ticks = 3.0 * 30 = 90 -> 4.0 / 90
+        ItemStack stonePick = TestItemService.mockItem(Material.STONE_PICKAXE);
+        assertEquals(4.0f / 90.0f, MiningSpeedCalculator.calculateProgressPerTick(null, stonePick, boraxOre), 0.0001f);
+
+        // 3. Mithril Ore (Hardness 4.0), yêu cầu Pickaxe Tier DIAMOND (speed 8.0)
+        CustomBlockDefinition mithrilOre = CustomBlockDefinition.builder("metallurgy:mithril_ore")
+                .hardness(4.0f)
+                .mineableWith(vn.haohan.itemcore.api.block.ToolType.PICKAXE, ToolTier.DIAMOND)
+                .build();
+
+        // Iron pickaxe không đào được Mithril Ore
+        ItemStack ironPick = TestItemService.mockItem(Material.IRON_PICKAXE);
+        assertEquals(0.0f, MiningSpeedCalculator.calculateProgressPerTick(null, ironPick, mithrilOre), 0.0001f);
+
+        // Diamond Pickaxe (speed 8.0) -> Base ticks = 4.0 * 30 = 120 -> 8.0 / 120 = 0.06666667 (15 ticks)
+        ItemStack diamondPick = TestItemService.mockItem(Material.DIAMOND_PICKAXE);
+        assertEquals(8.0f / 120.0f, MiningSpeedCalculator.calculateProgressPerTick(null, diamondPick, mithrilOre), 0.0001f);
+
+        // Metallurgy Custom Soulsteel Pickaxe với custom mining_speed = 11.0
+        itemRegistry.register(ItemDefinition.builder("metallurgy:soulsteel_pickaxe")
+                .material(Material.NETHERITE_PICKAXE)
+                .displayName("Soulsteel Pickaxe")
+                .property("mining_speed", 11.0)
+                .build());
+        ItemStack soulsteelPick = itemService.create("metallurgy:soulsteel_pickaxe");
+        // Tốc độ phải là 11.0 / 120, không bị cộng dồn netherite tier (9.0) + custom (11.0) = 20.0
+        assertEquals(11.0f / 120.0f, MiningSpeedCalculator.calculateProgressPerTick(null, soulsteelPick, mithrilOre), 0.0001f);
     }
 }

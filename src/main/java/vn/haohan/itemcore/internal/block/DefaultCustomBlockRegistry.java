@@ -17,6 +17,7 @@ import java.util.logging.Logger;
 public final class DefaultCustomBlockRegistry implements CustomBlockRegistry {
 
     private final Map<String, CustomBlockDefinition> definitions = new ConcurrentHashMap<>();
+    private final Map<org.bukkit.Material, CustomBlockDefinition> vanillaOverwrites = new ConcurrentHashMap<>();
     private final Logger logger;
 
     public DefaultCustomBlockRegistry() {
@@ -35,12 +36,21 @@ public final class DefaultCustomBlockRegistry implements CustomBlockRegistry {
         if (existing != null) {
             throw new IllegalArgumentException("Custom block with ID '" + id + "' is already registered!");
         }
+        if (definition.isVanillaOverwrite()) {
+            vanillaOverwrites.put(definition.getBaseBlock(), definition);
+        }
     }
 
     @Override
     public Optional<CustomBlockDefinition> get(String id) {
         if (id == null) return Optional.empty();
         return Optional.ofNullable(definitions.get(id));
+    }
+
+    @Override
+    public Optional<CustomBlockDefinition> getByMaterial(org.bukkit.Material material) {
+        if (material == null) return Optional.empty();
+        return Optional.ofNullable(vanillaOverwrites.get(material));
     }
 
     @Override
@@ -61,5 +71,6 @@ public final class DefaultCustomBlockRegistry implements CustomBlockRegistry {
     @Override
     public void clear() {
         definitions.clear();
+        vanillaOverwrites.clear();
     }
 }

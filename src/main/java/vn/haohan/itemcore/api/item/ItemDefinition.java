@@ -289,6 +289,30 @@ public final class ItemDefinition {
             return this;
         }
 
+        public Builder attribute(org.bukkit.attribute.Attribute attribute, double amount,
+                                 org.bukkit.attribute.AttributeModifier.Operation operation,
+                                 org.bukkit.inventory.EquipmentSlotGroup slotGroup) {
+            this.components.add(new AttributeComponent(attribute, amount, operation, slotGroup));
+            return this;
+        }
+
+        public Builder attribute(org.bukkit.attribute.Attribute attribute, double amount) {
+            this.components.add(new AttributeComponent(attribute, amount));
+            return this;
+        }
+
+        public Builder attribute(org.bukkit.NamespacedKey attributeKey, double amount,
+                                 org.bukkit.attribute.AttributeModifier.Operation operation,
+                                 org.bukkit.inventory.EquipmentSlotGroup slotGroup) {
+            this.components.add(new AttributeComponent(attributeKey, amount, operation, slotGroup));
+            return this;
+        }
+
+        public Builder attribute(org.bukkit.NamespacedKey attributeKey, double amount) {
+            this.components.add(new AttributeComponent(attributeKey, amount));
+            return this;
+        }
+
         public ItemDefinition build() {
             if (!ItemDefinition.isValidId(id)) {
                 throw new IllegalArgumentException(

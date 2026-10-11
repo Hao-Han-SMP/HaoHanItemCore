@@ -36,6 +36,14 @@ public interface CustomBlockRegistry {
     Optional<CustomBlockDefinition> get(String id);
 
     /**
+     * Retrieves the custom block definition overwriting a vanilla material, if any.
+     *
+     * @param material the vanilla block material
+     * @return an {@link Optional} containing the definition if found, or empty
+     */
+    Optional<CustomBlockDefinition> getByMaterial(org.bukkit.Material material);
+
+    /**
      * Checks if a custom block definition with the given ID exists.
      *
      * <p>When to use: Validation checks before placing or referencing blocks.</p>

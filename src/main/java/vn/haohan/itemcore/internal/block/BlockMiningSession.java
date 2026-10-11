@@ -14,10 +14,13 @@ public final class BlockMiningSession {
     private final Player player;
     private final Location blockLocation;
     private final CustomBlockDefinition definition;
-    private final int crackEntityId;
+    private int crackEntityId;
+    private int delayTicksRemaining = 0;
     private float progress = 0.0f;
     private int lastStage = -1;
     private int miningTicks = 0;
+    private int invalidToolTicks = 0;
+    private boolean warnedInvalidTool = false;
 
     public BlockMiningSession(Player player, Location blockLocation, CustomBlockDefinition definition, int crackEntityId) {
         this.player = Objects.requireNonNull(player, "player cannot be null");
@@ -32,6 +35,31 @@ public final class BlockMiningSession {
 
     public int getCrackEntityId() {
         return crackEntityId;
+    }
+
+    public void setCrackEntityId(int crackEntityId) {
+        this.crackEntityId = crackEntityId;
+    }
+
+    public int getDelayTicksRemaining() {
+        return delayTicksRemaining;
+    }
+
+    public void setDelayTicksRemaining(int delayTicksRemaining) {
+        this.delayTicksRemaining = Math.max(0, delayTicksRemaining);
+    }
+
+    public boolean decrementDelayTicks() {
+        if (delayTicksRemaining > 0) {
+            delayTicksRemaining--;
+            return true;
+        }
+        return false;
+    }
+
+    public void resetInvalidToolState() {
+        this.invalidToolTicks = 0;
+        this.warnedInvalidTool = false;
     }
 
     public Player getPlayer() {
@@ -64,5 +92,17 @@ public final class BlockMiningSession {
 
     public void setLastStage(int lastStage) {
         this.lastStage = lastStage;
+    }
+
+    public int incrementAndGetInvalidToolTicks() {
+        return ++this.invalidToolTicks;
+    }
+
+    public boolean isWarnedInvalidTool() {
+        return warnedInvalidTool;
+    }
+
+    public void setWarnedInvalidTool(boolean warnedInvalidTool) {
+        this.warnedInvalidTool = warnedInvalidTool;
     }
 }

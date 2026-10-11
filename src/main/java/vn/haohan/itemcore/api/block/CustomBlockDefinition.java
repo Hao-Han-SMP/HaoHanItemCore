@@ -33,7 +33,7 @@ public final class CustomBlockDefinition {
 
     private CustomBlockDefinition(Builder builder) {
         this.id = builder.id;
-        this.baseBlock = Material.BARRIER;
+        this.baseBlock = resolveBaseBlock(builder.id, builder.baseBlock);
         this.model = builder.model;
         this.properties = Collections.unmodifiableMap(new HashMap<>(builder.properties));
         this.dropItemId = builder.dropItemId;
@@ -80,6 +80,48 @@ public final class CustomBlockDefinition {
 
     public Material getBaseBlock() {
         return baseBlock;
+    }
+
+    /**
+     * Returns true if this definition overwrites an existing vanilla Minecraft block
+     * instead of using a physical Barrier + BlockDisplay.
+     */
+    public boolean isVanillaOverwrite() {
+        return baseBlock != null && baseBlock != Material.BARRIER && safeIsBlock(baseBlock);
+    }
+
+    private static boolean safeIsBlock(Material material) {
+        if (material == null) return false;
+        try {
+            return !material.isAir() && material.isBlock();
+        } catch (Throwable ignored) {
+            // Paper test environment without RegistryAccess initialized
+            String name = material.name();
+            return !name.equals("AIR") && !name.equals("CAVE_AIR") && !name.equals("VOID_AIR")
+                    && !name.endsWith("_ITEM") && !name.endsWith("_INGOT");
+        }
+    }
+
+    private static Material resolveBaseBlock(String id, Material explicitBaseBlock) {
+        if (explicitBaseBlock != null) {
+            return explicitBaseBlock;
+        }
+        if (id != null) {
+            String lower = id.toLowerCase(Locale.ROOT);
+            if (lower.startsWith("minecraft:")) {
+                String matName = lower.substring("minecraft:".length());
+                Material mat = Material.matchMaterial(matName);
+                if (mat != null && safeIsBlock(mat)) {
+                    return mat;
+                }
+            } else if (!lower.contains(":")) {
+                Material mat = Material.matchMaterial(lower);
+                if (mat != null && safeIsBlock(mat)) {
+                    return mat;
+                }
+            }
+        }
+        return Material.BARRIER;
     }
 
     public CustomBlockModel getModel() {
@@ -233,6 +275,7 @@ public final class CustomBlockDefinition {
      */
     public static final class Builder {
         private final String id;
+        private Material baseBlock;
         private CustomBlockModel model;
         private final Map<String, Object> properties = new HashMap<>();
         private String dropItemId;
@@ -253,6 +296,11 @@ public final class CustomBlockDefinition {
                 throw new IllegalArgumentException("Custom block ID cannot be blank");
             }
             this.id = id;
+        }
+
+        public Builder baseBlock(Material baseBlock) {
+            this.baseBlock = baseBlock;
+            return this;
         }
 
         public Builder soundGroup(CustomBlockSoundGroup soundGroup) {
@@ -364,7 +412,16 @@ public final class CustomBlockDefinition {
 
         public CustomBlockDefinition build() {
             if (this.model == null) {
-                this.model = new CustomBlockModel(null);
+                Material resolved = resolveBaseBlock(this.id, this.baseBlock);
+                if (resolved != null && resolved != Material.BARRIER && safeIsBlock(resolved)) {
+                    try {
+                        this.model = new CustomBlockModel(org.bukkit.Bukkit.createBlockData(resolved));
+                    } catch (Throwable ignored) {
+                        this.model = new CustomBlockModel(null);
+                    }
+                } else {
+                    this.model = new CustomBlockModel(null);
+                }
             }
             return new CustomBlockDefinition(this);
         }

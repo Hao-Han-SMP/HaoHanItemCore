@@ -37,7 +37,6 @@ public record TierComponent(String tierName, int tier) implements ItemComponent 
 
     @Override
     public void appendLore(List<String> lore) {
-        String label = (tierName != null && !tierName.isBlank()) ? tierName : String.valueOf(tier);
-        lore.add("&7Tier: &f" + label);
+        // Lore is explicitly controlled by item configuration lore lines
     }
 }

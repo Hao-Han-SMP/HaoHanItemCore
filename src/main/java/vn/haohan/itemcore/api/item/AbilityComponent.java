@@ -12,5 +12,5 @@ public record AbilityComponent(String abilityId, String displayName) implements 
     public AbilityComponent(String abilityId) { this(abilityId, abilityId); }
 
     @Override
-    public void appendLore(List<String> lore) { lore.add("&bAbility: &f" + displayName); }
+    public void appendLore(List<String> lore) { lore.add("§bAbility: §f" + displayName); }
 }
