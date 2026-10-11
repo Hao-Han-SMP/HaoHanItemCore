@@ -98,4 +98,36 @@ class CraftingRecipeResolverTest {
         assertEquals(1, recipes.size());
         assertEquals(vn.haohan.itemcore.api.recipe.RecipeType.SHAPELESS, recipes.get(0).getType());
     }
+
+    @Test
+    void testHasCustomIngredients() {
+        var shapedRecipe = recipeRegistry.get("haohanmetallurgy:embersteel_pickaxe");
+        assertTrue(resolver.hasCustomIngredients(shapedRecipe));
+
+        // Vanilla ingredients only recipe
+        RecipeDefinition vanillaRecipe = new ShapedRecipeDefinition(
+                "minecraft:iron_pickaxe_test",
+                List.of("III", " T ", " T "),
+                Map.of(
+                        'I', new Ingredient.ItemIngredient("minecraft:iron_ingot"),
+                        'T', new Ingredient.MaterialIngredient(Material.STICK)
+                ),
+                new ItemResult("minecraft:iron_pickaxe", 1)
+        );
+        assertFalse(resolver.hasCustomIngredients(vanillaRecipe));
+    }
+
+    @Test
+    void testGetNeededCustomItems() {
+        var recipe = (ShapedRecipeDefinition) recipeRegistry.get("haohanmetallurgy:embersteel_pickaxe");
+        Map<String, Integer> needed = resolver.getNeededCustomItems(recipe);
+        assertEquals(1, needed.size());
+        assertEquals(3, needed.get("haohanmetallurgy:embersteel_ingot"));
+    }
+
+    @Test
+    void testSendGhostRecipePreviewSafeHeadless() {
+        assertDoesNotThrow(() -> resolver.sendGhostRecipePreview(null, null));
+        assertDoesNotThrow(() -> resolver.sendGhostRecipePreview(null, new org.bukkit.NamespacedKey("haohanitemcore", "test")));
+    }
 }

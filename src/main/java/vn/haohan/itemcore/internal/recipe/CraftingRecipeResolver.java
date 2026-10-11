@@ -82,9 +82,9 @@ public final class CraftingRecipeResolver {
         }
 
         if (customRecipe instanceof ShapedRecipeDefinition shaped) {
-            fillShapedRecipe(craftingInv, player, shaped);
+            fillShapedRecipe(craftingInv, player, recipeKey, shaped);
         } else if (customRecipe.getType() == RecipeType.SHAPELESS) {
-            fillShapelessRecipe(craftingInv, player, customRecipe);
+            fillShapelessRecipe(craftingInv, player, recipeKey, customRecipe);
         }
 
         return true;
@@ -140,7 +140,7 @@ public final class CraftingRecipeResolver {
         return null;
     }
 
-    private void fillShapedRecipe(CraftingInventory craftingInv, Player player, ShapedRecipeDefinition shaped) {
+    private void fillShapedRecipe(CraftingInventory craftingInv, Player player, NamespacedKey recipeKey, ShapedRecipeDefinition shaped) {
         PlayerInventory playerInv = player.getInventory();
         List<String> pattern = shaped.getPattern();
         int H = pattern.size();
@@ -181,17 +181,16 @@ public final class CraftingRecipeResolver {
             }
         }
 
-        // Kiểm tra nguyên liệu trong túi đồ
+        // Kiểm tra nguyên liệu trong túi đồ: nếu thiếu thì hiển thị Ghost Recipe Preview và kết thúc
         for (var entry : neededCustomItems.entrySet()) {
             if (countCustomItems(playerInv, entry.getKey()) < entry.getValue()) {
-                player.sendActionBar(
-                        Component.text("Thiếu nguyên liệu: " + getDisplayName(entry.getKey()), NamedTextColor.RED));
+                sendGhostRecipePreview(player, recipeKey);
                 return;
             }
         }
         for (var entry : neededMaterials.entrySet()) {
             if (countMaterials(playerInv, entry.getKey()) < entry.getValue()) {
-                player.sendActionBar(Component.text("Thiếu nguyên liệu: " + entry.getKey().name(), NamedTextColor.RED));
+                sendGhostRecipePreview(player, recipeKey);
                 return;
             }
         }
@@ -229,7 +228,7 @@ public final class CraftingRecipeResolver {
         player.updateInventory();
     }
 
-    private void fillShapelessRecipe(CraftingInventory craftingInv, Player player, RecipeDefinition recipe) {
+    private void fillShapelessRecipe(CraftingInventory craftingInv, Player player, NamespacedKey recipeKey, RecipeDefinition recipe) {
         PlayerInventory playerInv = player.getInventory();
         List<Ingredient> ingredients = recipe.getIngredients();
         int totalNeeded = 0;
@@ -263,14 +262,13 @@ public final class CraftingRecipeResolver {
 
         for (var entry : neededCustomItems.entrySet()) {
             if (countCustomItems(playerInv, entry.getKey()) < entry.getValue()) {
-                player.sendActionBar(
-                        Component.text("Thiếu nguyên liệu: " + getDisplayName(entry.getKey()), NamedTextColor.RED));
+                sendGhostRecipePreview(player, recipeKey);
                 return;
             }
         }
         for (var entry : neededMaterials.entrySet()) {
             if (countMaterials(playerInv, entry.getKey()) < entry.getValue()) {
-                player.sendActionBar(Component.text("Thiếu nguyên liệu: " + entry.getKey().name(), NamedTextColor.RED));
+                sendGhostRecipePreview(player, recipeKey);
                 return;
             }
         }
@@ -537,5 +535,114 @@ public final class CraftingRecipeResolver {
             return def.getDisplayName();
         }
         return customId;
+    }
+
+    /**
+     * Gửi packet Ghost Recipe Preview hiển thị bóng mờ nguyên liệu trên bàn chế tạo khi thiếu nguyên liệu.
+     */
+    public void sendGhostRecipePreview(Player player, NamespacedKey recipeKey) {
+        if (player == null || recipeKey == null) {
+            return;
+        }
+        try {
+            if (com.github.retrooper.packetevents.PacketEvents.getAPI() != null) {
+                int windowId = getContainerId(player);
+                com.github.retrooper.packetevents.resources.ResourceLocation resLoc =
+                        new com.github.retrooper.packetevents.resources.ResourceLocation(
+                                recipeKey.getNamespace(), recipeKey.getKey());
+                var packet = new com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerCraftRecipeResponse(
+                        windowId, resLoc);
+                com.github.retrooper.packetevents.PacketEvents.getAPI().getPlayerManager().sendPacket(player, packet);
+            }
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private int getContainerId(Player player) {
+        try {
+            Object handle = player.getClass().getMethod("getHandle").invoke(player);
+            Object menu = handle.getClass().getField("containerMenu").get(handle);
+            return (int) menu.getClass().getField("containerId").get(menu);
+        } catch (Throwable t) {
+            return 1;
+        }
+    }
+
+    /**
+     * Kiểm tra xem recipe có chứa bất kỳ Custom Item Ingredient nào không.
+     */
+    public boolean hasCustomIngredients(RecipeDefinition recipe) {
+        if (recipe == null) {
+            return false;
+        }
+        if (recipe instanceof ShapedRecipeDefinition shaped) {
+            for (Ingredient ing : shaped.getIngredientMap().values()) {
+                if (ing instanceof Ingredient.ItemIngredient itemIng && !itemIng.isVanilla()) {
+                    return true;
+                }
+            }
+        } else {
+            for (Ingredient ing : recipe.getIngredients()) {
+                if (ing instanceof Ingredient.ItemIngredient itemIng && !itemIng.isVanilla()) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Kiểm tra xem người chơi có đủ các Custom Item yêu cầu trong recipe hay không.
+     */
+    public boolean hasRequiredCustomItems(Player player, RecipeDefinition recipe) {
+        if (player == null || recipe == null) {
+            return false;
+        }
+        PlayerInventory inv = player.getInventory();
+
+        if (recipe instanceof ShapedRecipeDefinition shaped) {
+            Map<String, Integer> neededCustom = getNeededCustomItems(shaped);
+            for (var entry : neededCustom.entrySet()) {
+                if (countCustomItems(inv, entry.getKey()) < entry.getValue()) {
+                    return false;
+                }
+            }
+            return true;
+        } else if (recipe.getType() == RecipeType.SHAPELESS) {
+            Map<String, Integer> neededCustom = getNeededCustomItemsShapeless(recipe);
+            for (var entry : neededCustom.entrySet()) {
+                if (countCustomItems(inv, entry.getKey()) < entry.getValue()) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        return true;
+    }
+
+    public Map<String, Integer> getNeededCustomItems(ShapedRecipeDefinition shaped) {
+        Map<String, Integer> needed = new HashMap<>();
+        for (String row : shaped.getPattern()) {
+            for (int c = 0; c < row.length(); c++) {
+                char ch = row.charAt(c);
+                if (ch != ' ') {
+                    Ingredient ing = shaped.getIngredientMap().get(ch);
+                    if (ing instanceof Ingredient.ItemIngredient itemIng && !itemIng.isVanilla()) {
+                        needed.put(itemIng.id(), needed.getOrDefault(itemIng.id(), 0) + 1);
+                    }
+                }
+            }
+        }
+        return needed;
+    }
+
+    public Map<String, Integer> getNeededCustomItemsShapeless(RecipeDefinition recipe) {
+        Map<String, Integer> needed = new HashMap<>();
+        for (Ingredient ing : recipe.getIngredients()) {
+            if (ing instanceof Ingredient.ItemIngredient itemIng && !itemIng.isVanilla()) {
+                needed.put(itemIng.id(), needed.getOrDefault(itemIng.id(), 0) + ing.amount());
+            }
+        }
+        return needed;
     }
 }

@@ -152,6 +152,10 @@ public final class ItemEventRouter implements Listener {
                 definition.getBehavior().onCraft(context);
             }
         }
+
+        if (event.getWhoClicked() instanceof Player player && plugin != null && org.bukkit.Bukkit.getServer() != null) {
+            org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> syncPlayerRecipes(player));
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -235,12 +239,7 @@ public final class ItemEventRouter implements Listener {
     @EventHandler(priority = EventPriority.LOWEST)
     public void onPlayerJoin(org.bukkit.event.player.PlayerJoinEvent event) {
         Player player = event.getPlayer();
-        if (recipeAdapter != null) {
-            List<NamespacedKey> keys = recipeAdapter.getRegisteredKeys();
-            if (!keys.isEmpty()) {
-                player.discoverRecipes(keys);
-            }
-        }
+        syncPlayerRecipes(player);
         for (ItemStack item : player.getInventory().getContents()) {
             if (item != null) {
                 vn.haohan.itemcore.api.HaoHanItemCore.get().getItemService().validateAndUpdate(item);
@@ -255,6 +254,9 @@ public final class ItemEventRouter implements Listener {
 
     @EventHandler(priority = EventPriority.LOWEST)
     public void onInventoryOpen(org.bukkit.event.inventory.InventoryOpenEvent event) {
+        if (event.getPlayer() instanceof Player player) {
+            syncPlayerRecipes(player);
+        }
         for (ItemStack item : event.getInventory().getContents()) {
             if (item != null) {
                 vn.haohan.itemcore.api.HaoHanItemCore.get().getItemService().validateAndUpdate(item);
@@ -266,6 +268,53 @@ public final class ItemEventRouter implements Listener {
     public void onEntityPickupItem(org.bukkit.event.entity.EntityPickupItemEvent event) {
         ItemStack item = event.getItem().getItemStack();
         vn.haohan.itemcore.api.HaoHanItemCore.get().getItemService().validateAndUpdate(item);
+        if (event.getEntity() instanceof Player player && plugin != null && org.bukkit.Bukkit.getServer() != null) {
+            org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> syncPlayerRecipes(player));
+        }
+    }
+
+    /**
+     * Đồng bộ Recipe Discovery cho người chơi theo các nguyên liệu custom trong kho đồ.
+     * Ngăn chặn client-side StackedContents tự ý hiển thị công thức custom ở mục "Craftable"
+     * khi người chơi chỉ có nguyên liệu vanilla (chống Carrier Collision).
+     */
+    public void syncPlayerRecipes(Player player) {
+        if (player == null || recipeAdapter == null || craftingRecipeResolver == null) {
+            return;
+        }
+        var recipeService = HaoHanItemCore.get().getRecipeService();
+        if (recipeService == null) {
+            return;
+        }
+
+        for (var recipe : recipeService.all()) {
+            if (recipe.getType() != vn.haohan.itemcore.api.recipe.RecipeType.SHAPED
+                    && recipe.getType() != vn.haohan.itemcore.api.recipe.RecipeType.SHAPELESS) {
+                continue;
+            }
+
+            NamespacedKey key = recipeAdapter.getKey(recipe.getId());
+            if (key == null) {
+                continue;
+            }
+
+            if (craftingRecipeResolver.hasCustomIngredients(recipe)) {
+                boolean hasIngredients = craftingRecipeResolver.hasRequiredCustomItems(player, recipe);
+                if (hasIngredients) {
+                    if (!player.hasDiscoveredRecipe(key)) {
+                        player.discoverRecipe(key);
+                    }
+                } else {
+                    if (player.hasDiscoveredRecipe(key)) {
+                        player.undiscoverRecipe(key);
+                    }
+                }
+            } else {
+                if (!player.hasDiscoveredRecipe(key)) {
+                    player.discoverRecipe(key);
+                }
+            }
+        }
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)

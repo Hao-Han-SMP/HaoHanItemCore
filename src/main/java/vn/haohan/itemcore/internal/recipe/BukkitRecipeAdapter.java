@@ -91,6 +91,10 @@ public final class BukkitRecipeAdapter {
         return Collections.unmodifiableList(new ArrayList<>(registeredKeys.values()));
     }
 
+    public NamespacedKey getKey(String recipeId) {
+        return registeredKeys.get(recipeId);
+    }
+
     /**
      * Chuyển RecipeDefinition → Bukkit Recipe.
      */
