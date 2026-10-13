@@ -2,15 +2,16 @@ package vn.haohan.itemcore.api.block;
 
 import org.bukkit.Material;
 import org.bukkit.block.data.BlockData;
+import org.bukkit.inventory.ItemStack;
 import org.joml.Vector3f;
 
 import java.util.Objects;
 
 /**
- * Visual and rendering definition for a client-side BlockDisplay entity.
+ * Visual and rendering definition for a client-side display entity (BlockDisplay or ItemDisplay).
  *
- * <p>Defines the block data or material to display, fixed scale (strictly 1.00005f),
- * and alignment translation offset. This object is immutable and thread-safe.</p>
+ * <p>Supports both BlockData (for vanilla block overwrites via BlockDisplay) and
+ * ItemStack (for custom models via ItemDisplay). This object is immutable and thread-safe.</p>
  */
 public final class CustomBlockModel {
 
@@ -25,36 +26,56 @@ public final class CustomBlockModel {
     public static final float DEFAULT_TRANSLATION_OFFSET = 0.0f;
 
     private final BlockData blockData;
+    private final ItemStack itemStack;
+    private final boolean itemDisplay;
     private final Vector3f scale;
     private final Vector3f translation;
 
     /**
+     * Constructs a default empty block model.
+     */
+    public CustomBlockModel() {
+        this((BlockData) null);
+    }
+
+    /**
      * Constructs a custom block model with the specified block data.
      *
-     * <p>When to use: Call when creating a visual definition for a custom block.</p>
-     * <p>Thread requirement: Thread-safe.</p>
-     * <p>World/Packet impact: None (pure data model).</p>
-     *
-     * @param blockData the Bukkit BlockData to render in the BlockDisplay; must not be null
-     * @throws NullPointerException if blockData is null
+     * @param blockData the Bukkit BlockData to render in the BlockDisplay
      */
     public CustomBlockModel(BlockData blockData) {
+        this(blockData, null, false, new Vector3f(DEFAULT_SCALE, DEFAULT_SCALE, DEFAULT_SCALE),
+                new Vector3f(DEFAULT_TRANSLATION_OFFSET, DEFAULT_TRANSLATION_OFFSET, DEFAULT_TRANSLATION_OFFSET));
+    }
+
+    /**
+     * Full constructor with explicit block data, item stack, scale, and translation offset.
+     */
+    public CustomBlockModel(BlockData blockData, ItemStack itemStack, Vector3f scale, Vector3f translation) {
+        this(blockData, itemStack, itemStack != null, scale, translation);
+    }
+
+    /**
+     * Full constructor with explicit display mode flag.
+     */
+    public CustomBlockModel(BlockData blockData, ItemStack itemStack, boolean itemDisplay, Vector3f scale, Vector3f translation) {
         this.blockData = blockData;
-        this.scale = new Vector3f(DEFAULT_SCALE, DEFAULT_SCALE, DEFAULT_SCALE);
-        this.translation = new Vector3f(DEFAULT_TRANSLATION_OFFSET, DEFAULT_TRANSLATION_OFFSET, DEFAULT_TRANSLATION_OFFSET);
+        ItemStack safeItem = null;
+        if (itemStack != null) {
+            try {
+                safeItem = itemStack.clone();
+            } catch (Throwable t) {
+                safeItem = itemStack;
+            }
+        }
+        this.itemStack = safeItem;
+        this.itemDisplay = itemDisplay;
+        this.scale = scale != null ? new Vector3f(scale) : new Vector3f(DEFAULT_SCALE, DEFAULT_SCALE, DEFAULT_SCALE);
+        this.translation = translation != null ? new Vector3f(translation) : new Vector3f(DEFAULT_TRANSLATION_OFFSET, DEFAULT_TRANSLATION_OFFSET, DEFAULT_TRANSLATION_OFFSET);
     }
 
     /**
      * Constructs a custom block model from a simple Bukkit Material.
-     *
-     * <p>When to use: Convenience factory method for standard materials without extra states.</p>
-     * <p>Thread requirement: Safe to call on any thread if material creates default BlockData.</p>
-     * <p>World/Packet impact: None.</p>
-     *
-     * @param material the material to render; must be a block material
-     * @return a new CustomBlockModel instance
-     * @throws IllegalArgumentException if material is not a block
-     * @throws NullPointerException if material is null
      */
     public static CustomBlockModel of(Material material) {
         Objects.requireNonNull(material, "material cannot be null");
@@ -66,37 +87,62 @@ public final class CustomBlockModel {
 
     /**
      * Constructs a custom block model from a Bukkit BlockData instance.
-     *
-     * <p>When to use: When custom properties or states (e.g. facing, lit) are defined.</p>
-     * <p>Thread requirement: Thread-safe.</p>
-     * <p>World/Packet impact: None.</p>
-     *
-     * @param blockData the custom block data; must not be null
-     * @return a new CustomBlockModel instance
-     * @throws NullPointerException if blockData is null
      */
     public static CustomBlockModel of(BlockData blockData) {
         return new CustomBlockModel(blockData);
     }
 
     /**
+     * Constructs a custom block model from a Bukkit ItemStack instance.
+     */
+    public static CustomBlockModel of(ItemStack itemStack) {
+        return new CustomBlockModel(null, itemStack, true,
+                new Vector3f(DEFAULT_SCALE, DEFAULT_SCALE, DEFAULT_SCALE),
+                new Vector3f(DEFAULT_TRANSLATION_OFFSET, DEFAULT_TRANSLATION_OFFSET, DEFAULT_TRANSLATION_OFFSET));
+    }
+
+    /**
+     * Convenience alias for constructing from an ItemStack.
+     */
+    public static CustomBlockModel ofItem(ItemStack itemStack) {
+        return of(itemStack);
+    }
+
+    /**
+     * Checks if this model renders via ItemDisplay.
+     */
+    public boolean isItemDisplay() {
+        return itemDisplay;
+    }
+
+    /**
+     * Checks if this model renders via BlockDisplay.
+     */
+    public boolean isBlockDisplay() {
+        return !itemDisplay;
+    }
+
+    /**
      * Gets the displayed Bukkit BlockData.
-     *
-     * <p>Thread requirement: Thread-safe.</p>
-     *
-     * @return the BlockData instance
      */
     public BlockData getBlockData() {
         return blockData;
     }
 
     /**
+     * Gets a clone of the displayed Bukkit ItemStack, or null if using BlockData.
+     */
+    public ItemStack getItemStack() {
+        if (itemStack == null) return null;
+        try {
+            return itemStack.clone();
+        } catch (Throwable t) {
+            return itemStack;
+        }
+    }
+
+    /**
      * Gets the rendering scale vector.
-     *
-     * <p>Returns a new copy of the Vector3f with (1.00005f, 1.00005f, 1.00005f).</p>
-     * <p>Thread requirement: Thread-safe.</p>
-     *
-     * @return copy of scale vector
      */
     public Vector3f getScale() {
         return new Vector3f(scale);
@@ -104,10 +150,6 @@ public final class CustomBlockModel {
 
     /**
      * Gets the rendering translation offset vector.
-     *
-     * <p>Thread requirement: Thread-safe.</p>
-     *
-     * @return copy of translation vector
      */
     public Vector3f getTranslation() {
         return new Vector3f(translation);
@@ -117,16 +159,27 @@ public final class CustomBlockModel {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (!(o instanceof CustomBlockModel that)) return false;
-        return Objects.equals(blockData, that.blockData);
+        return itemDisplay == that.itemDisplay
+                && Objects.equals(blockData, that.blockData)
+                && Objects.equals(itemStack, that.itemStack);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(blockData);
+        return Objects.hash(blockData, itemStack, itemDisplay);
     }
 
     @Override
     public String toString() {
-        return "CustomBlockModel{blockData=" + blockData.getAsString() + ", scale=" + scale + "}";
+        if (itemDisplay) {
+            String typeStr = "CUSTOM_ITEM";
+            if (itemStack != null) {
+                try {
+                    typeStr = itemStack.getType().name();
+                } catch (Throwable ignored) {}
+            }
+            return "CustomBlockModel{item=" + typeStr + ", scale=" + scale + "}";
+        }
+        return "CustomBlockModel{blockData=" + (blockData != null ? blockData.getAsString() : "null") + ", scale=" + scale + "}";
     }
 }

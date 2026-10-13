@@ -4,6 +4,7 @@ import com.github.retrooper.packetevents.PacketEvents;
 import com.github.retrooper.packetevents.protocol.entity.data.EntityData;
 import com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes;
 import com.github.retrooper.packetevents.protocol.entity.type.EntityTypes;
+import com.github.retrooper.packetevents.protocol.item.type.ItemTypes;
 import com.github.retrooper.packetevents.util.Vector3d;
 import com.github.retrooper.packetevents.wrapper.PacketWrapper;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerDestroyEntities;
@@ -24,22 +25,24 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Handles client-side BlockDisplay rendering via PacketEvents packets.
+ * Handles client-side Display rendering (BlockDisplay or ItemDisplay) via PacketEvents packets.
  *
  * <p>Produces pure protocol-level packets:
  * <ul>
- *   <li>{@link WrapperPlayServerSpawnEntity}: Spawns client-side virtual BlockDisplay entity.</li>
- *   <li>{@link WrapperPlayServerEntityMetadata}: Sets fixed 1.00005f scale, translation, and block state.</li>
- *   <li>{@link WrapperPlayServerDestroyEntities}: Despawns BlockDisplay entities when leaving view.</li>
+ *   <li>{@link WrapperPlayServerSpawnEntity}: Spawns client-side virtual Display entity.</li>
+ *   <li>{@link WrapperPlayServerEntityMetadata}: Sets scale, translation, item/block state and display type.</li>
+ *   <li>{@link WrapperPlayServerDestroyEntities}: Despawns Display entities when leaving view.</li>
  * </ul>
- * Zero Bukkit/NMS BlockDisplay entities are created or ticked on the server.</p>
+ * Zero Bukkit/NMS Display entities are created or ticked on the server.</p>
  */
 public class BlockDisplayRenderer {
 
-    // Index mappings for Minecraft 1.20+ Display and BlockDisplay metadata
+    // Index mappings for Minecraft 1.20+ Display metadata
     public static final int METADATA_TRANSLATION_INDEX = 11;
     public static final int METADATA_SCALE_INDEX = 12;
     public static final int METADATA_BLOCK_STATE_INDEX = 23;
+    public static final int METADATA_ITEM_INDEX = 23;
+    public static final int METADATA_ITEM_DISPLAY_TYPE_INDEX = 24;
 
     private final Logger logger;
     private BiConsumer<Player, PacketWrapper<?>> packetInterceptor; // used for benchmarks and test assertions
@@ -62,7 +65,7 @@ public class BlockDisplayRenderer {
     }
 
     /**
-     * Dispatches packets to spawn a client-side BlockDisplay entity for a specific player.
+     * Dispatches packets to spawn a client-side Display entity for a specific player.
      *
      * <p>Thread requirement: Thread-safe.</p>
      * <p>World/Packet impact: Emits 1 spawn packet and 1 metadata packet to the player's connection.</p>
@@ -70,7 +73,7 @@ public class BlockDisplayRenderer {
      * @param player player to receive the packets; must be online
      * @param entityId virtual entity ID
      * @param location world location of the block
-     * @param model model definition specifying block state and scale
+     * @param model model definition specifying item/block state and scale
      */
     public void spawnDisplay(Player player, int entityId, Location location, CustomBlockModel model) {
         if (player == null || !player.isOnline() || model == null || location == null) {
@@ -78,12 +81,15 @@ public class BlockDisplayRenderer {
         }
 
         try {
-            // 1. Spawn packet
-            Vector3d pos = new Vector3d(location.getBlockX(), location.getBlockY(), location.getBlockZ());
+            boolean isItem = model.isItemDisplay();
+            Vector3d pos = isItem
+                    ? new Vector3d(location.getBlockX() + 0.5, location.getBlockY() + 0.5, location.getBlockZ() + 0.5)
+                    : new Vector3d(location.getBlockX(), location.getBlockY(), location.getBlockZ());
+
             WrapperPlayServerSpawnEntity spawnPacket = new WrapperPlayServerSpawnEntity(
                     entityId,
                     Optional.of(UUID.randomUUID()),
-                    EntityTypes.BLOCK_DISPLAY,
+                    isItem ? EntityTypes.ITEM_DISPLAY : EntityTypes.BLOCK_DISPLAY,
                     pos,
                     0f,
                     0f,
@@ -92,19 +98,18 @@ public class BlockDisplayRenderer {
                     Optional.empty()
             );
 
-            // 2. Metadata packet
             List<EntityData<?>> metadataList = createDisplayMetadata(model);
             WrapperPlayServerEntityMetadata metadataPacket = new WrapperPlayServerEntityMetadata(entityId, metadataList);
 
             send(player, spawnPacket);
             send(player, metadataPacket);
         } catch (Exception e) {
-            logger.log(Level.WARNING, "Failed to spawn BlockDisplay virtual entity " + entityId + " for player " + player.getName(), e);
+            logger.log(Level.WARNING, "Failed to spawn Display virtual entity " + entityId + " for player " + player.getName(), e);
         }
     }
 
     /**
-     * Dispatches packets to destroy one or more virtual BlockDisplay entities on a player's client.
+     * Dispatches packets to destroy one or more virtual Display entities on a player's client.
      *
      * <p>Thread requirement: Thread-safe.</p>
      * <p>World/Packet impact: Emits 1 destroy packet to the player.</p>
@@ -121,12 +126,12 @@ public class BlockDisplayRenderer {
             WrapperPlayServerDestroyEntities destroyPacket = new WrapperPlayServerDestroyEntities(entityIds);
             send(player, destroyPacket);
         } catch (Exception e) {
-            logger.log(Level.WARNING, "Failed to destroy BlockDisplay entities for player " + player.getName(), e);
+            logger.log(Level.WARNING, "Failed to destroy Display entities for player " + player.getName(), e);
         }
     }
 
     /**
-     * Dispatches a metadata update packet for an already spawned BlockDisplay entity.
+     * Dispatches a metadata update packet for an already spawned Display entity.
      *
      * @param player player to update
      * @param entityId virtual entity ID
@@ -142,17 +147,17 @@ public class BlockDisplayRenderer {
             WrapperPlayServerEntityMetadata metadataPacket = new WrapperPlayServerEntityMetadata(entityId, metadataList);
             send(player, metadataPacket);
         } catch (Exception e) {
-            logger.log(Level.WARNING, "Failed to update BlockDisplay metadata for player " + player.getName(), e);
+            logger.log(Level.WARNING, "Failed to update Display metadata for player " + player.getName(), e);
         }
     }
 
     /**
-     * Builds the metadata entries for a BlockDisplay entity using the specified model.
+     * Builds the metadata entries for a Display entity using the specified model.
      */
     public List<EntityData<?>> createDisplayMetadata(CustomBlockModel model) {
-        List<EntityData<?>> list = new ArrayList<>(3);
+        List<EntityData<?>> list = new ArrayList<>(4);
 
-        // Scale: strictly 1.00005f
+        // Scale
         org.joml.Vector3f scale = model.getScale();
         list.add(new EntityData<>(
                 METADATA_SCALE_INDEX,
@@ -160,7 +165,7 @@ public class BlockDisplayRenderer {
                 new com.github.retrooper.packetevents.util.Vector3f(scale.x, scale.y, scale.z)
         ));
 
-        // Translation offset: -0.000025f to center 1.00005f cube on grid
+        // Translation offset
         org.joml.Vector3f trans = model.getTranslation();
         list.add(new EntityData<>(
                 METADATA_TRANSLATION_INDEX,
@@ -168,20 +173,46 @@ public class BlockDisplayRenderer {
                 new com.github.retrooper.packetevents.util.Vector3f(trans.x, trans.y, trans.z)
         ));
 
-        // Displayed Block State
-        int blockStateId = 0;
-        if (model.getBlockData() != null) {
-            try {
-                blockStateId = SpigotConversionUtil.fromBukkitBlockData(model.getBlockData()).getGlobalId();
-            } catch (Throwable ignored) {
-                // fallback if called in isolated headless test environment
+        if (model.isItemDisplay()) {
+            com.github.retrooper.packetevents.protocol.item.ItemStack peItem = null;
+            if (model.getItemStack() != null) {
+                try {
+                    peItem = SpigotConversionUtil.fromBukkitItemStack(model.getItemStack());
+                } catch (Throwable ignored) {
+                }
             }
+            if (peItem == null) {
+                peItem = com.github.retrooper.packetevents.protocol.item.ItemStack.builder()
+                        .type(ItemTypes.BARRIER)
+                        .amount(1)
+                        .build();
+            }
+            list.add(new EntityData<>(
+                    METADATA_ITEM_INDEX,
+                    EntityDataTypes.ITEMSTACK,
+                    peItem
+            ));
+            list.add(new EntityData<>(
+                    METADATA_ITEM_DISPLAY_TYPE_INDEX,
+                    EntityDataTypes.BYTE,
+                    (byte) 8 // FIXED
+            ));
+        } else {
+            // Displayed Block State
+            int blockStateId = 0;
+            if (model.getBlockData() != null) {
+                try {
+                    blockStateId = SpigotConversionUtil.fromBukkitBlockData(model.getBlockData()).getGlobalId();
+                } catch (Throwable ignored) {
+                    // fallback if called in isolated headless test environment
+                }
+            }
+            list.add(new EntityData<>(
+                    METADATA_BLOCK_STATE_INDEX,
+                    EntityDataTypes.BLOCK_STATE,
+                    blockStateId
+            ));
         }
-        list.add(new EntityData<>(
-                METADATA_BLOCK_STATE_INDEX,
-                EntityDataTypes.BLOCK_STATE,
-                blockStateId
-        ));
 
         return list;
     }

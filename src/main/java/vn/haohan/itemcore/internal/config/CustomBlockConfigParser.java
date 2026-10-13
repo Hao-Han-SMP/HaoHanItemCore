@@ -32,17 +32,63 @@ public final class CustomBlockConfigParser {
             return null;
         }
 
-        BlockData blockData = null;
+        CustomBlockModel customModel;
         Object modelObj = itemDef.getProperties().get("custom_block_model");
-        if (modelObj instanceof String modelStr) {
+
+        if (itemDef.isVanillaOverwrite()) {
+            BlockData blockData = null;
+            if (modelObj instanceof String modelStr) {
+                try {
+                    blockData = Bukkit.createBlockData(modelStr);
+                } catch (Exception ignored) {}
+            }
+            if (blockData == null && itemDef.getMaterial() != null) {
+                try {
+                    if (itemDef.getMaterial().isBlock()) {
+                        blockData = itemDef.getMaterial().createBlockData();
+                    }
+                } catch (Throwable ignored) {}
+            }
+            if (blockData == null) {
+                try {
+                    blockData = Bukkit.createBlockData(Material.STONE);
+                } catch (Throwable ignored) {}
+            }
+            customModel = new CustomBlockModel(blockData);
+        } else {
+            org.bukkit.inventory.ItemStack itemStack = null;
             try {
-                blockData = Bukkit.createBlockData(modelStr);
-            } catch (Exception ignored) {}
-        }
-        if (blockData == null) {
-            try {
-                blockData = Bukkit.createBlockData(Material.STONE);
+                var core = vn.haohan.itemcore.api.HaoHanItemCore.get();
+                if (core != null && core.getItemFactory() != null) {
+                    itemStack = core.getItemFactory().create(itemDef);
+                }
             } catch (Throwable ignored) {}
+
+            if (itemStack == null) {
+                try {
+                    Material mat = itemDef.getMaterial() != null ? itemDef.getMaterial() : Material.BARRIER;
+                    itemStack = new org.bukkit.inventory.ItemStack(mat);
+                    org.bukkit.inventory.meta.ItemMeta meta = itemStack.getItemMeta();
+                    if (meta != null) {
+                        if (itemDef.getCustomModelData() != null) {
+                            meta.setCustomModelData(itemDef.getCustomModelData());
+                        }
+                        String itemModel = itemDef.getItemModel();
+                        if (itemModel == null && itemDef.getId() != null && itemDef.getId().contains(":")) {
+                            itemModel = itemDef.getId();
+                        }
+                        if (itemModel != null) {
+                            try {
+                                meta.setItemModel(org.bukkit.NamespacedKey.fromString(itemModel));
+                            } catch (Throwable ignored) {}
+                        }
+                        itemStack.setItemMeta(meta);
+                    }
+                } catch (Throwable ignored) {
+                    itemStack = null;
+                }
+            }
+            customModel = CustomBlockModel.of(itemStack);
         }
 
         String dropId = null;
@@ -54,7 +100,7 @@ public final class CustomBlockConfigParser {
         }
 
         CustomBlockDefinition.Builder builder = CustomBlockDefinition.builder(customBlockId)
-                .model(new CustomBlockModel(blockData));
+                .model(customModel);
         if (dropId != null) {
             builder.dropItemId(dropId);
         }
