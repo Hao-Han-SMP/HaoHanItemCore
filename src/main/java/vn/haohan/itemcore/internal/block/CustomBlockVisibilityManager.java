@@ -71,7 +71,8 @@ public final class CustomBlockVisibilityManager {
             VirtualEntityIdManager idManager,
             BlockDisplayRenderer renderer,
             Logger logger) {
-        this(storage, registry, idManager, renderer, new CustomBlockCullingService(), CustomBlockCullingConfig.defaultConfig(), logger);
+        this(storage, registry, idManager, renderer, new CustomBlockCullingService(),
+                new CustomBlockCullingConfig(128.0, 16.0, false, false, 90.0, 180.0), logger);
     }
 
     public int getViewDistanceChunks() {
@@ -127,7 +128,7 @@ public final class CustomBlockVisibilityManager {
         int toChunkZ = to.getBlockZ() >> 4;
 
         if (fromChunkX != toChunkX || fromChunkZ != toChunkZ) {
-            updatePlayerChunks(player, toChunkX, toChunkZ);
+            updatePlayerChunks(player, toChunkX, toChunkZ, to);
             playerLastLook.put(player.getUniqueId(), new float[]{to.getYaw(), to.getPitch()});
             return true;
         }
@@ -331,13 +332,23 @@ public final class CustomBlockVisibilityManager {
      * Updates player visibility when crossing into a new chunk.
      */
     private void updatePlayerChunks(Player player, int newChunkX, int newChunkZ) {
+        updatePlayerChunks(player, newChunkX, newChunkZ, null);
+    }
+
+    private void updatePlayerChunks(Player player, int newChunkX, int newChunkZ, Location loc) {
         Set<Long> previousChunks = playerVisibleChunks.getOrDefault(player.getUniqueId(), Collections.emptySet());
         Set<Long> currentChunks = calculateChunksInRadius(newChunkX, newChunkZ, viewDistanceChunks);
 
         playerVisibleChunks.put(player.getUniqueId(), currentChunks);
 
-        World world = player.getWorld();
-        Location playerLoc = player.getLocation();
+        World world = (loc != null && loc.getWorld() != null) ? loc.getWorld() : player.getWorld();
+        Location playerLoc = loc;
+        if (playerLoc == null) {
+            try {
+                playerLoc = player.getLocation();
+            } catch (Throwable ignored) {
+            }
+        }
 
         // Entered chunks -> evaluate & spawn
         for (long chunkKey : currentChunks) {
@@ -379,7 +390,12 @@ public final class CustomBlockVisibilityManager {
         if (world == null) return;
         long chunkKey = CustomBlockStorage.packChunkKey(chunkX, chunkZ);
         playerVisibleChunks.computeIfAbsent(player.getUniqueId(), k -> ConcurrentHashMap.newKeySet()).add(chunkKey);
-        evaluateChunkCustomBlocks(player, world, chunkKey, player.getLocation());
+        Location loc = null;
+        try {
+            loc = player.getLocation();
+        } catch (Throwable ignored) {
+        }
+        evaluateChunkCustomBlocks(player, world, chunkKey, loc);
     }
 
     /**
@@ -407,6 +423,16 @@ public final class CustomBlockVisibilityManager {
 
         var playerEntities = playerChunkEntities.computeIfAbsent(player.getUniqueId(), k -> new ConcurrentHashMap<>())
                 .computeIfAbsent(chunkKey, k -> ConcurrentHashMap.newKeySet());
+
+        if (playerLoc == null) {
+            try {
+                playerLoc = player.getLocation();
+            } catch (Throwable ignored) {
+            }
+        }
+        if (playerLoc == null) {
+            playerLoc = new Location(world, (chunkX << 4) + 8, 64, (chunkZ << 4) + 8);
+        }
 
         double px = playerLoc.getX();
         double py = playerLoc.getY();
