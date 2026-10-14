@@ -5,6 +5,7 @@ import org.bukkit.block.data.BlockData;
 import org.bukkit.inventory.ItemStack;
 import org.joml.Vector3f;
 
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -30,6 +31,7 @@ public final class CustomBlockModel {
     private final boolean itemDisplay;
     private final Vector3f scale;
     private final Vector3f translation;
+    private final List<com.github.retrooper.packetevents.protocol.entity.data.EntityData<?>> cachedMetadata;
 
     /**
      * Constructs a default empty block model.
@@ -72,6 +74,85 @@ public final class CustomBlockModel {
         this.itemDisplay = itemDisplay;
         this.scale = scale != null ? new Vector3f(scale) : new Vector3f(DEFAULT_SCALE, DEFAULT_SCALE, DEFAULT_SCALE);
         this.translation = translation != null ? new Vector3f(translation) : new Vector3f(DEFAULT_TRANSLATION_OFFSET, DEFAULT_TRANSLATION_OFFSET, DEFAULT_TRANSLATION_OFFSET);
+        this.cachedMetadata = compileMetadata();
+    }
+
+    private List<com.github.retrooper.packetevents.protocol.entity.data.EntityData<?>> compileMetadata() {
+        if (com.github.retrooper.packetevents.PacketEvents.getAPI() == null) {
+            return java.util.Collections.emptyList();
+        }
+        try {
+            List<com.github.retrooper.packetevents.protocol.entity.data.EntityData<?>> list = new java.util.ArrayList<>(4);
+
+            // Scale
+            list.add(new com.github.retrooper.packetevents.protocol.entity.data.EntityData<>(
+                    12, // METADATA_SCALE_INDEX
+                    com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes.VECTOR3F,
+                    new com.github.retrooper.packetevents.util.Vector3f(scale.x, scale.y, scale.z)
+            ));
+
+            // Translation
+            list.add(new com.github.retrooper.packetevents.protocol.entity.data.EntityData<>(
+                    11, // METADATA_TRANSLATION_INDEX
+                    com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes.VECTOR3F,
+                    new com.github.retrooper.packetevents.util.Vector3f(translation.x, translation.y, translation.z)
+            ));
+
+            if (this.itemDisplay) {
+                com.github.retrooper.packetevents.protocol.item.ItemStack peItem = null;
+                if (this.itemStack != null) {
+                    try {
+                        peItem = io.github.retrooper.packetevents.util.SpigotConversionUtil.fromBukkitItemStack(this.itemStack);
+                    } catch (Throwable ignored) {
+                    }
+                }
+                if (peItem == null) {
+                    peItem = com.github.retrooper.packetevents.protocol.item.ItemStack.builder()
+                            .type(com.github.retrooper.packetevents.protocol.item.type.ItemTypes.BARRIER)
+                            .amount(1)
+                            .build();
+                }
+                list.add(new com.github.retrooper.packetevents.protocol.entity.data.EntityData<>(
+                        23, // METADATA_ITEM_INDEX
+                        com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes.ITEMSTACK,
+                        peItem
+                ));
+                list.add(new com.github.retrooper.packetevents.protocol.entity.data.EntityData<>(
+                        24, // METADATA_ITEM_DISPLAY_TYPE_INDEX
+                        com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes.BYTE,
+                        (byte) 8 // FIXED
+                ));
+            } else {
+                int blockStateId = 0;
+                if (this.blockData != null) {
+                    try {
+                        blockStateId = io.github.retrooper.packetevents.util.SpigotConversionUtil.fromBukkitBlockData(this.blockData).getGlobalId();
+                    } catch (Throwable ignored) {
+                    }
+                }
+                list.add(new com.github.retrooper.packetevents.protocol.entity.data.EntityData<>(
+                        23, // METADATA_BLOCK_STATE_INDEX
+                        com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes.BLOCK_STATE,
+                        blockStateId
+                ));
+            }
+
+            return java.util.Collections.unmodifiableList(list);
+        } catch (Throwable t) {
+            return java.util.Collections.emptyList();
+        }
+    }
+
+    /**
+     * Gets the pre-compiled PacketEvents EntityData metadata list for this model.
+     *
+     * @return unmodifiable list of pre-compiled EntityData
+     */
+    public List<com.github.retrooper.packetevents.protocol.entity.data.EntityData<?>> getCachedMetadata() {
+        if (cachedMetadata.isEmpty() && com.github.retrooper.packetevents.PacketEvents.getAPI() != null) {
+            return compileMetadata();
+        }
+        return cachedMetadata;
     }
 
     /**

@@ -98,7 +98,10 @@ public class BlockDisplayRenderer {
                     Optional.empty()
             );
 
-            List<EntityData<?>> metadataList = createDisplayMetadata(model);
+            List<EntityData<?>> metadataList = model.getCachedMetadata();
+            if (metadataList == null || metadataList.isEmpty()) {
+                metadataList = createDisplayMetadata(model);
+            }
             WrapperPlayServerEntityMetadata metadataPacket = new WrapperPlayServerEntityMetadata(entityId, metadataList);
 
             send(player, spawnPacket);
@@ -143,7 +146,10 @@ public class BlockDisplayRenderer {
         }
 
         try {
-            List<EntityData<?>> metadataList = createDisplayMetadata(newModel);
+            List<EntityData<?>> metadataList = newModel.getCachedMetadata();
+            if (metadataList == null || metadataList.isEmpty()) {
+                metadataList = createDisplayMetadata(newModel);
+            }
             WrapperPlayServerEntityMetadata metadataPacket = new WrapperPlayServerEntityMetadata(entityId, metadataList);
             send(player, metadataPacket);
         } catch (Exception e) {
