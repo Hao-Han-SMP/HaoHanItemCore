@@ -6,6 +6,7 @@ import org.bukkit.World;
 import org.bukkit.entity.Player;
 import vn.haohan.itemcore.api.block.CustomBlockDefinition;
 import vn.haohan.itemcore.api.block.CustomBlockRegistry;
+import vn.haohan.itemcore.internal.config.CustomBlockCullingConfig;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -21,9 +22,9 @@ import java.util.logging.Logger;
 /**
  * Manages player-specific visibility and spatial culling for custom blocks.
  *
- * <p>Enforces zero-overhead intra-chunk movement: when a player moves within the same chunk,
- * no packets or spatial loops are executed. When crossing chunk borders, calculates diffs
- * between entering and leaving chunks and dispatches spawn/destroy packets accordingly.</p>
+ * <p>Enforces zero-overhead intra-chunk movement: when a player moves within the same chunk
+ * without camera angle change, no packets or spatial loops are executed. When crossing chunk
+ * borders or rotating past threshold, calculates culling diffs and dispatches delta packets.</p>
  */
 public final class CustomBlockVisibilityManager {
 
@@ -31,6 +32,8 @@ public final class CustomBlockVisibilityManager {
     private final CustomBlockRegistry registry;
     private final VirtualEntityIdManager idManager;
     private final BlockDisplayRenderer renderer;
+    private final CustomBlockCullingService cullingService;
+    private volatile CustomBlockCullingConfig cullingConfig;
     private final Logger logger;
 
     // Default radial chunk view distance for custom block rendering
@@ -42,17 +45,33 @@ public final class CustomBlockVisibilityManager {
     // Player UUID -> ChunkKey -> Set of active virtual entity IDs currently spawned on client
     private final ConcurrentHashMap<UUID, ConcurrentHashMap<Long, Set<Integer>>> playerChunkEntities = new ConcurrentHashMap<>();
 
+    // Player UUID -> [lastYaw, lastPitch] for camera rotation debounce
+    private final ConcurrentHashMap<UUID, float[]> playerLastLook = new ConcurrentHashMap<>();
+
+    public CustomBlockVisibilityManager(
+            CustomBlockStorage storage,
+            CustomBlockRegistry registry,
+            VirtualEntityIdManager idManager,
+            BlockDisplayRenderer renderer,
+            CustomBlockCullingService cullingService,
+            CustomBlockCullingConfig cullingConfig,
+            Logger logger) {
+        this.storage = Objects.requireNonNull(storage, "storage cannot be null");
+        this.registry = Objects.requireNonNull(registry, "registry cannot be null");
+        this.idManager = Objects.requireNonNull(idManager, "idManager cannot be null");
+        this.renderer = Objects.requireNonNull(renderer, "renderer cannot be null");
+        this.cullingService = cullingService != null ? cullingService : new CustomBlockCullingService();
+        this.cullingConfig = cullingConfig != null ? cullingConfig : CustomBlockCullingConfig.defaultConfig();
+        this.logger = logger != null ? logger : Logger.getLogger(CustomBlockVisibilityManager.class.getName());
+    }
+
     public CustomBlockVisibilityManager(
             CustomBlockStorage storage,
             CustomBlockRegistry registry,
             VirtualEntityIdManager idManager,
             BlockDisplayRenderer renderer,
             Logger logger) {
-        this.storage = Objects.requireNonNull(storage, "storage cannot be null");
-        this.registry = Objects.requireNonNull(registry, "registry cannot be null");
-        this.idManager = Objects.requireNonNull(idManager, "idManager cannot be null");
-        this.renderer = Objects.requireNonNull(renderer, "renderer cannot be null");
-        this.logger = logger != null ? logger : Logger.getLogger(CustomBlockVisibilityManager.class.getName());
+        this(storage, registry, idManager, renderer, new CustomBlockCullingService(), CustomBlockCullingConfig.defaultConfig(), logger);
     }
 
     public int getViewDistanceChunks() {
@@ -63,44 +82,79 @@ public final class CustomBlockVisibilityManager {
         this.viewDistanceChunks = Math.max(1, Math.min(32, viewDistanceChunks));
     }
 
+    public CustomBlockCullingConfig getCullingConfig() {
+        return cullingConfig;
+    }
+
+    public void setCullingConfig(CustomBlockCullingConfig cullingConfig) {
+        this.cullingConfig = Objects.requireNonNull(cullingConfig, "cullingConfig cannot be null");
+    }
+
+    public CustomBlockCullingService getCullingService() {
+        return cullingService;
+    }
+
     /**
      * Handles player joining the server. Computes initial visible chunks and spawns custom blocks.
      */
     public void handlePlayerJoin(Player player) {
         if (player == null || !player.isOnline()) return;
+        Location loc = player.getLocation();
+        playerLastLook.put(player.getUniqueId(), new float[]{loc.getYaw(), loc.getPitch()});
         syncPlayerView(player);
     }
 
     /**
-     * Handles player movement.
-     *
-     * <p>Performance critical: Returns immediately if the player did not change chunks.</p>
+     * Handles player movement using chunk coordinates.
      */
     public void handlePlayerMove(Player player, int fromChunkX, int fromChunkZ, int toChunkX, int toChunkZ) {
         if (fromChunkX == toChunkX && fromChunkZ == toChunkZ) {
-            // Intra-chunk movement: 0 packets, 0 scans
             return;
         }
-
         updatePlayerChunks(player, toChunkX, toChunkZ);
     }
 
     /**
-     * Handles player move with Location objects.
+     * Handles player move with Location objects, detecting chunk crossings and camera rotation deltas.
      *
-     * @return true if a chunk border was crossed, false if intra-chunk movement
+     * @return true if visibility state was evaluated, false if intra-chunk movement without rotation
      */
     public boolean handlePlayerMove(Player player, Location from, Location to) {
-        if (from == null || to == null) return false;
+        if (from == null || to == null || player == null) return false;
         int fromChunkX = from.getBlockX() >> 4;
         int fromChunkZ = from.getBlockZ() >> 4;
         int toChunkX = to.getBlockX() >> 4;
         int toChunkZ = to.getBlockZ() >> 4;
-        if (fromChunkX == toChunkX && fromChunkZ == toChunkZ) {
-            return false;
+
+        if (fromChunkX != toChunkX || fromChunkZ != toChunkZ) {
+            updatePlayerChunks(player, toChunkX, toChunkZ);
+            playerLastLook.put(player.getUniqueId(), new float[]{to.getYaw(), to.getPitch()});
+            return true;
         }
-        handlePlayerMove(player, fromChunkX, fromChunkZ, toChunkX, toChunkZ);
-        return true;
+
+        // Intra-chunk movement: check camera rotation delta
+        if (cullingConfig.isFrustumCullingEnabled()) {
+            float[] last = playerLastLook.get(player.getUniqueId());
+            float curYaw = to.getYaw();
+            float curPitch = to.getPitch();
+
+            if (last == null) {
+                playerLastLook.put(player.getUniqueId(), new float[]{curYaw, curPitch});
+                return false;
+            }
+
+            float dYaw = Math.abs(curYaw - last[0]);
+            if (dYaw > 180f) dYaw = 360f - dYaw;
+            float dPitch = Math.abs(curPitch - last[1]);
+
+            if (dYaw >= cullingConfig.getFrustumAngleThreshold() || dPitch >= cullingConfig.getFrustumAngleThreshold()) {
+                playerLastLook.put(player.getUniqueId(), new float[]{curYaw, curPitch});
+                updatePlayerCullingInLoadedChunks(player, to);
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -108,6 +162,8 @@ public final class CustomBlockVisibilityManager {
      */
     public void initPlayer(Player player, Location location) {
         if (player == null || location == null) return;
+        playerLastLook.put(player.getUniqueId(), new float[]{location.getYaw(), location.getPitch()});
+
         int centerChunkX = location.getBlockX() >> 4;
         int centerChunkZ = location.getBlockZ() >> 4;
 
@@ -116,7 +172,7 @@ public final class CustomBlockVisibilityManager {
 
         World world = location.getWorld();
         for (long chunkKey : newChunks) {
-            spawnChunkCustomBlocks(player, world, chunkKey);
+            evaluateChunkCustomBlocks(player, world, chunkKey, location);
         }
     }
 
@@ -165,10 +221,29 @@ public final class CustomBlockVisibilityManager {
         for (Player player : world.getPlayers()) {
             Set<Long> visible = playerVisibleChunks.get(player.getUniqueId());
             if (visible != null && visible.contains(chunkKey)) {
-                renderer.spawnDisplay(player, entityId, location, definition.getModel());
-                playerChunkEntities.computeIfAbsent(player.getUniqueId(), k -> new ConcurrentHashMap<>())
-                        .computeIfAbsent(chunkKey, k -> ConcurrentHashMap.newKeySet())
-                        .add(entityId);
+                Location pLoc = player.getLocation();
+                boolean canSee = true;
+
+                if (cullingConfig.isSurfaceCullingEnabled()) {
+                    canSee = cullingService.isSurfaceExposed(world, x, y, z);
+                }
+                if (canSee) {
+                    double bx = x + 0.5, by = y + 0.5, bz = z + 0.5;
+                    canSee = cullingService.isInSphere(pLoc.getX(), pLoc.getY(), pLoc.getZ(), bx, by, bz, cullingConfig.getSphericalRadiusSq());
+                }
+                if (canSee && cullingConfig.isFrustumCullingEnabled()) {
+                    double[] dir = cullingService.getDirection(pLoc.getYaw(), pLoc.getPitch());
+                    canSee = cullingService.isInFrustum(pLoc.getX(), pLoc.getY() + 1.62, pLoc.getZ(),
+                            dir[0], dir[1], dir[2], x + 0.5, y + 0.5, z + 0.5,
+                            cullingConfig.getFrustumCosThreshold(), CustomBlockCullingService.DEFAULT_NEAR_DISTANCE_SQ);
+                }
+
+                if (canSee) {
+                    renderer.spawnDisplay(player, entityId, location, definition.getModel());
+                    playerChunkEntities.computeIfAbsent(player.getUniqueId(), k -> new ConcurrentHashMap<>())
+                            .computeIfAbsent(chunkKey, k -> ConcurrentHashMap.newKeySet())
+                            .add(entityId);
+                }
             }
         }
     }
@@ -248,7 +323,7 @@ public final class CustomBlockVisibilityManager {
 
         World world = player.getWorld();
         for (long chunkKey : newChunks) {
-            spawnChunkCustomBlocks(player, world, chunkKey);
+            evaluateChunkCustomBlocks(player, world, chunkKey, loc);
         }
     }
 
@@ -262,11 +337,12 @@ public final class CustomBlockVisibilityManager {
         playerVisibleChunks.put(player.getUniqueId(), currentChunks);
 
         World world = player.getWorld();
+        Location playerLoc = player.getLocation();
 
-        // Entered chunks -> spawn
+        // Entered chunks -> evaluate & spawn
         for (long chunkKey : currentChunks) {
             if (!previousChunks.contains(chunkKey)) {
-                spawnChunkCustomBlocks(player, world, chunkKey);
+                evaluateChunkCustomBlocks(player, world, chunkKey, playerLoc);
             }
         }
 
@@ -279,8 +355,23 @@ public final class CustomBlockVisibilityManager {
     }
 
     /**
-     * Handles chunk data packet delivery to client. Spawns virtual BlockDisplay entities
-     * for all custom blocks contained in the chunk.
+     * Re-evaluates culling state for all currently visible chunks of a player.
+     */
+    public void updatePlayerCullingInLoadedChunks(Player player, Location loc) {
+        if (player == null || loc == null) return;
+        World world = loc.getWorld();
+        if (world == null) return;
+
+        Set<Long> visibleChunks = playerVisibleChunks.get(player.getUniqueId());
+        if (visibleChunks == null || visibleChunks.isEmpty()) return;
+
+        for (long chunkKey : visibleChunks) {
+            evaluateChunkCustomBlocks(player, world, chunkKey, loc);
+        }
+    }
+
+    /**
+     * Handles chunk data packet delivery to client. Evaluates custom blocks contained in the chunk.
      */
     public void handleChunkData(Player player, int chunkX, int chunkZ) {
         if (player == null || !player.isOnline()) return;
@@ -288,7 +379,7 @@ public final class CustomBlockVisibilityManager {
         if (world == null) return;
         long chunkKey = CustomBlockStorage.packChunkKey(chunkX, chunkZ);
         playerVisibleChunks.computeIfAbsent(player.getUniqueId(), k -> ConcurrentHashMap.newKeySet()).add(chunkKey);
-        spawnChunkCustomBlocks(player, world, chunkKey);
+        evaluateChunkCustomBlocks(player, world, chunkKey, player.getLocation());
     }
 
     /**
@@ -304,7 +395,7 @@ public final class CustomBlockVisibilityManager {
         destroyChunkCustomBlocks(player, chunkKey);
     }
 
-    private void spawnChunkCustomBlocks(Player player, World world, long chunkKey) {
+    private void evaluateChunkCustomBlocks(Player player, World world, long chunkKey, Location playerLoc) {
         int chunkX = CustomBlockStorage.unpackChunkX(chunkKey);
         int chunkZ = CustomBlockStorage.unpackChunkZ(chunkKey);
 
@@ -316,6 +407,20 @@ public final class CustomBlockVisibilityManager {
 
         var playerEntities = playerChunkEntities.computeIfAbsent(player.getUniqueId(), k -> new ConcurrentHashMap<>())
                 .computeIfAbsent(chunkKey, k -> ConcurrentHashMap.newKeySet());
+
+        double px = playerLoc.getX();
+        double py = playerLoc.getY();
+        double pz = playerLoc.getZ();
+        double eyeX = px;
+        double eyeY = py + 1.62;
+        double eyeZ = pz;
+
+        float yaw = playerLoc.getYaw();
+        float pitch = playerLoc.getPitch();
+        double[] dir = cullingService.getDirection(yaw, pitch);
+        double fovCosThreshold = cullingConfig.getFrustumCosThreshold();
+
+        List<Integer> toDestroy = new ArrayList<>();
 
         for (Map.Entry<Integer, String> entry : blocksInChunk.entrySet()) {
             int localKey = entry.getKey();
@@ -330,10 +435,55 @@ public final class CustomBlockVisibilityManager {
             int worldZ = baseZ + CustomBlockStorage.unpackLocalZ(localKey);
 
             int entityId = idManager.getOrCreateId(world.getUID(), worldX, worldY, worldZ);
-            Location loc = new Location(world, worldX, worldY, worldZ);
+            boolean isSpawned = playerEntities.contains(entityId);
 
-            renderer.spawnDisplay(player, entityId, loc, def.getModel());
-            playerEntities.add(entityId);
+            // Tier 1: 1-Face Surface Culling
+            if (cullingConfig.isSurfaceCullingEnabled() && !cullingService.isSurfaceExposed(world, worldX, worldY, worldZ)) {
+                if (isSpawned) {
+                    toDestroy.add(entityId);
+                    playerEntities.remove(entityId);
+                }
+                continue;
+            }
+
+            // Tier 2: Spherical Radius with Hysteresis
+            double bx = worldX + 0.5;
+            double by = worldY + 0.5;
+            double bz = worldZ + 0.5;
+            double radiusSq = isSpawned ? cullingConfig.getHysteresisRadiusSq() : cullingConfig.getSphericalRadiusSq();
+
+            if (!cullingService.isInSphere(px, py, pz, bx, by, bz, radiusSq)) {
+                if (isSpawned) {
+                    toDestroy.add(entityId);
+                    playerEntities.remove(entityId);
+                }
+                continue;
+            }
+
+            // Tier 3: Conical Frustum Culling
+            if (cullingConfig.isFrustumCullingEnabled()) {
+                boolean inFrustum = cullingService.isInFrustum(eyeX, eyeY, eyeZ, dir[0], dir[1], dir[2],
+                        bx, by, bz, fovCosThreshold, CustomBlockCullingService.DEFAULT_NEAR_DISTANCE_SQ);
+                if (!inFrustum) {
+                    if (isSpawned) {
+                        toDestroy.add(entityId);
+                        playerEntities.remove(entityId);
+                    }
+                    continue;
+                }
+            }
+
+            // Passes all culling filters
+            if (!isSpawned) {
+                Location loc = new Location(world, worldX, worldY, worldZ);
+                renderer.spawnDisplay(player, entityId, loc, def.getModel());
+                playerEntities.add(entityId);
+            }
+        }
+
+        if (!toDestroy.isEmpty()) {
+            int[] array = toDestroy.stream().mapToInt(Integer::intValue).toArray();
+            renderer.destroyDisplay(player, array);
         }
     }
 
@@ -351,6 +501,7 @@ public final class CustomBlockVisibilityManager {
     private void clearPlayer(Player player) {
         UUID uid = player.getUniqueId();
         playerVisibleChunks.remove(uid);
+        playerLastLook.remove(uid);
 
         var chunkMap = playerChunkEntities.remove(uid);
         if (chunkMap != null && !chunkMap.isEmpty()) {
@@ -378,6 +529,7 @@ public final class CustomBlockVisibilityManager {
     public void clear() {
         playerVisibleChunks.clear();
         playerChunkEntities.clear();
+        playerLastLook.clear();
     }
 
     public void shutdown() {

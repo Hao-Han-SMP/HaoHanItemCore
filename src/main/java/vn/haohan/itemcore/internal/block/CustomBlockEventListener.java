@@ -441,14 +441,7 @@ public final class CustomBlockEventListener implements Listener {
             }
         }
 
-        int fromChunkX = from.getBlockX() >> 4;
-        int fromChunkZ = from.getBlockZ() >> 4;
-        int toChunkX = to.getBlockX() >> 4;
-        int toChunkZ = to.getBlockZ() >> 4;
-
-        if (fromChunkX != toChunkX || fromChunkZ != toChunkZ) {
-            visibilityManager.handlePlayerMove(event.getPlayer(), fromChunkX, fromChunkZ, toChunkX, toChunkZ);
-        }
+        visibilityManager.handlePlayerMove(event.getPlayer(), from, to);
     }
 
     // --- Lifecycle Events ---

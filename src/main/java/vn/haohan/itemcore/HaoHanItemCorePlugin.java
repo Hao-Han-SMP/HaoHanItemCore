@@ -232,6 +232,13 @@ public final class HaoHanItemCorePlugin extends JavaPlugin {
     private void loadAllConfigs() {
         Logger log = getLogger();
 
+        // Update culling configuration
+        if (customBlockVisibilityManager != null) {
+            customBlockVisibilityManager.setCullingConfig(
+                    vn.haohan.itemcore.internal.config.CustomBlockCullingConfig.fromConfig(getConfig())
+            );
+        }
+
         // Load custom tool tiers
         toolTierConfigLoader = new vn.haohan.itemcore.internal.config.ToolTierConfigLoader(log);
         File tiersFile = new File(getDataFolder(), "tiers.yml");
