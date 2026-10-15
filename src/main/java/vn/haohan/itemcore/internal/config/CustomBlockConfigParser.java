@@ -3,12 +3,14 @@ package vn.haohan.itemcore.internal.config;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.block.data.BlockData;
+import vn.haohan.itemcore.api.block.AlternativeCustomBlock;
 import vn.haohan.itemcore.api.block.BlockDropProvider;
 import vn.haohan.itemcore.api.block.CustomBlockActionRegistry;
 import vn.haohan.itemcore.api.block.CustomBlockDefinition;
 import vn.haohan.itemcore.api.block.CustomBlockModel;
 import vn.haohan.itemcore.api.block.CustomBlockSound;
 import vn.haohan.itemcore.api.block.CustomBlockSoundGroup;
+import vn.haohan.itemcore.api.block.NativeCustomBlock;
 import vn.haohan.itemcore.api.block.ToolType;
 import vn.haohan.itemcore.api.item.ItemDefinition;
 
@@ -99,8 +101,48 @@ public final class CustomBlockConfigParser {
             dropId = itemDef.getId();
         }
 
-        CustomBlockDefinition.AbstractBuilder<?, ?> builder = CustomBlockDefinition.builder(customBlockId)
-                .model(customModel);
+        Object variationObj = itemDef.getProperties().get("custom_variation");
+        if (variationObj == null) {
+            variationObj = itemDef.getProperties().get("custom_block_variation");
+        }
+
+        CustomBlockDefinition.AbstractBuilder<?, ?> builder;
+        if (variationObj instanceof Number num) {
+            NativeCustomBlock.Builder nativeBuilder = NativeCustomBlock.builder(customBlockId)
+                    .customVariation(num.intValue());
+            Object directionalObj = itemDef.getProperties().get("custom_directional");
+            if (directionalObj == null) {
+                directionalObj = itemDef.getProperties().get("custom_block_directional");
+            }
+            if (directionalObj == null) {
+                directionalObj = itemDef.getProperties().get("directional");
+            }
+            if (Boolean.TRUE.equals(directionalObj)) {
+                nativeBuilder.directional(true);
+            }
+            builder = nativeBuilder;
+        } else if (variationObj instanceof String str && str.matches("-?\\d+")) {
+            NativeCustomBlock.Builder nativeBuilder = NativeCustomBlock.builder(customBlockId)
+                    .customVariation(Integer.parseInt(str));
+            Object directionalObj = itemDef.getProperties().get("custom_directional");
+            if (directionalObj == null) {
+                directionalObj = itemDef.getProperties().get("custom_block_directional");
+            }
+            if (directionalObj == null) {
+                directionalObj = itemDef.getProperties().get("directional");
+            }
+            if (Boolean.TRUE.equals(directionalObj)) {
+                nativeBuilder.directional(true);
+            }
+            builder = nativeBuilder;
+        } else if (itemDef.isVanillaOverwrite()) {
+            builder = CustomBlockDefinition.builder(customBlockId);
+        } else {
+            builder = AlternativeCustomBlock.builder(customBlockId);
+        }
+
+        builder.model(customModel);
+        builder.properties(itemDef.getProperties());
         if (dropId != null) {
             builder.dropItemId(dropId);
         }
