@@ -14,7 +14,7 @@ import java.util.*;
  * drop providers, and arbitrary attributes.
  * This class is immutable and thread-safe.</p>
  */
-public final class CustomBlockDefinition {
+public class CustomBlockDefinition {
 
     private final String id;
     private final Material baseBlock;
@@ -31,10 +31,10 @@ public final class CustomBlockDefinition {
     private final CustomBlockInteractHandler interactHandler;
     private final CustomBlockStepHandler stepHandler;
 
-    private CustomBlockDefinition(Builder builder) {
+    protected CustomBlockDefinition(AbstractBuilder<?, ?> builder) {
         this.id = builder.id;
         this.baseBlock = resolveBaseBlock(builder.id, builder.baseBlock);
-        this.model = builder.model;
+        this.model = builder.model != null ? builder.model : resolveDefaultModel(this.id, this.baseBlock);
         this.properties = Collections.unmodifiableMap(new HashMap<>(builder.properties));
         this.dropItemId = builder.dropItemId;
         this.hardness = builder.hardness;
@@ -82,12 +82,33 @@ public final class CustomBlockDefinition {
         return baseBlock;
     }
 
+    public boolean isNative() {
+        return this instanceof NativeCustomBlock;
+    }
+
+    public boolean isAlternative() {
+        return this instanceof AlternativeCustomBlock;
+    }
+
     /**
      * Returns true if this definition overwrites an existing vanilla Minecraft block
-     * instead of using a physical Barrier + BlockDisplay.
+     * instead of using a physical Barrier + BlockDisplay or NoteBlock native state.
      */
     public boolean isVanillaOverwrite() {
-        return baseBlock != null && baseBlock != Material.BARRIER && safeIsBlock(baseBlock);
+        return baseBlock != null && baseBlock != Material.BARRIER && baseBlock != Material.NOTE_BLOCK && safeIsBlock(baseBlock);
+    }
+
+    private static CustomBlockModel resolveDefaultModel(String id, Material baseBlock) {
+        Material resolved = resolveBaseBlock(id, baseBlock);
+        if (resolved != null && resolved != Material.BARRIER && safeIsBlock(resolved)) {
+            try {
+                return new CustomBlockModel(org.bukkit.Bukkit.createBlockData(resolved));
+            } catch (Throwable ignored) {
+                return new CustomBlockModel(null);
+            }
+        } else {
+            return new CustomBlockModel(null);
+        }
     }
 
     private static boolean safeIsBlock(Material material) {
@@ -271,158 +292,175 @@ public final class CustomBlockDefinition {
     }
 
     /**
-     * Builder for {@link CustomBlockDefinition}.
+     * Abstract builder containing common properties for all custom block definitions.
+     *
+     * @param <B> self builder type for fluent chaining
+     * @param <T> resulting custom block definition type
      */
-    public static final class Builder {
-        private final String id;
-        private Material baseBlock;
-        private CustomBlockModel model;
-        private final Map<String, Object> properties = new HashMap<>();
-        private String dropItemId;
-        private float hardness = 0.0f;
-        private MiningCondition miningCondition;
-        private BlockDropProvider dropProvider;
-        private ToolType toolType;
-        private final Set<ToolType> harvestToolTypes = new HashSet<>();
-        private ToolTier requiredTier;
-        private boolean silkTouchDropsSelf = true;
-        private CustomBlockSoundGroup soundGroup;
-        private CustomBlockInteractHandler interactHandler;
-        private CustomBlockStepHandler stepHandler;
+    public static abstract class AbstractBuilder<B extends AbstractBuilder<B, T>, T extends CustomBlockDefinition> {
+        protected final String id;
+        protected Material baseBlock;
+        protected CustomBlockModel model;
+        protected final Map<String, Object> properties = new HashMap<>();
+        protected String dropItemId;
+        protected float hardness = 0.0f;
+        protected MiningCondition miningCondition;
+        protected BlockDropProvider dropProvider;
+        protected ToolType toolType;
+        protected final Set<ToolType> harvestToolTypes = new HashSet<>();
+        protected ToolTier requiredTier;
+        protected boolean silkTouchDropsSelf = true;
+        protected CustomBlockSoundGroup soundGroup;
+        protected CustomBlockInteractHandler interactHandler;
+        protected CustomBlockStepHandler stepHandler;
 
-        private Builder(String id) {
+        protected AbstractBuilder(String id) {
+            this(id, null);
+        }
+
+        protected AbstractBuilder(String id, Material baseBlock) {
             Objects.requireNonNull(id, "Custom block ID cannot be null");
             if (id.isBlank()) {
                 throw new IllegalArgumentException("Custom block ID cannot be blank");
             }
             this.id = id;
-        }
-
-        public Builder baseBlock(Material baseBlock) {
             this.baseBlock = baseBlock;
-            return this;
         }
 
-        public Builder soundGroup(CustomBlockSoundGroup soundGroup) {
+        @SuppressWarnings("unchecked")
+        protected B self() {
+            return (B) this;
+        }
+
+        public B baseBlock(Material baseBlock) {
+            this.baseBlock = baseBlock;
+            return self();
+        }
+
+        public B soundGroup(CustomBlockSoundGroup soundGroup) {
             this.soundGroup = soundGroup;
-            return this;
+            return self();
         }
 
-        public Builder onInteract(CustomBlockInteractHandler handler) {
+        public B onInteract(CustomBlockInteractHandler handler) {
             this.interactHandler = handler;
-            return this;
+            return self();
         }
 
-        public Builder onStep(CustomBlockStepHandler handler) {
+        public B onStep(CustomBlockStepHandler handler) {
             this.stepHandler = handler;
-            return this;
+            return self();
         }
 
-        public Builder model(CustomBlockModel model) {
+        public B model(CustomBlockModel model) {
             this.model = Objects.requireNonNull(model, "model cannot be null");
-            return this;
+            return self();
         }
 
-        public Builder property(String key, Object value) {
+        public B property(String key, Object value) {
             if (key != null && value != null) {
                 this.properties.put(key, value);
             }
-            return this;
+            return self();
         }
 
-        public Builder properties(Map<String, Object> properties) {
+        public B properties(Map<String, Object> properties) {
             if (properties != null) {
                 this.properties.putAll(properties);
             }
-            return this;
+            return self();
         }
 
-        public Builder dropItemId(String dropItemId) {
+        public B dropItemId(String dropItemId) {
             this.dropItemId = dropItemId;
-            return this;
+            return self();
         }
 
-        public Builder hardness(float seconds) {
+        public B hardness(float seconds) {
             this.hardness = seconds;
-            return this;
+            return self();
         }
 
-        public Builder unbreakable() {
+        public B unbreakable() {
             this.hardness = -1.0f;
-            return this;
+            return self();
         }
 
-        public Builder instantBreak() {
+        public B instantBreak() {
             this.hardness = 0.0f;
-            return this;
+            return self();
         }
 
-        public Builder hardness(boolean unbreakable) {
+        public B hardness(boolean unbreakable) {
             this.hardness = unbreakable ? -1.0f : 0.0f;
-            return this;
+            return self();
         }
 
-        public Builder miningCondition(MiningCondition miningCondition) {
+        public B miningCondition(MiningCondition miningCondition) {
             this.miningCondition = miningCondition;
-            return this;
+            return self();
         }
 
-        public Builder dropProvider(BlockDropProvider dropProvider) {
+        public B dropProvider(BlockDropProvider dropProvider) {
             this.dropProvider = dropProvider;
-            return this;
+            return self();
         }
 
-        public Builder toolType(ToolType toolType) {
+        public B toolType(ToolType toolType) {
             this.toolType = toolType;
             if (toolType != null) {
                 this.harvestToolTypes.add(toolType);
             }
-            return this;
+            return self();
         }
 
-        public Builder mineableWith(ToolType toolType, ToolTier minTier) {
+        public B mineableWith(ToolType toolType, ToolTier minTier) {
             if (toolType != null) {
                 this.harvestToolTypes.add(toolType);
             }
             this.requiredTier = minTier;
-            return this;
+            return self();
         }
 
-        public Builder mineableWith(Collection<ToolType> toolTypes, ToolTier minTier) {
+        public B mineableWith(Collection<ToolType> toolTypes, ToolTier minTier) {
             if (toolTypes != null) {
                 this.harvestToolTypes.addAll(toolTypes);
             }
             this.requiredTier = minTier;
-            return this;
+            return self();
         }
 
-        public Builder mineableWith(ToolType toolType) {
+        public B mineableWith(ToolType toolType) {
             return mineableWith(toolType, ToolTier.WOOD);
         }
 
-        public Builder requiredTier(ToolTier minTier) {
+        public B requiredTier(ToolTier minTier) {
             this.requiredTier = minTier;
-            return this;
+            return self();
         }
 
-        public Builder silkTouchDropsSelf(boolean dropsSelf) {
+        public B silkTouchDropsSelf(boolean dropsSelf) {
             this.silkTouchDropsSelf = dropsSelf;
-            return this;
+            return self();
         }
 
+        public abstract T build();
+    }
+
+    /**
+     * Builder for {@link CustomBlockDefinition}.
+     */
+    public static class Builder extends AbstractBuilder<Builder, CustomBlockDefinition> {
+        public Builder(String id) {
+            super(id);
+        }
+
+        public Builder(String id, Material baseBlock) {
+            super(id, baseBlock);
+        }
+
+        @Override
         public CustomBlockDefinition build() {
-            if (this.model == null) {
-                Material resolved = resolveBaseBlock(this.id, this.baseBlock);
-                if (resolved != null && resolved != Material.BARRIER && safeIsBlock(resolved)) {
-                    try {
-                        this.model = new CustomBlockModel(org.bukkit.Bukkit.createBlockData(resolved));
-                    } catch (Throwable ignored) {
-                        this.model = new CustomBlockModel(null);
-                    }
-                } else {
-                    this.model = new CustomBlockModel(null);
-                }
-            }
             return new CustomBlockDefinition(this);
         }
     }
