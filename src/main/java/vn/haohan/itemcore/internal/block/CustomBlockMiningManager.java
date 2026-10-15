@@ -122,11 +122,15 @@ public class CustomBlockMiningManager implements PacketListener {
             if (overlayRenderer != null && session.getCrackEntityId() != -1) {
                 destroyCrackOverlay(session.getPlayer(), session.getBlockLocation(), session.getCrackEntityId());
             }
-            if (nativeStrategy != null) {
-                nativeStrategy.removeModifier(session.getPlayer());
-            }
         }
         sessions.clear();
+        if (nativeStrategy != null) {
+            try {
+                for (Player player : org.bukkit.Bukkit.getOnlinePlayers()) {
+                    nativeStrategy.removeModifier(player);
+                }
+            } catch (Throwable ignored) {}
+        }
     }
 
     @Override

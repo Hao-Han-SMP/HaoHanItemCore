@@ -132,6 +132,9 @@ public class CustomBlockCullingService {
             if (mat == null || isAirMaterial(mat)) return true;
 
             try {
+                if (org.bukkit.Bukkit.getServer() == null) {
+                    return isNonOccludingFallback(mat);
+                }
                 return !mat.isOccluding();
             } catch (Throwable ignored) {
                 return isNonOccludingFallback(mat);

@@ -153,16 +153,27 @@ class CustomBlockServiceRoutingTest {
     }
 
     @Test
-    @DisplayName("removeCustomBlock on NOTE_BLOCK sets AIR and returns true without touching barrier storage")
+    @DisplayName("removeCustomBlock on registered NOTE_BLOCK sets AIR and returns true, while unregistered returns false")
     void testRemoveNativeBlock() {
         DefaultCustomBlockRegistry registry = new DefaultCustomBlockRegistry();
+        NativeCustomBlock nativeBlock = NativeCustomBlock.builder("haohan:native_ore")
+                .customVariation(10)
+                .build();
+        registry.register(nativeBlock);
+
         CustomBlockStorage storage = mock(CustomBlockStorage.class);
         CustomBlockVisibilityManager visManager = mock(CustomBlockVisibilityManager.class);
         DefaultCustomBlockService service = new DefaultCustomBlockService(registry, storage, visManager, mock(Plugin.class));
 
         World world = mock(World.class);
         Block block = mock(Block.class);
+        NoteBlock noteBlockData = mock(NoteBlock.class);
+        when(noteBlockData.getInstrument()).thenReturn(org.bukkit.Instrument.BASS_DRUM);
+        when(noteBlockData.getNote()).thenReturn(new org.bukkit.Note(10));
+        when(noteBlockData.isPowered()).thenReturn(false);
+
         when(block.getType()).thenReturn(Material.NOTE_BLOCK);
+        when(block.getBlockData()).thenReturn(noteBlockData);
 
         Location loc = mock(Location.class);
         when(loc.getWorld()).thenReturn(world);
@@ -174,6 +185,23 @@ class CustomBlockServiceRoutingTest {
         verify(block).setType(Material.AIR, false);
         verify(storage, never()).remove(any(World.class), anyInt(), anyInt(), anyInt());
         verify(visManager, never()).handleBlockBroken(any());
+
+        // Unregistered NoteBlock:
+        Block unregBlock = mock(Block.class);
+        NoteBlock unregData = mock(NoteBlock.class);
+        when(unregData.getInstrument()).thenReturn(org.bukkit.Instrument.PIANO);
+        when(unregData.getNote()).thenReturn(new org.bukkit.Note(0));
+        when(unregData.isPowered()).thenReturn(false);
+        when(unregBlock.getType()).thenReturn(Material.NOTE_BLOCK);
+        when(unregBlock.getBlockData()).thenReturn(unregData);
+
+        Location unregLoc = mock(Location.class);
+        when(unregLoc.getWorld()).thenReturn(world);
+        when(unregLoc.getBlock()).thenReturn(unregBlock);
+
+        boolean unregRemoved = service.removeCustomBlock(unregLoc);
+        assertFalse(unregRemoved);
+        verify(unregBlock, never()).setType(Material.AIR, false);
     }
 
     @Test
@@ -288,5 +316,57 @@ class CustomBlockServiceRoutingTest {
         // Alternative CANCELLED_DIGGING -> cancels progressive mining session
         miningManager.handleDiggingAction(player, DiggingAction.CANCELLED_DIGGING, new Vector3i(5, 64, 5), altLoc);
         assertFalse(miningManager.hasActiveSession(uuid));
+    }
+
+    @Test
+    @DisplayName("clearAllSessions removes native attribute modifiers from all online players")
+    void testClearAllSessionsCleansOnlinePlayers() {
+        DefaultCustomBlockRegistry registry = new DefaultCustomBlockRegistry();
+        CustomBlockStorage storage = mock(CustomBlockStorage.class);
+        CustomBlockVisibilityManager visManager = mock(CustomBlockVisibilityManager.class);
+        Plugin plugin = mock(Plugin.class);
+        DefaultCustomBlockService service = new DefaultCustomBlockService(registry, storage, visManager, plugin);
+
+        NativeMiningStrategy nativeStrategy = mock(NativeMiningStrategy.class);
+        CustomBlockMiningManager miningManager = new CustomBlockMiningManager(
+                service, null, null, nativeStrategy, plugin
+        );
+
+        Player p1 = mock(Player.class);
+        Player p2 = mock(Player.class);
+        doReturn(java.util.List.of(p1, p2)).when(server).getOnlinePlayers();
+
+        miningManager.clearAllSessions();
+
+        verify(nativeStrategy).removeModifier(p1);
+        verify(nativeStrategy).removeModifier(p2);
+    }
+
+    @Test
+    @DisplayName("onBlockBreakCleanup on MONITOR priority cancels mining session on cancelled break")
+    void testOnBlockBreakCleanupCancelsSession() {
+        DefaultCustomBlockRegistry registry = new DefaultCustomBlockRegistry();
+        CustomBlockStorage storage = mock(CustomBlockStorage.class);
+        CustomBlockVisibilityManager visManager = mock(CustomBlockVisibilityManager.class);
+        Plugin plugin = mock(Plugin.class);
+        DefaultCustomBlockService service = new DefaultCustomBlockService(registry, storage, visManager, plugin);
+
+        CustomBlockMiningManager miningManager = mock(CustomBlockMiningManager.class);
+        service.setMiningManager(miningManager);
+
+        vn.haohan.itemcore.internal.block.CustomBlockEventListener listener =
+                new vn.haohan.itemcore.internal.block.CustomBlockEventListener(service, storage, visManager, null, plugin);
+
+        Player player = mock(Player.class);
+        UUID uuid = UUID.randomUUID();
+        when(player.getUniqueId()).thenReturn(uuid);
+        Block block = mock(Block.class);
+
+        org.bukkit.event.block.BlockBreakEvent breakEvent = new org.bukkit.event.block.BlockBreakEvent(block, player);
+        breakEvent.setCancelled(true);
+
+        listener.onBlockBreakCleanup(breakEvent);
+
+        verify(miningManager).cancelSession(uuid);
     }
 }

@@ -215,6 +215,14 @@ public final class CustomBlockEventListener implements Listener {
         }
     }
 
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onBlockBreakCleanup(BlockBreakEvent event) {
+        if (customBlockService instanceof DefaultCustomBlockService defaultService
+                && defaultService.getMiningManager() != null) {
+            defaultService.getMiningManager().cancelSession(event.getPlayer().getUniqueId());
+        }
+    }
+
     private void dropCustomBlockItem(Location loc, CustomBlockDefinition def, Player player, ItemStack tool) {
         if (loc == null || loc.getWorld() == null || def == null) return;
         vn.haohan.itemcore.api.block.MiningContext context = new vn.haohan.itemcore.api.block.MiningContext(player, loc.getBlock(), def, tool);

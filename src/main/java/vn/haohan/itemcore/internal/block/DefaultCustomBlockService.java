@@ -121,8 +121,11 @@ public final class DefaultCustomBlockService implements CustomBlockService {
 
         Block block = location.getBlock();
         if (block != null && block.getType() == Material.NOTE_BLOCK) {
-            block.setType(Material.AIR, false);
-            return true;
+            if (registry.getByBlockData(block.getBlockData()).isPresent()) {
+                block.setType(Material.AIR, false);
+                return true;
+            }
+            return false;
         }
 
         String removedId = storage.remove(world, location.getBlockX(), location.getBlockY(), location.getBlockZ());
