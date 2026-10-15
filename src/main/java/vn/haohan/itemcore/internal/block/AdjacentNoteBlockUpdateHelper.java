@@ -113,12 +113,13 @@ public final class AdjacentNoteBlockUpdateHelper {
      * Finalizes an adjacent block change by sending block changes and acknowledging sequence.
      */
     public static void finishAdjacentBlockChange(Player player, Block changedBlock, Location packetBlock, CustomBlockRegistry registry) {
-        if (changedBlock == null || registry == null) return;
-        if (!hasCustomVerticalNeighbor(changedBlock, registry)) return;
+        if (changedBlock == null) return;
 
         if (player != null && player.isOnline()) {
             player.sendBlockChange(changedBlock.getLocation(), changedBlock.getBlockData());
-            resendCustomVerticalNeighbors(changedBlock, player, registry);
+            if (registry != null && hasCustomVerticalNeighbor(changedBlock, registry)) {
+                resendCustomVerticalNeighbors(changedBlock, player, registry);
+            }
             acknowledgeBlockChanges(player, packetBlock, true);
         }
     }

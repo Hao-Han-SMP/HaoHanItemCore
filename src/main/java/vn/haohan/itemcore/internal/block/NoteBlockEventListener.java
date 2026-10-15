@@ -26,6 +26,7 @@ import org.bukkit.plugin.Plugin;
 import org.bukkit.util.BoundingBox;
 import org.bukkit.util.RayTraceResult;
 import vn.haohan.itemcore.api.HaoHanItemCore;
+import vn.haohan.itemcore.api.block.CustomBlockDefinition;
 import vn.haohan.itemcore.api.block.CustomBlockInteractContext;
 import vn.haohan.itemcore.api.block.CustomBlockRegistry;
 import vn.haohan.itemcore.api.block.CustomBlockSound;
@@ -159,11 +160,24 @@ public final class NoteBlockEventListener implements Listener {
 
         if (item == null || item.getType() == Material.AIR) return;
 
+        // Check if item is food/consumable and player is using it (not placing)
+        if (!item.getType().isBlock() && item.getType().isEdible() && !player.isSneaking()) {
+            return;
+        }
+
+        // Check for CustomBlock item (either Native or Alternative)
+        String customBlockId = resolveCustomBlockIdFromItem(item);
         BlockData newData = null;
-        Optional<NativeCustomBlock> itemNativeOpt = getNativeCustomBlockFromItem(item);
-        if (itemNativeOpt.isPresent()) {
-            NativeCustomBlock itemDef = itemNativeOpt.get();
-            newData = NoteBlockVariationTable.createBlockData(itemDef.getCustomVariation());
+        if (customBlockId != null) {
+            Optional<CustomBlockDefinition> optPlacingDef = registry.get(customBlockId);
+            if (optPlacingDef.isPresent()) {
+                CustomBlockDefinition placingDef = optPlacingDef.get();
+                if (placingDef instanceof NativeCustomBlock nativeDef) {
+                    newData = NoteBlockVariationTable.createBlockData(nativeDef.getCustomVariation());
+                } else {
+                    newData = Bukkit.createBlockData(Material.BARRIER);
+                }
+            }
         } else if (item.getType().isBlock()) {
             try {
                 newData = item.getType().createBlockData();
@@ -171,10 +185,39 @@ public final class NoteBlockEventListener implements Listener {
         }
 
         if (newData != null) {
-            makePlayerPlaceBlock(player, hand, item, block, blockFace, newData);
-            Block target = isReplaceable(block.getType()) ? block : block.getRelative(blockFace);
-            AdjacentNoteBlockUpdateHelper.finishAdjacentBlockChange(player, target, block.getLocation(), registry);
+            event.setUseItemInHand(Event.Result.DENY);
+            boolean placed = makePlayerPlaceCustomOrVanillaBlock(player, hand, item, block, blockFace, newData, customBlockId);
+            if (placed) {
+                Block target = isReplaceable(block.getType()) ? block : block.getRelative(blockFace);
+                // Resend clicked NoteBlock's exact state to prevent client prediction from altering it
+                player.sendBlockChange(block.getLocation(), block.getBlockData());
+                AdjacentNoteBlockUpdateHelper.finishAdjacentBlockChange(player, target, block.getLocation(), registry);
+            }
         }
+    }
+
+    private String resolveCustomBlockIdFromItem(ItemStack item) {
+        if (item == null || item.getType().isAir()) return null;
+        try {
+            var core = HaoHanItemCore.get();
+            if (core != null && core.getItemService() != null) {
+                String id = core.getItemService().getId(item);
+                if (id != null) {
+                    if (registry.has(id)) return id;
+                    var itemRegistry = core.getItemRegistry();
+                    if (itemRegistry != null) {
+                        var itemDef = itemRegistry.get(id);
+                        if (itemDef != null) {
+                            Object cbIdObj = itemDef.getProperties().get("custom_block_id");
+                            if (cbIdObj instanceof String cbId && registry.has(cbId)) {
+                                return cbId;
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Throwable ignored) {}
+        return null;
     }
 
     /**
@@ -197,7 +240,7 @@ public final class NoteBlockEventListener implements Listener {
 
         event.setUseInteractedBlock(Event.Result.DENY);
         event.setUseItemInHand(Event.Result.DENY);
-        makePlayerPlaceBlock(event.getPlayer(), hand, item, placedAgainst, event.getBlockFace(), item.getType().createBlockData());
+        makePlayerPlaceCustomOrVanillaBlock(event.getPlayer(), hand, item, placedAgainst, event.getBlockFace(), item.getType().createBlockData(), null);
         AdjacentNoteBlockUpdateHelper.finishAdjacentBlockChange(event.getPlayer(), target, placedAgainst.getLocation(), registry);
     }
 
@@ -344,19 +387,19 @@ public final class NoteBlockEventListener implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBlockPhysics(BlockPhysicsEvent event) {
         Block block = event.getBlock();
-        Block above = block.getRelative(BlockFace.UP);
-        Block below = block.getRelative(BlockFace.DOWN);
-
-        if (isNativeBlock(below)) {
-            event.setCancelled(true);
-            updateAndCheck(below);
-        } else if (isNativeBlock(above)) {
-            event.setCancelled(true);
-            updateAndCheck(above);
-        }
         if (isNativeBlock(block)) {
             event.setCancelled(true);
             updateAndCheck(block);
+            return;
+        }
+
+        for (BlockFace face : new BlockFace[]{BlockFace.UP, BlockFace.DOWN, BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST}) {
+            Block neighbor = block.getRelative(face);
+            if (isNativeBlock(neighbor)) {
+                event.setCancelled(true);
+                updateAndCheck(neighbor);
+                break;
+            }
         }
     }
 
@@ -488,23 +531,34 @@ public final class NoteBlockEventListener implements Listener {
         }
     }
 
-    public void makePlayerPlaceBlock(Player player, EquipmentSlot hand, ItemStack item,
-                                     Block placedAgainst, BlockFace face, BlockData newData) {
-        if (player == null || placedAgainst == null || newData == null) return;
+    public boolean makePlayerPlaceCustomOrVanillaBlock(Player player, EquipmentSlot hand, ItemStack item,
+                                                        Block placedAgainst, BlockFace face, BlockData newData,
+                                                        String customBlockId) {
+        if (player == null || placedAgainst == null || newData == null) return false;
         Block target = isReplaceable(placedAgainst.getType()) ? placedAgainst : placedAgainst.getRelative(face);
-        if (!isReplaceable(target.getType())) return;
-        if (isStandingInside(player, target)) return;
+        if (!isReplaceable(target.getType())) return false;
+        if (isStandingInside(player, target)) return false;
 
         World world = target.getWorld();
-        if (target.getY() < world.getMinHeight() || target.getY() >= world.getMaxHeight()) return;
+        if (target.getY() < world.getMinHeight() || target.getY() >= world.getMaxHeight()) return false;
 
+        var oldState = target.getState();
         BlockData oldData = target.getBlockData();
-        target.setBlockData(newData);
+        target.setBlockData(newData, false);
 
-        BlockPlaceEvent placeEvent = new BlockPlaceEvent(target, target.getState(), placedAgainst, item, player, true, hand);
+        BlockPlaceEvent placeEvent = new BlockPlaceEvent(target, oldState, placedAgainst, item, player, true, hand);
         if (!placeEvent.callEvent() || !placeEvent.canBuild()) {
-            target.setBlockData(oldData);
-            return;
+            target.setBlockData(oldData, false);
+            return false;
+        }
+
+        if (customBlockId != null) {
+            try {
+                var core = HaoHanItemCore.get();
+                if (core != null && core.getCustomBlockService() != null) {
+                    core.getCustomBlockService().placeCustomBlock(target.getLocation(), customBlockId);
+                }
+            } catch (Throwable ignored) {}
         }
 
         if (player.getGameMode() != GameMode.CREATIVE && item != null && item.getAmount() > 0) {
@@ -517,6 +571,12 @@ public final class NoteBlockEventListener implements Listener {
             player.swingMainHand();
         }
         target.getWorld().sendGameEvent(player, GameEvent.BLOCK_PLACE, target.getLocation().toVector());
+        return true;
+    }
+
+    public void makePlayerPlaceBlock(Player player, EquipmentSlot hand, ItemStack item,
+                                     Block placedAgainst, BlockFace face, BlockData newData) {
+        makePlayerPlaceCustomOrVanillaBlock(player, hand, item, placedAgainst, face, newData, null);
     }
 
     public static boolean isReplaceable(Material material) {

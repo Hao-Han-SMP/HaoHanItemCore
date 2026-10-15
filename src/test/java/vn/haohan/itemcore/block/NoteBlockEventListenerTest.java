@@ -23,11 +23,13 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import vn.haohan.itemcore.api.block.CustomBlockRegistry;
 import vn.haohan.itemcore.api.block.NativeCustomBlock;
+import vn.haohan.itemcore.internal.block.AdjacentNoteBlockUpdateHelper;
 import vn.haohan.itemcore.internal.block.NoteBlockEventListener;
 import vn.haohan.itemcore.internal.block.NoteBlockVariationTable;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -307,5 +309,31 @@ class NoteBlockEventListenerTest {
         NoteBlockEventListener.acknowledgeBlockChange(null, 1);
         NoteBlockEventListener.acknowledgeBlockChange(player, -1);
         NoteBlockEventListener.acknowledgeBlockChange(player, 100);
+    }
+
+    @Test
+    @DisplayName("finishAdjacentBlockChange acknowledges sequence and sends block change even without custom vertical neighbors")
+    void testFinishAdjacentBlockChangeHorizontal() {
+        Player player = mock(Player.class);
+        when(player.isOnline()).thenReturn(true);
+        when(player.getUniqueId()).thenReturn(UUID.randomUUID());
+
+        Block changed = mock(Block.class);
+        Location loc = new Location(null, 10, 64, 10);
+        when(changed.getLocation()).thenReturn(loc);
+        when(changed.getBlockData()).thenReturn(mock(org.bukkit.block.data.BlockData.class));
+
+        // Horizontal placement: UP and DOWN are AIR
+        Block air = mock(Block.class);
+        when(air.getType()).thenReturn(Material.AIR);
+        when(changed.getRelative(BlockFace.UP)).thenReturn(air);
+        when(changed.getRelative(BlockFace.DOWN)).thenReturn(air);
+
+        CustomBlockRegistry registry = mock(CustomBlockRegistry.class);
+
+        AdjacentNoteBlockUpdateHelper.finishAdjacentBlockChange(player, changed, loc, registry);
+
+        // Verify block change was sent to player
+        verify(player).sendBlockChange(eq(loc), any(org.bukkit.block.data.BlockData.class));
     }
 }
