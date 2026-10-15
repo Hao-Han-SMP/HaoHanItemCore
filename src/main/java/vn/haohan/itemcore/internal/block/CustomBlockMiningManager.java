@@ -53,6 +53,7 @@ public class CustomBlockMiningManager implements PacketListener {
     private final Logger logger;
     private final ConcurrentHashMap<UUID, BlockMiningSession> sessions = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<UUID, Long> consecutiveCooldowns = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<UUID, Long> lastToolWarningTimes = new ConcurrentHashMap<>();
     private AnimationObserver animationObserver;
 
     public CustomBlockMiningManager(
@@ -114,10 +115,14 @@ public class CustomBlockMiningManager implements PacketListener {
         if (player != null && nativeStrategy != null) {
             nativeStrategy.removeModifier(player);
         }
+        if (playerUuid != null) {
+            lastToolWarningTimes.remove(playerUuid);
+        }
     }
 
     public void clearAllSessions() {
         consecutiveCooldowns.clear();
+        lastToolWarningTimes.clear();
         for (BlockMiningSession session : sessions.values()) {
             sendBreakAnimation(session.getPlayer(), session.getBlockLocation(), -1);
             if (overlayRenderer != null && session.getCrackEntityId() != -1) {
@@ -232,6 +237,14 @@ public class CustomBlockMiningManager implements PacketListener {
             ItemStack tool = player.getInventory().getItemInMainHand();
 
             if (def.isNative() || def.isVanillaOverwrite()) {
+                if (!def.isEffectiveTool(tool)) {
+                    long now = System.currentTimeMillis();
+                    Long lastWarn = lastToolWarningTimes.get(player.getUniqueId());
+                    if (lastWarn == null || now - lastWarn >= 1500L) {
+                        lastToolWarningTimes.put(player.getUniqueId(), now);
+                        sendToolRequirementWarning(player, def);
+                    }
+                }
                 if (nativeStrategy != null) {
                     nativeStrategy.onStartDigging(player, block, def, tool);
                 }

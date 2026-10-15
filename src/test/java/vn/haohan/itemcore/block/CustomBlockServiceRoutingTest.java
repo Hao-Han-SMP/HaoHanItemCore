@@ -369,4 +369,50 @@ class CustomBlockServiceRoutingTest {
 
         verify(miningManager).cancelSession(uuid);
     }
+
+    @Test
+    @DisplayName("Starting digging on native block with ineffective tool sends tool requirement warning")
+    void testNativeMiningIneffectiveToolWarning() {
+        Player player = mock(Player.class);
+        UUID uuid = UUID.randomUUID();
+        when(player.getUniqueId()).thenReturn(uuid);
+        org.bukkit.inventory.PlayerInventory inv = mock(org.bukkit.inventory.PlayerInventory.class);
+        ItemStack ineffectiveTool = mock(ItemStack.class);
+        when(ineffectiveTool.getType()).thenReturn(Material.WOODEN_PICKAXE);
+        when(inv.getItemInMainHand()).thenReturn(ineffectiveTool);
+        when(player.getInventory()).thenReturn(inv);
+        when(player.getLocation()).thenReturn(new Location(null, 0, 64, 0));
+
+        DefaultCustomBlockRegistry registry = new DefaultCustomBlockRegistry();
+        NativeCustomBlock def = NativeCustomBlock.builder("haohan:deep_mithril")
+                .customVariation(103)
+                .hardness(5.0f)
+                .mineableWith(vn.haohan.itemcore.api.block.ToolType.PICKAXE, vn.haohan.itemcore.api.block.ToolTier.DIAMOND)
+                .build();
+        registry.register(def);
+
+        DefaultCustomBlockService service = new DefaultCustomBlockService(registry, mock(CustomBlockStorage.class), mock(CustomBlockVisibilityManager.class), mock(Plugin.class));
+
+        NativeMiningStrategy nativeStrategy = mock(NativeMiningStrategy.class);
+        CustomBlockMiningManager miningManager = new CustomBlockMiningManager(
+                service, null, null, nativeStrategy, mock(Plugin.class));
+
+        Block nativeMcBlock = mock(Block.class);
+        NoteBlock noteBlockData = mock(NoteBlock.class);
+        when(noteBlockData.getInstrument()).thenReturn(vn.haohan.itemcore.internal.block.NoteBlockVariationTable.getInstrument(103));
+        when(noteBlockData.getNote()).thenReturn(new org.bukkit.Note(vn.haohan.itemcore.internal.block.NoteBlockVariationTable.getNote(103)));
+        when(noteBlockData.isPowered()).thenReturn(vn.haohan.itemcore.internal.block.NoteBlockVariationTable.isPowered(103));
+        when(nativeMcBlock.getType()).thenReturn(Material.NOTE_BLOCK);
+        when(nativeMcBlock.getBlockData()).thenReturn(noteBlockData);
+
+        Location loc = mock(Location.class);
+        when(loc.getWorld()).thenReturn(mock(World.class));
+        when(loc.getBlock()).thenReturn(nativeMcBlock);
+
+        Vector3i pos = new Vector3i(10, 64, 10);
+        miningManager.handleDiggingAction(player, DiggingAction.START_DIGGING, pos, loc);
+
+        // Verify warning message was sent to player
+        verify(player).sendMessage(contains("DIAMOND"));
+    }
 }
