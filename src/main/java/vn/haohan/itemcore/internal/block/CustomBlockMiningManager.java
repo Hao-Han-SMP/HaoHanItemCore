@@ -8,6 +8,7 @@ import com.github.retrooper.packetevents.protocol.player.DiggingAction;
 import com.github.retrooper.packetevents.util.Vector3i;
 import com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientPlayerDigging;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerBlockBreakAnimation;
+import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Sound;
@@ -19,6 +20,7 @@ import org.bukkit.plugin.Plugin;
 import vn.haohan.itemcore.api.block.CustomBlockDefinition;
 import vn.haohan.itemcore.api.block.CustomBlockService;
 import vn.haohan.itemcore.api.block.MiningContext;
+import vn.haohan.itemcore.internal.block.mining.NativeMiningStrategy;
 
 import java.util.Iterator;
 import java.util.List;
@@ -47,6 +49,7 @@ public class CustomBlockMiningManager implements PacketListener {
     private final VirtualEntityIdManager idManager;
     private final BlockBreakOverlayRenderer overlayRenderer;
     private final Plugin plugin;
+    private final NativeMiningStrategy nativeStrategy;
     private final Logger logger;
     private final ConcurrentHashMap<UUID, BlockMiningSession> sessions = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<UUID, Long> consecutiveCooldowns = new ConcurrentHashMap<>();
@@ -56,16 +59,30 @@ public class CustomBlockMiningManager implements PacketListener {
             CustomBlockService customBlockService,
             VirtualEntityIdManager idManager,
             BlockBreakOverlayRenderer overlayRenderer,
+            NativeMiningStrategy nativeStrategy,
             Plugin plugin) {
         this.customBlockService = Objects.requireNonNull(customBlockService, "customBlockService cannot be null");
         this.idManager = idManager;
         this.overlayRenderer = overlayRenderer;
+        this.nativeStrategy = nativeStrategy != null ? nativeStrategy : new NativeMiningStrategy(plugin);
         this.plugin = plugin;
         this.logger = plugin != null ? plugin.getLogger() : Logger.getLogger(CustomBlockMiningManager.class.getName());
     }
 
+    public CustomBlockMiningManager(
+            CustomBlockService customBlockService,
+            VirtualEntityIdManager idManager,
+            BlockBreakOverlayRenderer overlayRenderer,
+            Plugin plugin) {
+        this(customBlockService, idManager, overlayRenderer, new NativeMiningStrategy(plugin), plugin);
+    }
+
     public CustomBlockMiningManager(CustomBlockService customBlockService, Plugin plugin) {
-        this(customBlockService, null, null, plugin);
+        this(customBlockService, null, null, new NativeMiningStrategy(plugin), plugin);
+    }
+
+    public NativeMiningStrategy getNativeStrategy() {
+        return nativeStrategy;
     }
 
     public void setAnimationObserver(AnimationObserver observer) {
@@ -80,11 +97,21 @@ public class CustomBlockMiningManager implements PacketListener {
     public void cancelSession(UUID playerUuid) {
         consecutiveCooldowns.remove(playerUuid);
         BlockMiningSession session = sessions.remove(playerUuid);
+        Player player = null;
         if (session != null) {
-            sendBreakAnimation(session.getPlayer(), session.getBlockLocation(), -1);
+            player = session.getPlayer();
+            sendBreakAnimation(player, session.getBlockLocation(), -1);
             if (overlayRenderer != null && session.getCrackEntityId() != -1) {
-                destroyCrackOverlay(session.getPlayer(), session.getBlockLocation(), session.getCrackEntityId());
+                destroyCrackOverlay(player, session.getBlockLocation(), session.getCrackEntityId());
             }
+        }
+        if (player == null && playerUuid != null) {
+            try {
+                player = Bukkit.getPlayer(playerUuid);
+            } catch (Throwable ignored) {}
+        }
+        if (player != null && nativeStrategy != null) {
+            nativeStrategy.removeModifier(player);
         }
     }
 
@@ -94,6 +121,9 @@ public class CustomBlockMiningManager implements PacketListener {
             sendBreakAnimation(session.getPlayer(), session.getBlockLocation(), -1);
             if (overlayRenderer != null && session.getCrackEntityId() != -1) {
                 destroyCrackOverlay(session.getPlayer(), session.getBlockLocation(), session.getCrackEntityId());
+            }
+            if (nativeStrategy != null) {
+                nativeStrategy.removeModifier(session.getPlayer());
             }
         }
         sessions.clear();
@@ -178,11 +208,19 @@ public class CustomBlockMiningManager implements PacketListener {
                 return; // Let standard Bukkit BlockBreakEvent handle creative breaking
             }
 
+            ItemStack tool = player.getInventory().getItemInMainHand();
+
+            if (def.isNative() || def.isVanillaOverwrite()) {
+                if (nativeStrategy != null) {
+                    nativeStrategy.onStartDigging(player, block, def, tool);
+                }
+                return;
+            }
+
             if (def.isUnbreakable()) {
                 return; // Unbreakable, cannot be mined
             }
 
-            ItemStack tool = player.getInventory().getItemInMainHand();
             boolean effectiveTool = def.isEffectiveTool(tool);
 
             // Calculate consecutive delay if player previously broke a block in continuous mining
@@ -201,11 +239,6 @@ public class CustomBlockMiningManager implements PacketListener {
                 BlockMiningSession session = new BlockMiningSession(player, loc, def, -1);
                 session.setDelayTicksRemaining(delayTicks);
                 sessions.put(player.getUniqueId(), session);
-                return;
-            }
-
-            // Vanilla overwrite blocks with effective tools are mined naturally by the client and Paper
-            if (def.isVanillaOverwrite()) {
                 return;
             }
 
@@ -229,6 +262,17 @@ public class CustomBlockMiningManager implements PacketListener {
             }
 
         } else if (action == DiggingAction.CANCELLED_DIGGING) {
+            Block block = loc.getBlock();
+            Optional<CustomBlockDefinition> optDef = customBlockService.getCustomBlock(block);
+            if (optDef.isPresent()) {
+                CustomBlockDefinition def = optDef.get();
+                if (def.isNative() || def.isVanillaOverwrite()) {
+                    if (nativeStrategy != null) {
+                        nativeStrategy.onStopDigging(player, block, def);
+                    }
+                    return;
+                }
+            }
             cancelSession(player.getUniqueId());
         }
     }

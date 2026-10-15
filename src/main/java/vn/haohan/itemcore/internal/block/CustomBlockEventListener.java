@@ -108,26 +108,39 @@ public final class CustomBlockEventListener implements Listener {
         Block block = event.getBlockPlaced();
         Location loc = block.getLocation();
 
-        // Suppress barrier sound packet to avoid double sound
-        if (soundPacketListener != null) {
-            soundPacketListener.markRecentPlacement(loc);
-        }
+        Optional<CustomBlockDefinition> optPlacedDef = customBlockService.getRegistry().get(customBlockId);
+        if (optPlacedDef.isEmpty()) return;
+        CustomBlockDefinition def = optPlacedDef.get();
 
-        // Mutate block to Barrier and register
-        block.setType(Material.BARRIER, false);
-        customBlockService.placeCustomBlock(loc, customBlockId);
-
-        // Play custom block place sound
-        customBlockService.getRegistry().get(customBlockId).ifPresent(placedDef -> {
-            if (placedDef.getSoundGroup() != null && placedDef.getSoundGroup().getPlaceSound() != null) {
-                placedDef.getSoundGroup().getPlaceSound().play(loc.clone().add(0.5, 0.5, 0.5));
+        if (def.isAlternative()) {
+            // Suppress barrier sound packet to avoid double sound
+            if (soundPacketListener != null) {
+                soundPacketListener.markRecentPlacement(loc);
             }
-        });
 
-        if (soundPacketListener != null) {
-            org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                soundPacketListener.clearRecentPlacement(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
-            }, 5L);
+            // Mutate block to Barrier and register
+            block.setType(Material.BARRIER, false);
+            customBlockService.placeCustomBlock(loc, customBlockId);
+
+            // Play custom block place sound
+            if (def.getSoundGroup() != null && def.getSoundGroup().getPlaceSound() != null) {
+                def.getSoundGroup().getPlaceSound().play(loc.clone().add(0.5, 0.5, 0.5));
+            }
+
+            if (soundPacketListener != null) {
+                org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    soundPacketListener.clearRecentPlacement(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
+                }, 5L);
+            }
+        } else if (def.isNative()) {
+            // Native custom blocks set NoteBlock blockdata directly in service without barrier mutations
+            customBlockService.placeCustomBlock(loc, customBlockId);
+
+            if (def.getSoundGroup() != null && def.getSoundGroup().getPlaceSound() != null) {
+                def.getSoundGroup().getPlaceSound().play(loc.clone().add(0.5, 0.5, 0.5));
+            }
+        } else {
+            customBlockService.placeCustomBlock(loc, customBlockId);
         }
     }
 
@@ -282,7 +295,13 @@ public final class CustomBlockEventListener implements Listener {
         Block clicked = event.getClickedBlock();
         if (clicked == null) return;
 
-        // Custom block interaction hook (onInteract)
+        // NoteBlock native custom blocks are handled by NoteBlockEventListener at LOWEST priority.
+        // We skip NoteBlock blocks here to prevent double interact handler execution and barrier placement logic.
+        if (clicked.getType() == Material.NOTE_BLOCK) {
+            return;
+        }
+
+        // Custom block interaction hook (onInteract) for Barrier and Vanilla Overwrite blocks
         if (customBlockService.isCustomBlock(clicked)) {
             Optional<CustomBlockDefinition> optDef = customBlockService.getCustomBlock(clicked);
             if (optDef.isPresent()) {
@@ -301,13 +320,16 @@ public final class CustomBlockEventListener implements Listener {
             }
         }
 
-        // Prevent interacting into existing custom blocks when not sneaking
-        if (customBlockService.isCustomBlock(clicked) && !event.getPlayer().isSneaking()) {
-            event.setUseInteractedBlock(org.bukkit.event.Event.Result.DENY);
-        }
+        // Barrier-specific handling:
+        if (clicked.getType() == Material.BARRIER && customBlockService.isCustomBlock(clicked)) {
+            // Prevent interacting into existing custom blocks when not sneaking
+            if (!event.getPlayer().isSneaking()) {
+                event.setUseInteractedBlock(org.bukkit.event.Event.Result.DENY);
+            }
 
-        // Support placing custom blocks or regular blocks against custom block
-        handlePlacementAgainstCustomBlock(event, clicked);
+            // Support placing custom blocks or regular blocks against custom block
+            handlePlacementAgainstCustomBlock(event, clicked);
+        }
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
@@ -366,17 +388,22 @@ public final class CustomBlockEventListener implements Listener {
         }
 
         if (customBlockId != null) {
-            // Suppress barrier sound packet to avoid double sound
-            if (soundPacketListener != null) {
-                soundPacketListener.markRecentPlacement(target.getLocation());
+            Optional<CustomBlockDefinition> optPlacingDef = customBlockService.getRegistry().get(customBlockId);
+            if (optPlacingDef.isPresent() && optPlacingDef.get().isNative()) {
+                customBlockService.placeCustomBlock(target.getLocation(), customBlockId);
+            } else {
+                // Suppress barrier sound packet to avoid double sound
+                if (soundPacketListener != null) {
+                    soundPacketListener.markRecentPlacement(target.getLocation());
+                }
+
+                // Mutate block to Barrier and register custom block
+                target.setType(Material.BARRIER, false);
+                customBlockService.placeCustomBlock(target.getLocation(), customBlockId);
             }
 
-            // Mutate block to Barrier and register custom block
-            target.setType(Material.BARRIER, false);
-            customBlockService.placeCustomBlock(target.getLocation(), customBlockId);
-
             // Play custom block place sound
-            customBlockService.getRegistry().get(customBlockId).ifPresentOrElse(placedDef -> {
+            optPlacingDef.ifPresentOrElse(placedDef -> {
                 if (placedDef.getSoundGroup() != null && placedDef.getSoundGroup().getPlaceSound() != null) {
                     placedDef.getSoundGroup().getPlaceSound().play(target.getLocation().add(0.5, 0.5, 0.5));
                 } else {
@@ -386,7 +413,7 @@ public final class CustomBlockEventListener implements Listener {
                 target.getWorld().playSound(target.getLocation().add(0.5, 0.5, 0.5), Sound.BLOCK_STONE_PLACE, 1.0f, 0.8f);
             });
 
-            if (soundPacketListener != null) {
+            if (soundPacketListener != null && (optPlacingDef.isEmpty() || !optPlacingDef.get().isNative())) {
                 Location tLoc = target.getLocation();
                 org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> {
                     soundPacketListener.clearRecentPlacement(tLoc.getBlockX(), tLoc.getBlockY(), tLoc.getBlockZ());
@@ -453,7 +480,19 @@ public final class CustomBlockEventListener implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPlayerQuit(PlayerQuitEvent event) {
+        if (customBlockService instanceof DefaultCustomBlockService defaultService
+                && defaultService.getMiningManager() != null) {
+            defaultService.getMiningManager().cancelSession(event.getPlayer().getUniqueId());
+        }
         visibilityManager.handlePlayerQuit(event.getPlayer());
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onPlayerDeath(org.bukkit.event.entity.PlayerDeathEvent event) {
+        if (customBlockService instanceof DefaultCustomBlockService defaultService
+                && defaultService.getMiningManager() != null) {
+            defaultService.getMiningManager().cancelSession(event.getEntity().getUniqueId());
+        }
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)

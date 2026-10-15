@@ -14,6 +14,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.logging.Logger;
 
+import vn.haohan.itemcore.api.block.NativeCustomBlock;
+
 /**
  * Standard implementation of {@link CustomBlockService}.
  */
@@ -43,6 +45,9 @@ public final class DefaultCustomBlockService implements CustomBlockService {
         if (block.getType() == Material.BARRIER) {
             return storage.get(block.getWorld(), block.getX(), block.getY(), block.getZ()) != null;
         }
+        if (block.getType() == Material.NOTE_BLOCK) {
+            return registry.getByBlockData(block.getBlockData()).isPresent();
+        }
         return registry.getByMaterial(block.getType()).isPresent();
     }
 
@@ -53,6 +58,9 @@ public final class DefaultCustomBlockService implements CustomBlockService {
             String id = storage.get(block.getWorld(), block.getX(), block.getY(), block.getZ());
             return id != null ? registry.get(id) : Optional.empty();
         }
+        if (block.getType() == Material.NOTE_BLOCK) {
+            return registry.getByBlockData(block.getBlockData()).map(def -> def);
+        }
         return registry.getByMaterial(block.getType());
     }
 
@@ -61,6 +69,9 @@ public final class DefaultCustomBlockService implements CustomBlockService {
         if (block == null) return null;
         if (block.getType() == Material.BARRIER) {
             return storage.get(block.getWorld(), block.getX(), block.getY(), block.getZ());
+        }
+        if (block.getType() == Material.NOTE_BLOCK) {
+            return registry.getByBlockData(block.getBlockData()).map(CustomBlockDefinition::getId).orElse(null);
         }
         return registry.getByMaterial(block.getType()).map(CustomBlockDefinition::getId).orElse(null);
     }
@@ -80,8 +91,14 @@ public final class DefaultCustomBlockService implements CustomBlockService {
         World world = location.getWorld();
         if (world == null) return false;
 
-        // Ensure physical block is Barrier
         Block block = location.getBlock();
+
+        if (def instanceof NativeCustomBlock nativeDef) {
+            block.setBlockData(NoteBlockVariationTable.createBlockData(nativeDef.getCustomVariation()), false);
+            return true;
+        }
+
+        // Ensure physical block is Barrier
         block.setType(Material.BARRIER, false);
 
         // Record in spatial storage
@@ -102,10 +119,15 @@ public final class DefaultCustomBlockService implements CustomBlockService {
         World world = location.getWorld();
         if (world == null) return false;
 
+        Block block = location.getBlock();
+        if (block != null && block.getType() == Material.NOTE_BLOCK) {
+            block.setType(Material.AIR, false);
+            return true;
+        }
+
         String removedId = storage.remove(world, location.getBlockX(), location.getBlockY(), location.getBlockZ());
         if (removedId == null) {
-            Block block = location.getBlock();
-            if (registry.getByMaterial(block.getType()).isPresent()) {
+            if (block != null && registry.getByMaterial(block.getType()).isPresent()) {
                 block.setType(Material.AIR, false);
                 return true;
             }
@@ -116,8 +138,7 @@ public final class DefaultCustomBlockService implements CustomBlockService {
         } catch (Throwable ignored) {}
 
         // Set physical block to AIR
-        Block block = location.getBlock();
-        if (block.getType() == Material.BARRIER) {
+        if (block != null && block.getType() == Material.BARRIER) {
             block.setType(Material.AIR, false);
         }
 

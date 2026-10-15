@@ -64,6 +64,8 @@ public final class HaoHanItemCorePlugin extends JavaPlugin {
     private DefaultCustomBlockService customBlockService;
     private CustomBlockEventListener customBlockEventListener;
     private vn.haohan.itemcore.internal.block.CustomBlockMiningManager customBlockMiningManager;
+    private vn.haohan.itemcore.internal.block.mining.NativeMiningStrategy nativeMiningStrategy;
+    private vn.haohan.itemcore.internal.block.NoteBlockEventListener noteBlockEventListener;
     private vn.haohan.itemcore.api.block.ToolTierRegistry toolTierRegistry;
     private vn.haohan.itemcore.internal.config.ToolTierConfigLoader toolTierConfigLoader;
     private org.bukkit.scheduler.BukkitTask miningTickerTask;
@@ -126,13 +128,18 @@ public final class HaoHanItemCorePlugin extends JavaPlugin {
                 customBlockService, customBlockStorage, customBlockVisibilityManager, itemRegistry, this, soundPacketListener);
         getServer().getPluginManager().registerEvents(customBlockEventListener, this);
 
+        // NoteBlock native custom blocks listener (tuning interception, physics, piston, sounds)
+        noteBlockEventListener = new vn.haohan.itemcore.internal.block.NoteBlockEventListener(customBlockRegistry, this);
+        getServer().getPluginManager().registerEvents(noteBlockEventListener, this);
+
         // Preload any existing custom blocks from loaded server chunks
         customBlockStorage.loadAll(getServer());
 
         // Initialize CustomBlockMiningManager & register PacketEvents listener
+        nativeMiningStrategy = new vn.haohan.itemcore.internal.block.mining.NativeMiningStrategy(this);
         vn.haohan.itemcore.internal.block.BlockBreakOverlayRenderer breakOverlayRenderer = new vn.haohan.itemcore.internal.block.BlockBreakOverlayRenderer(log);
         customBlockMiningManager = new vn.haohan.itemcore.internal.block.CustomBlockMiningManager(
-                customBlockService, virtualEntityIdManager, breakOverlayRenderer, this);
+                customBlockService, virtualEntityIdManager, breakOverlayRenderer, nativeMiningStrategy, this);
         customBlockService.setMiningManager(customBlockMiningManager);
         vn.haohan.itemcore.internal.block.CustomBlockPacketListener chunkPacketListener =
                 new vn.haohan.itemcore.internal.block.CustomBlockPacketListener(customBlockVisibilityManager, log);
@@ -232,13 +239,6 @@ public final class HaoHanItemCorePlugin extends JavaPlugin {
     private void loadAllConfigs() {
         Logger log = getLogger();
 
-        // Update culling configuration
-        if (customBlockVisibilityManager != null) {
-            customBlockVisibilityManager.setCullingConfig(
-                    vn.haohan.itemcore.internal.config.CustomBlockCullingConfig.fromConfig(getConfig())
-            );
-        }
-
         // Load custom tool tiers
         toolTierConfigLoader = new vn.haohan.itemcore.internal.config.ToolTierConfigLoader(log);
         File tiersFile = new File(getDataFolder(), "tiers.yml");
@@ -294,5 +294,13 @@ public final class HaoHanItemCorePlugin extends JavaPlugin {
             recipesDir.mkdirs();
             saveResource("recipes/example.yml", false);
         }
+    }
+
+    public vn.haohan.itemcore.internal.block.NoteBlockEventListener getNoteBlockEventListener() {
+        return noteBlockEventListener;
+    }
+
+    public vn.haohan.itemcore.internal.block.mining.NativeMiningStrategy getNativeMiningStrategy() {
+        return nativeMiningStrategy;
     }
 }
