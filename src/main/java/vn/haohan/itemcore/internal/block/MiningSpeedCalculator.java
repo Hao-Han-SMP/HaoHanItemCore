@@ -100,7 +100,7 @@ public final class MiningSpeedCalculator {
 
             // 3. Mining Efficiency Attribute bonus (nếu có modifier bổ sung trên tool hoặc player)
             try {
-                Attribute miningEffAttr = Attribute.valueOf("PLAYER_MINING_EFFICIENCY");
+                Attribute miningEffAttr = resolveMiningEfficiency();
                 if (miningEffAttr != null) {
                     if (player != null && player.getAttribute(miningEffAttr) != null) {
                         double val = player.getAttribute(miningEffAttr).getValue();
@@ -123,7 +123,7 @@ public final class MiningSpeedCalculator {
         if (player != null) {
             // Player block break speed attribute multiplier (Paper 1.21: player.block_break_speed, default 1.0)
             try {
-                Attribute breakSpeedAttr = Attribute.valueOf("PLAYER_BLOCK_BREAK_SPEED");
+                Attribute breakSpeedAttr = resolveBlockBreakSpeed();
                 if (breakSpeedAttr != null && player.getAttribute(breakSpeedAttr) != null) {
                     double breakSpeed = player.getAttribute(breakSpeedAttr).getValue();
                     if (breakSpeed > 0.0) {
@@ -171,5 +171,33 @@ public final class MiningSpeedCalculator {
             }
         } catch (Throwable ignored) {}
         return 0;
+    }
+
+    private static Attribute resolveBlockBreakSpeed() {
+        try {
+            return Attribute.BLOCK_BREAK_SPEED;
+        } catch (Throwable ignored) {}
+        return resolveAttribute("BLOCK_BREAK_SPEED", "PLAYER_BLOCK_BREAK_SPEED", "player.block_break_speed");
+    }
+
+    private static Attribute resolveMiningEfficiency() {
+        try {
+            return Attribute.MINING_EFFICIENCY;
+        } catch (Throwable ignored) {}
+        return resolveAttribute("MINING_EFFICIENCY", "PLAYER_MINING_EFFICIENCY", "player.mining_efficiency");
+    }
+
+    @SuppressWarnings("removal")
+    private static Attribute resolveAttribute(String primaryName, String fallbackName, String registryKey) {
+        try {
+            return Attribute.valueOf(primaryName);
+        } catch (Throwable ignored) {}
+        try {
+            return Attribute.valueOf(fallbackName);
+        } catch (Throwable ignored) {}
+        try {
+            return org.bukkit.Registry.ATTRIBUTE.get(org.bukkit.NamespacedKey.minecraft(registryKey));
+        } catch (Throwable ignored) {}
+        return null;
     }
 }

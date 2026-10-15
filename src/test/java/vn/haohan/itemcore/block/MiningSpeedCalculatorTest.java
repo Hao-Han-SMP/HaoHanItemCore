@@ -213,4 +213,28 @@ public class MiningSpeedCalculatorTest {
         // Tốc độ phải là 11.0 / 120, không bị cộng dồn netherite tier (9.0) + custom (11.0) = 20.0
         assertEquals(11.0f / 120.0f, MiningSpeedCalculator.calculateProgressPerTick(null, soulsteelPick, mithrilOre), 0.0001f);
     }
+
+    @Test
+    public void testPlayerBlockBreakSpeedAttributeAndEnvironmentalModifiers() {
+        CustomBlockDefinition block = CustomBlockDefinition.builder("custom:stone")
+                .hardness(2.0f)
+                .build();
+
+        org.bukkit.entity.Player mockPlayer = org.mockito.Mockito.mock(org.bukkit.entity.Player.class);
+        org.bukkit.attribute.AttributeInstance mockAttr = org.mockito.Mockito.mock(org.bukkit.attribute.AttributeInstance.class);
+        org.mockito.Mockito.when(mockAttr.getValue()).thenReturn(0.5);
+        org.mockito.Mockito.when(mockPlayer.getAttribute(org.bukkit.attribute.Attribute.BLOCK_BREAK_SPEED)).thenReturn(mockAttr);
+        org.mockito.Mockito.when(mockPlayer.getActivePotionEffects()).thenReturn(java.util.Collections.emptyList());
+        org.mockito.Mockito.when(mockPlayer.isInWater()).thenReturn(false);
+        org.mockito.Mockito.when(mockPlayer.isOnGround()).thenReturn(true);
+
+        // Base progress is 0.025 per tick, with breakSpeed = 0.5, it becomes 0.0125 per tick
+        float progress = MiningSpeedCalculator.calculateProgressPerTick(mockPlayer, null, block);
+        assertEquals(0.0125f, progress, 0.0001f);
+
+        // Water penalty (1/5)
+        org.mockito.Mockito.when(mockPlayer.isInWater()).thenReturn(true);
+        float waterProgress = MiningSpeedCalculator.calculateProgressPerTick(mockPlayer, null, block);
+        assertEquals(0.0125f / 5.0f, waterProgress, 0.0001f);
+    }
 }
