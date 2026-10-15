@@ -78,6 +78,14 @@ public final class CustomBlockModel {
     }
 
     private List<com.github.retrooper.packetevents.protocol.entity.data.EntityData<?>> compileMetadata() {
+        try {
+            return doCompileMetadata();
+        } catch (Throwable ignored) {
+            return java.util.Collections.emptyList();
+        }
+    }
+
+    private List<com.github.retrooper.packetevents.protocol.entity.data.EntityData<?>> doCompileMetadata() {
         if (com.github.retrooper.packetevents.PacketEvents.getAPI() == null) {
             return java.util.Collections.emptyList();
         }
