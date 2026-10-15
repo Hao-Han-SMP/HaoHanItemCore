@@ -88,6 +88,22 @@ class CustomBlockConfigParserTest {
     }
 
     @Test
+    @DisplayName("Item with custom_variation as string parses to NativeCustomBlock")
+    void testParseNativeCustomBlockStringVariation() {
+        ItemDefinition item = ItemDefinition.builder("haohan:silver_ore")
+                .property("custom_block_id", "haohan:silver_ore")
+                .property("custom_variation", "77")
+                .property("custom_block_hardness", 4.0f)
+                .build();
+
+        CustomBlockDefinition blockDef = CustomBlockConfigParser.parseCustomBlock(item);
+        assertInstanceOf(NativeCustomBlock.class, blockDef);
+        NativeCustomBlock nativeBlock = (NativeCustomBlock) blockDef;
+        assertEquals(77, nativeBlock.getCustomVariation());
+        assertEquals(4.0f, nativeBlock.getHardness());
+    }
+
+    @Test
     @DisplayName("Item without custom_block_id returns null")
     void testParseItemWithoutCustomBlockId() {
         ItemDefinition item = ItemDefinition.builder("haohan:regular_item")

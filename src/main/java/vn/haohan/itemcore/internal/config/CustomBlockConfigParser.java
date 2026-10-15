@@ -106,24 +106,17 @@ public final class CustomBlockConfigParser {
             variationObj = itemDef.getProperties().get("custom_block_variation");
         }
 
-        CustomBlockDefinition.AbstractBuilder<?, ?> builder;
+        Integer variation = null;
         if (variationObj instanceof Number num) {
-            NativeCustomBlock.Builder nativeBuilder = NativeCustomBlock.builder(customBlockId)
-                    .customVariation(num.intValue());
-            Object directionalObj = itemDef.getProperties().get("custom_directional");
-            if (directionalObj == null) {
-                directionalObj = itemDef.getProperties().get("custom_block_directional");
-            }
-            if (directionalObj == null) {
-                directionalObj = itemDef.getProperties().get("directional");
-            }
-            if (Boolean.TRUE.equals(directionalObj)) {
-                nativeBuilder.directional(true);
-            }
-            builder = nativeBuilder;
+            variation = num.intValue();
         } else if (variationObj instanceof String str && str.matches("-?\\d+")) {
+            variation = Integer.parseInt(str);
+        }
+
+        CustomBlockDefinition.AbstractBuilder<?, ?> builder;
+        if (variation != null) {
             NativeCustomBlock.Builder nativeBuilder = NativeCustomBlock.builder(customBlockId)
-                    .customVariation(Integer.parseInt(str));
+                    .customVariation(variation);
             Object directionalObj = itemDef.getProperties().get("custom_directional");
             if (directionalObj == null) {
                 directionalObj = itemDef.getProperties().get("custom_block_directional");
