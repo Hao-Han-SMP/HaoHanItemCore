@@ -64,7 +64,10 @@ public final class NativeMiningStrategy implements MiningSpeedStrategy {
      * @return speed multiplier factor
      */
     public static double calculateAttributeFactor(float vanillaHardness, float targetHardness) {
-        if (targetHardness <= 0.0f) {
+        if (targetHardness < 0.0f) {
+            return 0.01; // unbreakable block, heavy reduction factor
+        }
+        if (targetHardness == 0.0f) {
             return 100.0; // instant break
         }
         return (double) vanillaHardness / (double) targetHardness;
@@ -83,8 +86,8 @@ public final class NativeMiningStrategy implements MiningSpeedStrategy {
         // Clean previous modifier if any
         attr.removeModifier(modifierKey);
 
-        if (!def.isEffectiveTool(tool)) {
-            // Penalize invalid tool to match vanilla slow-break or unbreakable
+        if (def.isUnbreakable() || !def.isEffectiveTool(tool)) {
+            // Penalize invalid tool or unbreakable block to match vanilla slow-break or unbreakable
             attr.addTransientModifier(new AttributeModifier(modifierKey, -0.99, AttributeModifier.Operation.MULTIPLY_SCALAR_1));
             return;
         }
@@ -108,9 +111,24 @@ public final class NativeMiningStrategy implements MiningSpeedStrategy {
         }
     }
 
+    /**
+     * Public cleanup hook to remove the custom mining speed modifier from the player.
+     *
+     * @param player the player to clean up
+     */
+    public void removeModifier(Player player) {
+        onStopDigging(player, null, null);
+    }
+
     @Override
     public float getBreakTimeSeconds(Player player, ItemStack tool, CustomBlockDefinition def) {
-        return def != null ? def.getBreakTimeSeconds() : 0.8f;
+        if (def == null) {
+            return 0.8f;
+        }
+        if (def.isUnbreakable() || def.getHardness() < 0.0f) {
+            return -1.0f;
+        }
+        return def.getBreakTimeSeconds();
     }
 
     @SuppressWarnings("removal")

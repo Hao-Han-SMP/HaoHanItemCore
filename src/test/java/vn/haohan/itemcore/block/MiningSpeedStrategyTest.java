@@ -35,9 +35,61 @@ class MiningSpeedStrategyTest {
         factor = NativeMiningStrategy.calculateAttributeFactor(0.8f, 0.4f);
         assertEquals(2.0, factor, 0.001);
 
-        // Instant break (hardness <= 0.0) -> high factor (100.0)
+        // Instant break (hardness == 0.0) -> high factor (100.0)
         double instantFactor = NativeMiningStrategy.calculateAttributeFactor(0.8f, 0.0f);
         assertEquals(100.0, instantFactor, 0.001);
+
+        // Unbreakable block (hardness < 0.0) -> heavy reduction factor (0.01)
+        double unbreakableFactor = NativeMiningStrategy.calculateAttributeFactor(0.8f, -1.0f);
+        assertEquals(0.01, unbreakableFactor, 0.001);
+    }
+
+    @Test
+    @DisplayName("NativeMiningStrategy handles unbreakable blocks with penalty and returns -1.0s break time")
+    void testNativeMiningStrategyUnbreakableBlockHandling() {
+        Plugin mockPlugin = Mockito.mock(Plugin.class);
+        Mockito.when(mockPlugin.getName()).thenReturn("haohanitemcore");
+        Mockito.when(mockPlugin.namespace()).thenReturn("haohanitemcore");
+
+        NativeMiningStrategy strategy = new NativeMiningStrategy(mockPlugin);
+
+        Player mockPlayer = Mockito.mock(Player.class);
+        Block mockBlock = Mockito.mock(Block.class);
+        AttributeInstance mockAttr = Mockito.mock(AttributeInstance.class);
+        Mockito.when(mockPlayer.getAttribute(Mockito.any(Attribute.class))).thenReturn(mockAttr);
+
+        NativeCustomBlock unbreakableDef = NativeCustomBlock.builder("custom:bedrock_ore")
+                .unbreakable()
+                .build();
+
+        // 1. Break time must be -1.0f
+        assertEquals(-1.0f, strategy.getBreakTimeSeconds(mockPlayer, null, unbreakableDef), 0.001f);
+
+        // 2. Digging unbreakable block must apply -0.99 penalty (not instant break)
+        strategy.onStartDigging(mockPlayer, mockBlock, unbreakableDef, null);
+
+        ArgumentCaptor<AttributeModifier> modifierCaptor = ArgumentCaptor.forClass(AttributeModifier.class);
+        Mockito.verify(mockAttr).addTransientModifier(modifierCaptor.capture());
+        AttributeModifier captured = modifierCaptor.getValue();
+        assertEquals(-0.99, captured.getAmount(), 0.001);
+        assertEquals(AttributeModifier.Operation.MULTIPLY_SCALAR_1, captured.getOperation());
+    }
+
+    @Test
+    @DisplayName("NativeMiningStrategy removeModifier public cleanup hook delegates to onStopDigging")
+    void testRemoveModifierHook() {
+        Plugin mockPlugin = Mockito.mock(Plugin.class);
+        Mockito.when(mockPlugin.getName()).thenReturn("haohanitemcore");
+        Mockito.when(mockPlugin.namespace()).thenReturn("haohanitemcore");
+
+        NativeMiningStrategy strategy = new NativeMiningStrategy(mockPlugin);
+
+        Player mockPlayer = Mockito.mock(Player.class);
+        AttributeInstance mockAttr = Mockito.mock(AttributeInstance.class);
+        Mockito.when(mockPlayer.getAttribute(Mockito.any(Attribute.class))).thenReturn(mockAttr);
+
+        strategy.removeModifier(mockPlayer);
+        Mockito.verify(mockAttr).removeModifier(Mockito.any(NamespacedKey.class));
     }
 
     @Test
