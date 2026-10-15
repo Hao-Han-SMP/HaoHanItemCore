@@ -44,6 +44,30 @@ public interface CustomBlockRegistry {
     Optional<CustomBlockDefinition> getByMaterial(org.bukkit.Material material);
 
     /**
+     * Retrieves the native custom block definition associated with the specified NoteBlock variation index.
+     *
+     * <p>When to use: Resolving a custom block from a NoteBlock's variation index (0..774).</p>
+     * <p>Thread requirement: Thread-safe, safe to call asynchronously.</p>
+     * <p>World/Packet impact: None.</p>
+     *
+     * @param variation the variation index (0..774)
+     * @return an {@link Optional} containing the native custom block definition if found, or empty
+     */
+    Optional<NativeCustomBlock> getByVariation(int variation);
+
+    /**
+     * Retrieves the native custom block definition representing the given block data, if registered.
+     *
+     * <p>When to use: O(1) concurrent lookup directly from a placed or packet block data.</p>
+     * <p>Thread requirement: Thread-safe, safe to call asynchronously.</p>
+     * <p>World/Packet impact: None.</p>
+     *
+     * @param blockData the block data to inspect
+     * @return an {@link Optional} containing the native custom block definition if found, or empty
+     */
+    Optional<NativeCustomBlock> getByBlockData(org.bukkit.block.data.BlockData blockData);
+
+    /**
      * Checks if a custom block definition with the given ID exists.
      *
      * <p>When to use: Validation checks before placing or referencing blocks.</p>
