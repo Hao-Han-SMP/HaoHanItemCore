@@ -104,7 +104,7 @@ public final class NoteBlockVariationTable {
      * @return variation index (0..774), or -1 if null, vanilla, or out of range
      */
     public static int resolveVariation(NoteBlock noteBlock) {
-        if (noteBlock == null) {
+        if (noteBlock == null || noteBlock.getNote() == null) {
             return -1;
         }
         return resolveVariation(noteBlock.getInstrument(), noteBlock.getNote().getId(), noteBlock.isPowered());
