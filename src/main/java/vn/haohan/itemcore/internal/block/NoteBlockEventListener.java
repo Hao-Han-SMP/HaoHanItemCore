@@ -137,8 +137,13 @@ public final class NoteBlockEventListener implements Listener {
         if (event.getEvent() == GameEvent.NOTE_BLOCK_PLAY
                 || (event.getEvent() != null && "note_block_play".equals(event.getEvent().getKey().getKey()))) {
             Location loc = event.getLocation();
-            if (loc != null && isNativeBlock(loc.getBlock())) {
-                event.setCancelled(true);
+            if (loc != null) {
+                try {
+                    Block block = loc.getBlock();
+                    if (isNativeBlock(block)) {
+                        event.setCancelled(true);
+                    }
+                } catch (Throwable ignored) {}
             }
         }
     }
@@ -148,8 +153,11 @@ public final class NoteBlockEventListener implements Listener {
      */
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onPistonExtend(BlockPistonExtendEvent event) {
-        if (event.getBlocks().stream().anyMatch(this::isNativeBlock)) {
-            event.setCancelled(true);
+        for (Block b : event.getBlocks()) {
+            if (isNativeBlock(b)) {
+                event.setCancelled(true);
+                return;
+            }
         }
     }
 
@@ -158,8 +166,11 @@ public final class NoteBlockEventListener implements Listener {
      */
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onPistonRetract(BlockPistonRetractEvent event) {
-        if (event.getBlocks().stream().anyMatch(this::isNativeBlock)) {
-            event.setCancelled(true);
+        for (Block b : event.getBlocks()) {
+            if (isNativeBlock(b)) {
+                event.setCancelled(true);
+                return;
+            }
         }
     }
 
@@ -170,10 +181,10 @@ public final class NoteBlockEventListener implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBlockPhysics(BlockPhysicsEvent event) {
         Block block = event.getBlock();
-        Block above = block.getRelative(BlockFace.UP);
-        Block below = block.getRelative(BlockFace.DOWN);
-
-        if (isNativeBlock(below) || isNativeBlock(above) || isNativeBlock(block)) {
+        // Short-circuit self first before triggering chunk relative lookups
+        if (isNativeBlock(block)
+                || isNativeBlock(block.getRelative(BlockFace.DOWN))
+                || isNativeBlock(block.getRelative(BlockFace.UP))) {
             event.setCancelled(true);
         }
     }
