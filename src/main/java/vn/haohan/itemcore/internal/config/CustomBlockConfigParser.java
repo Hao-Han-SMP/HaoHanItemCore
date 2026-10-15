@@ -99,7 +99,7 @@ public final class CustomBlockConfigParser {
             dropId = itemDef.getId();
         }
 
-        CustomBlockDefinition.Builder builder = CustomBlockDefinition.builder(customBlockId)
+        CustomBlockDefinition.AbstractBuilder<?, ?> builder = CustomBlockDefinition.builder(customBlockId)
                 .model(customModel);
         if (dropId != null) {
             builder.dropItemId(dropId);

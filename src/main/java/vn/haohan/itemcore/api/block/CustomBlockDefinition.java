@@ -70,7 +70,7 @@ public class CustomBlockDefinition {
                         .build();
     }
 
-    public static Builder builder(String id) {
+    public static AbstractBuilder<?, ?> builder(String id) {
         return new Builder(id);
     }
 

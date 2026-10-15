@@ -75,4 +75,18 @@ class CustomBlockSubtypesTest {
         assertFalse(legacy.isNative());
         assertFalse(legacy.isAlternative());
     }
+
+    @Test
+    @DisplayName("toString should contain customVariation and directional for NativeCustomBlock")
+    void testNativeCustomBlockToString() {
+        NativeCustomBlock block = NativeCustomBlock.builder("haohan:ore")
+                .customVariation(10)
+                .directional(true)
+                .hardness(2.0f)
+                .build();
+        String str = block.toString();
+        assertTrue(str.contains("customVariation=10"));
+        assertTrue(str.contains("directional=true"));
+        assertTrue(str.contains("id='haohan:ore'"));
+    }
 }
