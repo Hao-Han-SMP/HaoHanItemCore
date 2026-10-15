@@ -64,6 +64,39 @@ public final class TestRegistryAccess implements RegistryAccess {
         public T get(NamespacedKey key) {
             if (key == null) return null;
             return cache.computeIfAbsent(key, k -> {
+                if (type == org.bukkit.GameEvent.class) {
+                    return (T) new org.bukkit.GameEvent() {
+                        @Override
+                        public NamespacedKey getKey() {
+                            return k;
+                        }
+
+                        @Override
+                        public int getRange() {
+                            return 16;
+                        }
+
+                        @Override
+                        public int getVibrationLevel() {
+                            return 0;
+                        }
+
+                        @Override
+                        public String toString() {
+                            return k.toString();
+                        }
+
+                        @Override
+                        public boolean equals(Object obj) {
+                            return obj instanceof org.bukkit.GameEvent ge && k.equals(ge.getKey());
+                        }
+
+                        @Override
+                        public int hashCode() {
+                            return k.hashCode();
+                        }
+                    };
+                }
                 Class<?>[] interfaces = type.isInterface()
                         ? new Class<?>[]{type}
                         : new Class<?>[]{Keyed.class};
