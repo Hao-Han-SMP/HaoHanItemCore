@@ -238,6 +238,68 @@ class NoteBlockEventListenerTest {
     }
 
     @Test
+    @DisplayName("Placing piston or shulker box directly above native note block is cancelled")
+    void testUnsupportedBlockAboveNoteBlockCancelled() {
+        CustomBlockRegistry registry = mock(CustomBlockRegistry.class);
+        NativeCustomBlock customBlock = NativeCustomBlock.builder("haohan:ore").customVariation(50).build();
+        Block nativeBlockBelow = createMockNativeNoteBlock(50, customBlock, registry);
+
+        NoteBlockEventListener listener = new NoteBlockEventListener(registry, null);
+
+        Block placedBlock = mock(Block.class);
+        when(placedBlock.getType()).thenReturn(Material.PISTON);
+        when(placedBlock.getRelative(BlockFace.DOWN)).thenReturn(nativeBlockBelow);
+
+        org.bukkit.event.block.BlockPlaceEvent event = mock(org.bukkit.event.block.BlockPlaceEvent.class);
+        when(event.getBlockPlaced()).thenReturn(placedBlock);
+
+        listener.onPlacingUnsupportedBlockAboveNoteBlock(event);
+        verify(event).setCancelled(true);
+    }
+
+    @Test
+    @DisplayName("Native custom block is protected against catching fire")
+    void testFireIgnitionCancelled() {
+        CustomBlockRegistry registry = mock(CustomBlockRegistry.class);
+        NativeCustomBlock customBlock = NativeCustomBlock.builder("haohan:ore").customVariation(55).build();
+        Block nativeBlock = createMockNativeNoteBlock(55, customBlock, registry);
+
+        NoteBlockEventListener listener = new NoteBlockEventListener(registry, null);
+
+        org.bukkit.event.block.BlockIgniteEvent igniteEvent = mock(org.bukkit.event.block.BlockIgniteEvent.class);
+        when(igniteEvent.getBlock()).thenReturn(nativeBlock);
+
+        listener.onCatchFire(igniteEvent);
+        verify(igniteEvent).setCancelled(true);
+    }
+
+    @Test
+    @DisplayName("Explosion removes native custom blocks from block list")
+    void testExplosionRemovesNativeBlocks() {
+        CustomBlockRegistry registry = mock(CustomBlockRegistry.class);
+        NativeCustomBlock customBlock = NativeCustomBlock.builder("haohan:ore").customVariation(60).build();
+        Block nativeBlock = createMockNativeNoteBlock(60, customBlock, registry);
+        when(nativeBlock.getLocation()).thenReturn(mock(Location.class));
+
+        Block normalBlock = mock(Block.class);
+        when(normalBlock.getType()).thenReturn(Material.DIRT);
+
+        NoteBlockEventListener listener = new NoteBlockEventListener(registry, null);
+
+        java.util.List<Block> blocks = new java.util.ArrayList<>();
+        blocks.add(nativeBlock);
+        blocks.add(normalBlock);
+
+        org.bukkit.event.block.BlockExplodeEvent explodeEvent = mock(org.bukkit.event.block.BlockExplodeEvent.class);
+        when(explodeEvent.blockList()).thenReturn(blocks);
+
+        listener.onBlockExplosion(explodeEvent);
+
+        assertEquals(1, blocks.size());
+        assertSame(normalBlock, blocks.get(0));
+    }
+
+    @Test
     @DisplayName("acknowledgeBlockChange helper handles null or negative sequence gracefully")
     void testAcknowledgeBlockChangeSafeFallback() {
         Player player = mock(Player.class);
