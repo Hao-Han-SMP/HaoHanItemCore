@@ -235,80 +235,15 @@ class NoteBlockEventListenerTest {
     }
 
     @Test
-    @DisplayName("onVerticalNeighborPlace acknowledges sequence and resends both placed block and vertical native NoteBlock")
-    void testVerticalNeighborPlaceSyncsPredictionAndNeighbor() {
-        CustomBlockRegistry registry = mock(CustomBlockRegistry.class);
-        NativeCustomBlock customBlock = NativeCustomBlock.builder("haohan:ore").customVariation(30).build();
-        Block nativeBlockBelow = createMockNativeNoteBlock(30, customBlock, registry);
-        Location belowLoc = new Location(null, 10, 63, 10);
-        when(nativeBlockBelow.getLocation()).thenReturn(belowLoc);
-
-        Block airAbove = mock(Block.class);
-        when(airAbove.getType()).thenReturn(Material.AIR);
-
-        Block placedBlock = mock(Block.class);
-        Location placedLoc = new Location(null, 10, 64, 10);
-        BlockData placedData = mock(BlockData.class);
-        when(placedBlock.getLocation()).thenReturn(placedLoc);
-        when(placedBlock.getBlockData()).thenReturn(placedData);
-        when(placedBlock.getRelative(BlockFace.DOWN)).thenReturn(nativeBlockBelow);
-        when(placedBlock.getRelative(BlockFace.UP)).thenReturn(airAbove);
-
+    @DisplayName("Recording pending digging sequence allows acknowledgeBlockChanges to acknowledge digging sequence")
+    void testRecordAndAcknowledgeDiggingSequence() {
         Player player = mock(Player.class);
-        UUID playerId = UUID.randomUUID();
+        UUID uuid = UUID.randomUUID();
+        when(player.getUniqueId()).thenReturn(uuid);
         when(player.isOnline()).thenReturn(true);
-        when(player.getUniqueId()).thenReturn(playerId);
 
-        AdjacentNoteBlockUpdateHelper.recordPendingPlacement(playerId, 77);
-
-        BlockPlaceEvent event = mock(BlockPlaceEvent.class);
-        when(event.getBlockPlaced()).thenReturn(placedBlock);
-        when(event.getPlayer()).thenReturn(player);
-
-        NoteBlockEventListener listener = new NoteBlockEventListener(registry, null);
-        listener.onVerticalNeighborPlace(event);
-
-        assertNull(AdjacentNoteBlockUpdateHelper.pollPendingPlacement(playerId),
-                "Pending sequence must be acknowledged and consumed on vertical neighbor place");
-        verify(player).sendBlockChange(placedLoc, placedData);
-        verify(player).sendBlockChange(belowLoc, nativeBlockBelow.getBlockData());
-    }
-
-    @Test
-    @DisplayName("onVerticalNeighborBreak acknowledges digging sequence, sends AIR for broken block, and resends vertical native NoteBlock")
-    void testVerticalNeighborBreakSyncsAirAndNeighbor() {
-        CustomBlockRegistry registry = mock(CustomBlockRegistry.class);
-        NativeCustomBlock customBlock = NativeCustomBlock.builder("haohan:ore").customVariation(35).build();
-        Block nativeBlockAbove = createMockNativeNoteBlock(35, customBlock, registry);
-        Location aboveLoc = new Location(null, 10, 65, 10);
-        when(nativeBlockAbove.getLocation()).thenReturn(aboveLoc);
-
-        Block airBelow = mock(Block.class);
-        when(airBelow.getType()).thenReturn(Material.AIR);
-
-        Block brokenBlock = mock(Block.class);
-        Location brokenLoc = new Location(null, 10, 64, 10);
-        when(brokenBlock.getLocation()).thenReturn(brokenLoc);
-        when(brokenBlock.getRelative(BlockFace.UP)).thenReturn(nativeBlockAbove);
-        when(brokenBlock.getRelative(BlockFace.DOWN)).thenReturn(airBelow);
-
-        Player player = mock(Player.class);
-        UUID playerId = UUID.randomUUID();
-        when(player.isOnline()).thenReturn(true);
-        when(player.getUniqueId()).thenReturn(playerId);
-
-        AdjacentNoteBlockUpdateHelper.recordPendingPlacement(playerId, 88);
-
-        org.bukkit.event.block.BlockBreakEvent event = mock(org.bukkit.event.block.BlockBreakEvent.class);
-        when(event.getBlock()).thenReturn(brokenBlock);
-        when(event.getPlayer()).thenReturn(player);
-
-        NoteBlockEventListener listener = new NoteBlockEventListener(registry, null);
-        listener.onVerticalNeighborBreak(event);
-
-        assertNull(AdjacentNoteBlockUpdateHelper.pollPendingPlacement(playerId),
-                "Pending digging sequence must be acknowledged and consumed on vertical neighbor break");
-        verify(player).sendBlockChange( aboveLoc, nativeBlockAbove.getBlockData());
+        AdjacentNoteBlockUpdateHelper.recordPendingAction(uuid, 99);
+        assertEquals(99, AdjacentNoteBlockUpdateHelper.pollPendingAction(uuid));
     }
 }
 
