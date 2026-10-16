@@ -1,10 +1,12 @@
 package vn.haohan.itemcore.block;
 
+import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Instrument;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Note;
+import org.bukkit.Server;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
@@ -20,6 +22,7 @@ import org.bukkit.event.block.NotePlayEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import vn.haohan.itemcore.api.block.CustomBlockRegistry;
@@ -28,6 +31,7 @@ import vn.haohan.itemcore.internal.block.AdjacentNoteBlockUpdateHelper;
 import vn.haohan.itemcore.internal.block.NoteBlockEventListener;
 import vn.haohan.itemcore.internal.block.NoteBlockVariationTable;
 
+import java.lang.reflect.Field;
 import java.util.Collections;
 import java.util.Optional;
 import java.util.UUID;
@@ -37,6 +41,21 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class NoteBlockEventListenerTest {
+
+    private static void setBukkitServer(Server server) {
+        try {
+            Field field = Bukkit.class.getDeclaredField("server");
+            field.setAccessible(true);
+            field.set(null, server);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @AfterEach
+    void tearDown() {
+        setBukkitServer(null);
+    }
 
     private Block createMockNativeNoteBlock(int variation, NativeCustomBlock customBlock, CustomBlockRegistry registry) {
         Block block = mock(Block.class);
@@ -245,5 +264,41 @@ class NoteBlockEventListenerTest {
         AdjacentNoteBlockUpdateHelper.recordPendingAction(uuid, 99);
         assertEquals(99, AdjacentNoteBlockUpdateHelper.pollPendingAction(uuid));
     }
+
+    @Test
+    @DisplayName("onVerticalNeighborBreak sends AIR block change, resends custom neighbors, and acknowledges digging sequence")
+    void testOnVerticalNeighborBreakImmediateSync() {
+        CustomBlockRegistry registry = mock(CustomBlockRegistry.class);
+        NativeCustomBlock customBlock = NativeCustomBlock.builder("haohan:ore").customVariation(10).build();
+        Block nativeNeighbor = createMockNativeNoteBlock(10, customBlock, registry);
+
+        NoteBlockEventListener listener = new NoteBlockEventListener(registry, null);
+
+        Block brokenBlock = mock(Block.class);
+        Location brokenLoc = new Location(null, 10, 65, 10);
+        when(brokenBlock.getLocation()).thenReturn(brokenLoc);
+        when(brokenBlock.getRelative(BlockFace.DOWN)).thenReturn(nativeNeighbor);
+        when(brokenBlock.getRelative(BlockFace.UP)).thenReturn(mock(Block.class));
+
+        Player player = mock(Player.class);
+        UUID uuid = UUID.randomUUID();
+        when(player.getUniqueId()).thenReturn(uuid);
+        when(player.isOnline()).thenReturn(true);
+
+        Server server = mock(Server.class);
+        BlockData airData = mock(BlockData.class);
+        when(server.createBlockData(Material.AIR)).thenReturn(airData);
+        setBukkitServer(server);
+
+        AdjacentNoteBlockUpdateHelper.recordPendingAction(uuid, 55);
+
+        org.bukkit.event.block.BlockBreakEvent breakEvent = new org.bukkit.event.block.BlockBreakEvent(brokenBlock, player);
+        listener.onVerticalNeighborBreak(breakEvent);
+
+        verify(player).sendBlockChange(eq(brokenLoc), eq(airData));
+        verify(player).sendBlockChange(eq(nativeNeighbor.getLocation()), any(BlockData.class));
+        assertNull(AdjacentNoteBlockUpdateHelper.pollPendingAction(uuid));
+    }
 }
+
 

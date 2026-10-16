@@ -126,8 +126,8 @@ public final class NoteBlockEventListener implements Listener {
             event.setUseItemInHand(Event.Result.DENY);
             if (makePlayerPlaceCustomOrVanillaBlock(player, hand, item, block, event.getBlockFace(), newData, customBlockId)) {
                 Block target = block.isReplaceable() ? block : block.getRelative(event.getBlockFace());
-                AdjacentNoteBlockUpdateHelper.finishAdjacentBlockChange(player, target, registry);
                 player.sendBlockChange(block.getLocation(), block.getBlockData());
+                AdjacentNoteBlockUpdateHelper.finishAdjacentBlockChange(player, target, registry);
             }
         }
     }
@@ -156,15 +156,20 @@ public final class NoteBlockEventListener implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onVerticalNeighborPlace(BlockPlaceEvent event) {
-        Block placed = event.getBlockPlaced();
-        if (AdjacentNoteBlockUpdateHelper.hasCustomVerticalNeighbor(placed, registry)) {
-            AdjacentNoteBlockUpdateHelper.finishAdjacentBlockChange(event.getPlayer(), placed, registry);
-        }
+        AdjacentNoteBlockUpdateHelper.finishAdjacentBlockChange(event.getPlayer(), event.getBlockPlaced(), registry);
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onVerticalNeighborBreak(BlockBreakEvent event) {
-        AdjacentNoteBlockUpdateHelper.finishVerticalNeighborBreak(event.getPlayer(), event.getBlock(), registry);
+        Player player = event.getPlayer();
+        Block broken = event.getBlock();
+        if (player != null && player.isOnline()) {
+            try {
+                player.sendBlockChange(broken.getLocation(), Bukkit.createBlockData(Material.AIR));
+            } catch (Throwable ignored) {}
+            AdjacentNoteBlockUpdateHelper.resendCustomVerticalNeighbors(broken, player, registry);
+            AdjacentNoteBlockUpdateHelper.acknowledgeBlockChanges(player);
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
