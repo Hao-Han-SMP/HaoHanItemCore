@@ -128,9 +128,10 @@ public final class HaoHanItemCorePlugin extends JavaPlugin {
                 customBlockService, customBlockStorage, customBlockVisibilityManager, itemRegistry, this, soundPacketListener);
         getServer().getPluginManager().registerEvents(customBlockEventListener, this);
 
-        // NoteBlock native custom blocks listener (tuning interception, physics, piston, sounds)
+        // NoteBlock native custom blocks listener (tuning interception, placement against NoteBlocks, sounds)
         noteBlockEventListener = new vn.haohan.itemcore.internal.block.NoteBlockEventListener(customBlockRegistry, this);
         getServer().getPluginManager().registerEvents(noteBlockEventListener, this);
+        checkPaperNoteBlockUpdatesConfig(new File("config/paper-global.yml"), log);
 
         // Preload any existing custom blocks from loaded server chunks
         customBlockStorage.loadAll(getServer());
@@ -309,5 +310,21 @@ public final class HaoHanItemCorePlugin extends JavaPlugin {
 
     public vn.haohan.itemcore.internal.block.mining.NativeMiningStrategy getNativeMiningStrategy() {
         return nativeMiningStrategy;
+    }
+
+    public static void checkPaperNoteBlockUpdatesConfig(File paperGlobalFile, Logger log) {
+        if (log == null) return;
+        boolean enabled = false;
+        if (paperGlobalFile != null && paperGlobalFile.isFile()) {
+            try {
+                org.bukkit.configuration.file.YamlConfiguration yaml =
+                        org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(paperGlobalFile);
+                enabled = yaml.getBoolean("block-updates.disable-noteblock-updates", false);
+            } catch (Throwable ignored) {}
+        }
+        if (!enabled) {
+            log.warning("[HaoHanItemCore] block-updates.disable-noteblock-updates is NOT enabled in config/paper-global.yml!");
+            log.warning("[HaoHanItemCore] Enable 'disable-noteblock-updates: true' in config/paper-global.yml to prevent NoteBlock state updates.");
+        }
     }
 }

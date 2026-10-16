@@ -216,4 +216,21 @@ class NoteBlockEventListenerTest {
         verify(player).sendBlockChange(eq(loc), any(BlockData.class));
         assertNull(AdjacentNoteBlockUpdateHelper.pollPendingPlacement(playerId));
     }
+
+    @Test
+    @DisplayName("checkPaperNoteBlockUpdatesConfig logs warning when disable-noteblock-updates is false or missing")
+    void testPaperNoteBlockUpdatesWarning(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tempDir) throws Exception {
+        java.util.logging.Logger logger = mock(java.util.logging.Logger.class);
+        java.io.File missingFile = tempDir.resolve("missing.yml").toFile();
+
+        vn.haohan.itemcore.HaoHanItemCorePlugin.checkPaperNoteBlockUpdatesConfig(missingFile, logger);
+        verify(logger, atLeastOnce()).warning(contains("disable-noteblock-updates"));
+
+        reset(logger);
+        java.io.File enabledFile = tempDir.resolve("paper-global.yml").toFile();
+        java.nio.file.Files.writeString(enabledFile.toPath(), "block-updates:\n  disable-noteblock-updates: true\n");
+
+        vn.haohan.itemcore.HaoHanItemCorePlugin.checkPaperNoteBlockUpdatesConfig(enabledFile, logger);
+        verify(logger, never()).warning(anyString());
+    }
 }
