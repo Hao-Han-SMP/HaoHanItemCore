@@ -151,8 +151,6 @@ public class CustomBlockMiningManager implements PacketListener {
             Vector3i blockPos = packet.getBlockPosition();
             if (blockPos == null) return;
 
-            AdjacentNoteBlockUpdateHelper.recordPendingChange(player.getUniqueId(), packet.getSequence(), blockPos.getX(), blockPos.getY(), blockPos.getZ(), false);
-
             Location loc = new Location(player.getWorld(), blockPos.getX(), blockPos.getY(), blockPos.getZ());
             handleDiggingAction(player, packet.getAction(), blockPos, loc);
         } else if (event.getPacketType() == PacketType.Play.Client.PLAYER_BLOCK_PLACEMENT) {
@@ -164,10 +162,7 @@ public class CustomBlockMiningManager implements PacketListener {
             try {
                 com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientPlayerBlockPlacement packet =
                         new com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientPlayerBlockPlacement(event);
-                Vector3i blockPos = packet.getBlockPosition();
-                if (blockPos != null) {
-                    AdjacentNoteBlockUpdateHelper.recordPendingChange(player.getUniqueId(), packet.getSequence(), blockPos.getX(), blockPos.getY(), blockPos.getZ(), true);
-                }
+                AdjacentNoteBlockUpdateHelper.recordPendingPlacement(player.getUniqueId(), packet.getSequence());
             } catch (Throwable ignored) {}
         } else if (event.getPacketType() == PacketType.Play.Client.HELD_ITEM_CHANGE) {
             Object rawPlayer = event.getPlayer();

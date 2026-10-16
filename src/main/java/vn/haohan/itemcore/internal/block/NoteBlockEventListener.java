@@ -191,7 +191,7 @@ public final class NoteBlockEventListener implements Listener {
                 Block target = isReplaceable(block.getType()) ? block : block.getRelative(blockFace);
                 // Resend clicked NoteBlock's exact state to prevent client prediction from altering it
                 player.sendBlockChange(block.getLocation(), block.getBlockData());
-                AdjacentNoteBlockUpdateHelper.finishAdjacentBlockChange(player, target, block.getLocation(), registry);
+                AdjacentNoteBlockUpdateHelper.finishAdjacentBlockChange(player, target, registry);
             }
         }
     }
@@ -236,12 +236,11 @@ public final class NoteBlockEventListener implements Listener {
                 ? placedAgainst
                 : placedAgainst.getRelative(event.getBlockFace());
         if (!isReplaceable(target.getType())) return;
-        if (!AdjacentNoteBlockUpdateHelper.hasCustomVerticalNeighbor(target, registry)) return;
 
         event.setUseInteractedBlock(Event.Result.DENY);
         event.setUseItemInHand(Event.Result.DENY);
         makePlayerPlaceCustomOrVanillaBlock(event.getPlayer(), hand, item, placedAgainst, event.getBlockFace(), item.getType().createBlockData(), null);
-        AdjacentNoteBlockUpdateHelper.finishAdjacentBlockChange(event.getPlayer(), target, placedAgainst.getLocation(), registry);
+        AdjacentNoteBlockUpdateHelper.finishAdjacentBlockChange(event.getPlayer(), target, registry);
     }
 
     /**

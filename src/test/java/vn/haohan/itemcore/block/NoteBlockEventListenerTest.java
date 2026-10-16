@@ -312,11 +312,12 @@ class NoteBlockEventListenerTest {
     }
 
     @Test
-    @DisplayName("finishAdjacentBlockChange acknowledges sequence and sends block change even without custom vertical neighbors")
+    @DisplayName("finishAdjacentBlockChange sends block change, resends vertical native neighbors, and clears pending sequence")
     void testFinishAdjacentBlockChangeHorizontal() {
         Player player = mock(Player.class);
+        UUID playerId = UUID.randomUUID();
         when(player.isOnline()).thenReturn(true);
-        when(player.getUniqueId()).thenReturn(UUID.randomUUID());
+        when(player.getUniqueId()).thenReturn(playerId);
 
         Block changed = mock(Block.class);
         Location loc = new Location(null, 10, 64, 10);
@@ -331,9 +332,11 @@ class NoteBlockEventListenerTest {
 
         CustomBlockRegistry registry = mock(CustomBlockRegistry.class);
 
-        AdjacentNoteBlockUpdateHelper.finishAdjacentBlockChange(player, changed, loc, registry);
+        AdjacentNoteBlockUpdateHelper.recordPendingPlacement(playerId, 42);
+        AdjacentNoteBlockUpdateHelper.finishAdjacentBlockChange(player, changed, registry);
 
         // Verify block change was sent to player
         verify(player).sendBlockChange(eq(loc), any(org.bukkit.block.data.BlockData.class));
+        assertNull(AdjacentNoteBlockUpdateHelper.pollPendingPlacement(playerId));
     }
 }
