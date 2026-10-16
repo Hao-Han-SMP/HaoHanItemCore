@@ -299,6 +299,41 @@ class NoteBlockEventListenerTest {
         verify(player).sendBlockChange(eq(nativeNeighbor.getLocation()), any(BlockData.class));
         assertNull(AdjacentNoteBlockUpdateHelper.pollPendingAction(uuid));
     }
+
+    @Test
+    @DisplayName("makePlayerPlaceCustomOrVanillaBlock handles block placement safely without redundant direct placement")
+    void testMakePlayerPlaceCustomOrVanillaBlockSafe() {
+        CustomBlockRegistry registry = mock(CustomBlockRegistry.class);
+        NoteBlockEventListener listener = new NoteBlockEventListener(registry, null);
+
+        Player player = mock(Player.class);
+        when(player.getGameMode()).thenReturn(GameMode.SURVIVAL);
+        when(player.isOnline()).thenReturn(true);
+
+        Server server = mock(Server.class);
+        org.bukkit.plugin.PluginManager pm = mock(org.bukkit.plugin.PluginManager.class);
+        when(server.getPluginManager()).thenReturn(pm);
+        setBukkitServer(server);
+
+        World world = mock(World.class);
+        when(world.getMinHeight()).thenReturn(-64);
+        when(world.getMaxHeight()).thenReturn(320);
+
+        Block target = mock(Block.class);
+        when(target.getWorld()).thenReturn(world);
+        when(target.isReplaceable()).thenReturn(true);
+        when(target.getY()).thenReturn(64);
+        when(target.getLocation()).thenReturn(new Location(world, 0, 64, 0));
+        when(target.getState()).thenReturn(mock(BlockState.class));
+        when(target.getBlockData()).thenReturn(mock(BlockData.class));
+
+        ItemStack item = mock(ItemStack.class);
+        when(item.getAmount()).thenReturn(2);
+        BlockData newData = mock(BlockData.class);
+
+        assertDoesNotThrow(() -> listener.makePlayerPlaceCustomOrVanillaBlock(
+                player, EquipmentSlot.HAND, item, target, BlockFace.UP, newData, "haohan:stone"));
+    }
 }
 
 

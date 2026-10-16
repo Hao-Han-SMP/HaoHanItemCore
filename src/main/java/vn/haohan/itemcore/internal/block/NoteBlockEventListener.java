@@ -125,9 +125,7 @@ public final class NoteBlockEventListener implements Listener {
         if (newData != null) {
             event.setUseItemInHand(Event.Result.DENY);
             if (makePlayerPlaceCustomOrVanillaBlock(player, hand, item, block, event.getBlockFace(), newData, customBlockId)) {
-                Block target = block.isReplaceable() ? block : block.getRelative(event.getBlockFace());
                 player.sendBlockChange(block.getLocation(), block.getBlockData());
-                AdjacentNoteBlockUpdateHelper.finishAdjacentBlockChange(player, target, registry);
             }
         }
     }
@@ -261,15 +259,6 @@ public final class NoteBlockEventListener implements Listener {
         if (!placeEvent.callEvent() || !placeEvent.canBuild()) {
             target.setBlockData(oldData, false);
             return false;
-        }
-
-        if (customBlockId != null) {
-            try {
-                var core = HaoHanItemCore.get();
-                if (core != null && core.getCustomBlockService() != null) {
-                    core.getCustomBlockService().placeCustomBlock(target.getLocation(), customBlockId);
-                }
-            } catch (Throwable ignored) {}
         }
 
         if (player.getGameMode() != GameMode.CREATIVE && item != null && item.getAmount() > 0) {
