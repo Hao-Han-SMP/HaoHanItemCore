@@ -126,8 +126,8 @@ public final class NoteBlockEventListener implements Listener {
             event.setUseItemInHand(Event.Result.DENY);
             if (makePlayerPlaceCustomOrVanillaBlock(player, hand, item, block, event.getBlockFace(), newData, customBlockId)) {
                 Block target = block.isReplaceable() ? block : block.getRelative(event.getBlockFace());
-                player.sendBlockChange(block.getLocation(), block.getBlockData());
                 AdjacentNoteBlockUpdateHelper.finishAdjacentBlockChange(player, target, registry);
+                player.sendBlockChange(block.getLocation(), block.getBlockData());
             }
         }
     }
@@ -156,12 +156,15 @@ public final class NoteBlockEventListener implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onVerticalNeighborPlace(BlockPlaceEvent event) {
-        AdjacentNoteBlockUpdateHelper.resendCustomVerticalNeighbors(event.getBlockPlaced(), event.getPlayer(), registry);
+        Block placed = event.getBlockPlaced();
+        if (AdjacentNoteBlockUpdateHelper.hasCustomVerticalNeighbor(placed, registry)) {
+            AdjacentNoteBlockUpdateHelper.finishAdjacentBlockChange(event.getPlayer(), placed, registry);
+        }
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onVerticalNeighborBreak(BlockBreakEvent event) {
-        AdjacentNoteBlockUpdateHelper.resendCustomVerticalNeighbors(event.getBlock(), event.getPlayer(), registry);
+        AdjacentNoteBlockUpdateHelper.finishVerticalNeighborBreak(event.getPlayer(), event.getBlock(), registry);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)

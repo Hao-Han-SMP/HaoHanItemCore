@@ -151,6 +151,8 @@ public class CustomBlockMiningManager implements PacketListener {
             Vector3i blockPos = packet.getBlockPosition();
             if (blockPos == null) return;
 
+            AdjacentNoteBlockUpdateHelper.recordPendingPlacement(player.getUniqueId(), packet.getSequence());
+
             Location loc = new Location(player.getWorld(), blockPos.getX(), blockPos.getY(), blockPos.getZ());
             handleDiggingAction(player, packet.getAction(), blockPos, loc);
         } else if (event.getPacketType() == PacketType.Play.Client.PLAYER_BLOCK_PLACEMENT) {

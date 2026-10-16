@@ -49,6 +49,12 @@ public final class AdjacentNoteBlockUpdateHelper {
         }
     }
 
+    public static boolean hasCustomVerticalNeighbor(Block block, CustomBlockRegistry registry) {
+        if (block == null || registry == null) return false;
+        return isNativeBlock(block.getRelative(BlockFace.DOWN), registry)
+                || isNativeBlock(block.getRelative(BlockFace.UP), registry);
+    }
+
     public static void resendCustomVerticalNeighbors(Block changedBlock, Player actor, CustomBlockRegistry registry) {
         if (changedBlock == null || registry == null) return;
         for (BlockFace face : new BlockFace[]{BlockFace.DOWN, BlockFace.UP}) {
@@ -58,6 +64,7 @@ public final class AdjacentNoteBlockUpdateHelper {
             Location loc = neighbor.getLocation();
             BlockData data = neighbor.getBlockData();
             if (actor != null && actor.isOnline()) {
+                acknowledgeBlockChanges(actor);
                 actor.sendBlockChange(loc, data);
             }
             World world = changedBlock.getWorld();
@@ -76,9 +83,20 @@ public final class AdjacentNoteBlockUpdateHelper {
 
     public static void finishAdjacentBlockChange(Player player, Block changedBlock, CustomBlockRegistry registry) {
         if (changedBlock == null || player == null || !player.isOnline()) return;
+        acknowledgeBlockChanges(player);
         player.sendBlockChange(changedBlock.getLocation(), changedBlock.getBlockData());
         resendCustomVerticalNeighbors(changedBlock, player, registry);
-        acknowledgeBlockChanges(player);
+    }
+
+    public static void finishVerticalNeighborBreak(Player player, Block brokenBlock, CustomBlockRegistry registry) {
+        if (brokenBlock == null || registry == null || !hasCustomVerticalNeighbor(brokenBlock, registry)) return;
+        if (player != null && player.isOnline()) {
+            acknowledgeBlockChanges(player);
+            try {
+                player.sendBlockChange(brokenBlock.getLocation(), Bukkit.createBlockData(Material.AIR));
+            } catch (Throwable ignored) {}
+        }
+        resendCustomVerticalNeighbors(brokenBlock, player, registry);
     }
 
     private static boolean isNativeBlock(Block block, CustomBlockRegistry registry) {
