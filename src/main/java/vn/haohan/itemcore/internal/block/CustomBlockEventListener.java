@@ -174,7 +174,7 @@ public final class CustomBlockEventListener implements Listener {
         // Creative players can break custom blocks directly
         if (event.getPlayer().getGameMode() == GameMode.CREATIVE) {
             event.setDropItems(false);
-            if (!def.isVanillaOverwrite()) {
+            if (def.isAlternative()) {
                 customBlockService.removeCustomBlock(block.getLocation());
             }
             return;
@@ -204,9 +204,9 @@ public final class CustomBlockEventListener implements Listener {
             defaultService.getMiningManager().cancelSession(event.getPlayer().getUniqueId());
         }
 
-        // Remove from custom block system (only physical custom blocks, vanilla overwrites are naturally managed by Paper)
+        // Remove from custom block system: only physical Barrier blocks stored in CustomBlockStorage
         Location loc = block.getLocation();
-        if (!def.isVanillaOverwrite()) {
+        if (def.isAlternative()) {
             customBlockService.removeCustomBlock(loc);
         }
 
