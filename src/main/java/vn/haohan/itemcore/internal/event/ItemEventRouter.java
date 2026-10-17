@@ -214,6 +214,43 @@ public final class ItemEventRouter implements Listener {
         definition.getBehavior().onDrop(context);
     }
 
+    @EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = true)
+    public void onPlayerItemConsume(org.bukkit.event.player.PlayerItemConsumeEvent event) {
+        ItemStack item = event.getItem();
+        if (item == null)
+            return;
+
+        ItemDefinition definition = getDefinition(item);
+        if (definition == null)
+            return;
+
+        ItemContext context = new ItemContext(event.getPlayer(), item, definition, event);
+
+        // 1. Dispatch to ItemBehavior if present
+        if (definition.hasBehavior()) {
+            try {
+                definition.getBehavior().onConsume(context);
+            } catch (Throwable t) {
+                logger.warning("Error in onConsume behavior for item " + definition.getId() + ": " + t.getMessage());
+            }
+        }
+
+        // 2. Dispatch to FoodComponent custom actions if present
+        if (definition.getComponents() != null) {
+            for (var component : definition.getComponents()) {
+                if (component instanceof vn.haohan.itemcore.api.item.food.FoodComponent food) {
+                    for (var action : food.customActions()) {
+                        try {
+                            action.execute(context);
+                        } catch (Throwable t) {
+                            logger.warning("Error in custom food action for item " + definition.getId() + ": " + t.getMessage());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     /**
      * Xác định ItemDefinition từ ItemStack thông qua PersistentDataContainer.
      */
