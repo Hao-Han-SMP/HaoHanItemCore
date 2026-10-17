@@ -67,6 +67,7 @@ public final class HaoHanItemCorePlugin extends JavaPlugin {
     private vn.haohan.itemcore.internal.block.mining.NativeMiningStrategy nativeMiningStrategy;
     private vn.haohan.itemcore.internal.block.NoteBlockEventListener noteBlockEventListener;
     private vn.haohan.itemcore.api.block.ToolTierRegistry toolTierRegistry;
+    private vn.haohan.itemcore.api.item.food.CustomFoodActionRegistry foodActionRegistry;
     private vn.haohan.itemcore.internal.config.ToolTierConfigLoader toolTierConfigLoader;
     private org.bukkit.scheduler.BukkitTask miningTickerTask;
     private com.github.retrooper.packetevents.event.PacketListenerCommon miningPacketListenerHandle;
@@ -96,12 +97,13 @@ public final class HaoHanItemCorePlugin extends JavaPlugin {
         customBlockService = new DefaultCustomBlockService(
                 customBlockRegistry, customBlockStorage, customBlockVisibilityManager, this);
         toolTierRegistry = new vn.haohan.itemcore.api.block.ToolTierRegistry();
+        foodActionRegistry = new vn.haohan.itemcore.internal.item.food.DefaultCustomFoodActionRegistry();
 
         // Set singleton
         HaoHanItemCore.setInstance(new HaoHanItemCore(
                 itemRegistry, itemFactory, itemService,
                 recipeRegistry, recipeService, iconTextureRegistry,
-                customBlockService, toolTierRegistry));
+                customBlockService, toolTierRegistry, foodActionRegistry));
 
         log.info("HaoHanItemCore loaded. Registries initialized.");
     }

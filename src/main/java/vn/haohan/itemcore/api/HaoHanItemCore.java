@@ -35,12 +35,14 @@ public final class HaoHanItemCore {
     private final IconTextureRegistry iconTextureRegistry;
     private final vn.haohan.itemcore.api.block.CustomBlockService customBlockService;
     private final vn.haohan.itemcore.api.block.ToolTierRegistry toolTierRegistry;
+    private final vn.haohan.itemcore.api.item.food.CustomFoodActionRegistry foodActionRegistry;
 
     public HaoHanItemCore(ItemRegistry itemRegistry, ItemFactory itemFactory, ItemService itemService,
                           RecipeRegistry recipeRegistry, RecipeService recipeService,
                           IconTextureRegistry iconTextureRegistry,
                           vn.haohan.itemcore.api.block.CustomBlockService customBlockService,
-                          vn.haohan.itemcore.api.block.ToolTierRegistry toolTierRegistry) {
+                          vn.haohan.itemcore.api.block.ToolTierRegistry toolTierRegistry,
+                          vn.haohan.itemcore.api.item.food.CustomFoodActionRegistry foodActionRegistry) {
         this.itemRegistry = itemRegistry;
         this.itemFactory = itemFactory;
         this.itemService = itemService;
@@ -49,6 +51,15 @@ public final class HaoHanItemCore {
         this.iconTextureRegistry = iconTextureRegistry;
         this.customBlockService = customBlockService;
         this.toolTierRegistry = toolTierRegistry != null ? toolTierRegistry : new vn.haohan.itemcore.api.block.ToolTierRegistry();
+        this.foodActionRegistry = foodActionRegistry != null ? foodActionRegistry : new vn.haohan.itemcore.internal.item.food.DefaultCustomFoodActionRegistry();
+    }
+
+    public HaoHanItemCore(ItemRegistry itemRegistry, ItemFactory itemFactory, ItemService itemService,
+                          RecipeRegistry recipeRegistry, RecipeService recipeService,
+                          IconTextureRegistry iconTextureRegistry,
+                          vn.haohan.itemcore.api.block.CustomBlockService customBlockService,
+                          vn.haohan.itemcore.api.block.ToolTierRegistry toolTierRegistry) {
+        this(itemRegistry, itemFactory, itemService, recipeRegistry, recipeService, iconTextureRegistry, customBlockService, toolTierRegistry, null);
     }
 
     public HaoHanItemCore(ItemRegistry itemRegistry, ItemFactory itemFactory, ItemService itemService,
@@ -115,4 +126,7 @@ public final class HaoHanItemCore {
 
     /** Registry quản lý ToolTier chuẩn và custom. */
     public vn.haohan.itemcore.api.block.ToolTierRegistry getToolTierRegistry() { return toolTierRegistry; }
+
+    /** Registry quản lý custom food actions của plugin dev. */
+    public vn.haohan.itemcore.api.item.food.CustomFoodActionRegistry getFoodActionRegistry() { return foodActionRegistry; }
 }
