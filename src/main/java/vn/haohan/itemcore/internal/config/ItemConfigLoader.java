@@ -34,9 +34,15 @@ import java.util.logging.Logger;
 public final class ItemConfigLoader {
 
     private final Logger logger;
+    private final vn.haohan.itemcore.api.item.food.CustomFoodActionRegistry foodActionRegistry;
+
+    public ItemConfigLoader(Logger logger, vn.haohan.itemcore.api.item.food.CustomFoodActionRegistry foodActionRegistry) {
+        this.logger = logger;
+        this.foodActionRegistry = foodActionRegistry;
+    }
 
     public ItemConfigLoader(Logger logger) {
-        this.logger = logger;
+        this(logger, null);
     }
 
     /**
@@ -213,6 +219,77 @@ public final class ItemConfigLoader {
             builder.overwriteVanilla(section.getBoolean("overwrite-vanilla"));
         } else if (section.contains("overwrite_vanilla")) {
             builder.overwriteVanilla(section.getBoolean("overwrite_vanilla"));
+        }
+
+        // Food component
+        if (section.isConfigurationSection("food")) {
+            ConfigurationSection foodSec = section.getConfigurationSection("food");
+            if (foodSec != null) {
+                vn.haohan.itemcore.api.item.food.FoodComponent.Builder foodBuilder =
+                        vn.haohan.itemcore.api.item.food.FoodComponent.builder();
+
+                if (foodSec.contains("nutrition")) {
+                    foodBuilder.nutrition(foodSec.getInt("nutrition"));
+                }
+                if (foodSec.contains("saturation")) {
+                    foodBuilder.saturation((float) foodSec.getDouble("saturation"));
+                }
+                if (foodSec.contains("can-always-eat")) {
+                    foodBuilder.canAlwaysEat(foodSec.getBoolean("can-always-eat"));
+                } else if (foodSec.contains("can_always_eat")) {
+                    foodBuilder.canAlwaysEat(foodSec.getBoolean("can_always_eat"));
+                }
+                if (foodSec.contains("consume-seconds")) {
+                    foodBuilder.consumeSeconds((float) foodSec.getDouble("consume-seconds"));
+                } else if (foodSec.contains("consume_seconds")) {
+                    foodBuilder.consumeSeconds((float) foodSec.getDouble("consume_seconds"));
+                }
+
+                // Custom actions
+                List<String> actions = foodSec.getStringList("custom-effects");
+                if (actions.isEmpty()) {
+                    actions = foodSec.getStringList("custom_effects");
+                }
+                if (foodActionRegistry != null) {
+                    for (String actionId : actions) {
+                        var action = foodActionRegistry.get(actionId);
+                        if (action != null) {
+                            foodBuilder.onConsume(action);
+                        } else {
+                            logger.warning("[ItemConfigLoader] Custom food action not found: " + actionId + " for " + id);
+                        }
+                    }
+                }
+
+                // Potion effects
+                if (foodSec.isList("potion-effects") || foodSec.isList("potion_effects")) {
+                    List<Map<?, ?>> list = foodSec.getMapList(foodSec.isList("potion-effects") ? "potion-effects" : "potion_effects");
+                    for (Map<?, ?> map : list) {
+                        try {
+                            String pTypeStr = String.valueOf(map.get("type"));
+                            org.bukkit.potion.PotionEffectType pType = org.bukkit.potion.PotionEffectType.getByName(pTypeStr.toUpperCase(Locale.ROOT));
+                            if (pType == null) {
+                                org.bukkit.NamespacedKey effectKey = org.bukkit.NamespacedKey.fromString(pTypeStr.toLowerCase(Locale.ROOT));
+                                if (effectKey != null) {
+                                    pType = org.bukkit.Registry.POTION_EFFECT_TYPE.get(effectKey);
+                                }
+                            }
+                            if (pType != null) {
+                                int duration = map.containsKey("duration") ? ((Number) map.get("duration")).intValue() : 100;
+                                int amplifier = map.containsKey("amplifier") ? ((Number) map.get("amplifier")).intValue() : 0;
+                                float prob = map.containsKey("probability") ? ((Number) map.get("probability")).floatValue() : 1.0f;
+                                foodBuilder.addPotionEffect(new org.bukkit.potion.PotionEffect(pType, duration, amplifier), prob);
+                            } else {
+                                logger.warning("[ItemConfigLoader] Invalid potion effect type: " + pTypeStr + " for " + id);
+                            }
+                        } catch (Exception ex) {
+                            logger.warning("[ItemConfigLoader] Failed to parse potion effect in " + id + ": " + ex.getMessage());
+                        }
+                    }
+                }
+
+                builder.food(foodBuilder.build());
+            }
         }
 
         if (!properties.isEmpty()) {

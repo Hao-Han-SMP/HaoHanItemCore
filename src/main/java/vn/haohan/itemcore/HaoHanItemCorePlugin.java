@@ -257,7 +257,7 @@ public final class HaoHanItemCorePlugin extends JavaPlugin {
         }
 
         // Load items first (recipes depend on items)
-        itemConfigLoader = new ItemConfigLoader(log);
+        itemConfigLoader = new ItemConfigLoader(log, foodActionRegistry);
         File itemsDir = new File(getDataFolder(), "items");
         int itemCount = itemConfigLoader.loadAll(itemsDir, itemRegistry);
         log.info("Loaded " + itemCount + " items from config.");
