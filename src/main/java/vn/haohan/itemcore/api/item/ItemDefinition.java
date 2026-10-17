@@ -236,6 +236,22 @@ public final class ItemDefinition {
             return this;
         }
 
+        public Builder food(vn.haohan.itemcore.api.item.food.FoodComponent foodComponent) {
+            Objects.requireNonNull(foodComponent, "FoodComponent cannot be null");
+            this.components.add(foodComponent);
+            if (this.type == ItemType.MATERIAL) {
+                this.type = ItemType.FOOD;
+            }
+            return this;
+        }
+
+        public Builder food(java.util.function.Consumer<vn.haohan.itemcore.api.item.food.FoodComponent.Builder> foodConsumer) {
+            Objects.requireNonNull(foodConsumer, "FoodComponent builder consumer cannot be null");
+            vn.haohan.itemcore.api.item.food.FoodComponent.Builder foodBuilder = vn.haohan.itemcore.api.item.food.FoodComponent.builder();
+            foodConsumer.accept(foodBuilder);
+            return food(foodBuilder.build());
+        }
+
         public Builder infoSection(ItemInfoSection section) {
             this.infoSections.add(Objects.requireNonNull(section));
             return this;

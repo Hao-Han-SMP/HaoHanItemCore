@@ -60,7 +60,7 @@ public enum ItemCategory {
             case WEAPONS -> isWeapon(def, type, matName);
             case ARMOR -> isArmor(def, type, matName);
             case MATERIALS -> type == ItemType.MATERIAL || isMaterial(matName);
-            case FOOD -> type == ItemType.FOOD || isFood(matName);
+            case FOOD -> type == ItemType.FOOD || isFood(matName) || hasFoodComponent(def);
             case MACHINES -> type == ItemType.MACHINE_COMPONENT;
             case CURRENCY -> type == ItemType.CURRENCY;
             case SPECIAL -> (type == ItemType.SPECIAL || (!isTool(def, type, matName) && !isWeapon(def, type, matName) && !isArmor(def, type, matName))) && !isCustomBlock(def, mat, matName);
@@ -133,5 +133,15 @@ public enum ItemCategory {
                matName.equals("QUARTZ") || matName.equals("LAPIS_LAZULI") || matName.equals("REDSTONE") ||
                matName.equals("COAL") || matName.equals("CHARCOAL") || matName.equals("PRISMARINE_SHARD") ||
                matName.equals("PRISMARINE_CRYSTALS") || matName.equals("NETHER_BRICK") || matName.equals("BRICK");
+    }
+
+    private static boolean hasFoodComponent(ItemDefinition def) {
+        if (def == null || def.getComponents() == null) return false;
+        for (var comp : def.getComponents()) {
+            if (comp instanceof vn.haohan.itemcore.api.item.food.FoodComponent) {
+                return true;
+            }
+        }
+        return false;
     }
 }

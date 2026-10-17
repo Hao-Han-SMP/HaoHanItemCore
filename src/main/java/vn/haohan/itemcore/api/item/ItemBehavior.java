@@ -22,6 +22,11 @@ public interface ItemBehavior {
     default void onUse(ItemContext context) {}
 
     /**
+     * Được gọi khi player hoàn thành việc ăn/tiêu thụ item.
+     */
+    default void onConsume(ItemContext context) {}
+
+    /**
      * Được gọi khi player interact với item.
      */
     default void onInteract(ItemContext context) {}
