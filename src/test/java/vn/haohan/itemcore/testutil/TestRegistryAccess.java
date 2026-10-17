@@ -27,6 +27,7 @@ public final class TestRegistryAccess implements RegistryAccess {
             Map.entry(RegistryKey.DAMAGE_TYPE, org.bukkit.damage.DamageType.class),
             Map.entry(RegistryKey.ENCHANTMENT, org.bukkit.enchantments.Enchantment.class),
             Map.entry(RegistryKey.ENTITY_TYPE, org.bukkit.entity.EntityType.class),
+            Map.entry(RegistryKey.DATA_COMPONENT_TYPE, io.papermc.paper.datacomponent.DataComponentType.Valued.class),
             Map.entry(RegistryKey.MENU, org.bukkit.inventory.MenuType.class)
     );
 
@@ -97,9 +98,34 @@ public final class TestRegistryAccess implements RegistryAccess {
                         }
                     };
                 }
-                Class<?>[] interfaces = type.isInterface()
-                        ? new Class<?>[]{type}
-                        : new Class<?>[]{Keyed.class};
+                if (type == org.bukkit.potion.PotionEffectType.class) {
+                    return (T) new org.bukkit.potion.PotionEffectType() {
+                        @Override public NamespacedKey getKey() { return k; }
+                        @Override public org.bukkit.potion.PotionEffect createEffect(int d, int a) { return new org.bukkit.potion.PotionEffect(this, d, a); }
+                        @Override public boolean isInstant() { return false; }
+                        @Override public org.bukkit.potion.PotionEffectTypeCategory getCategory() { return org.bukkit.potion.PotionEffectTypeCategory.BENEFICIAL; }
+                        @Override public org.bukkit.Color getColor() { return org.bukkit.Color.WHITE; }
+                        @Override public double getDurationModifier() { return 1.0; }
+                        @Override public int getId() { return 1; }
+                        @Override public String getName() { return k.getKey().toUpperCase(Locale.ROOT); }
+                        @Override public String translationKey() { return "effect.minecraft." + k.getKey(); }
+                        @Override public String getTranslationKey() { return "effect.minecraft." + k.getKey(); }
+                        @Override public java.util.Map<org.bukkit.attribute.Attribute, org.bukkit.attribute.AttributeModifier> getEffectAttributes() { return Collections.emptyMap(); }
+                        @Override public double getAttributeModifierAmount(org.bukkit.attribute.Attribute a, int amp) { return 0.0; }
+                        @Override public org.bukkit.potion.PotionEffectType.Category getEffectCategory() { return org.bukkit.potion.PotionEffectType.Category.BENEFICIAL; }
+                    };
+                }
+                Class<?>[] interfaces;
+                if (io.papermc.paper.datacomponent.DataComponentType.class.isAssignableFrom(type)) {
+                    interfaces = new Class<?>[]{
+                            io.papermc.paper.datacomponent.DataComponentType.Valued.class,
+                            io.papermc.paper.datacomponent.DataComponentType.NonValued.class
+                    };
+                } else if (type.isInterface()) {
+                    interfaces = new Class<?>[]{type};
+                } else {
+                    interfaces = new Class<?>[]{Keyed.class};
+                }
                 return (T) Proxy.newProxyInstance(
                         type.getClassLoader() != null ? type.getClassLoader() : getClass().getClassLoader(),
                         interfaces,
