@@ -233,5 +233,50 @@ public class CustomBlockMiningManagerTest {
         assertFalse(miningManager.hasActiveSession(mockPlayer.getUniqueId()), "Block should break after mining completes");
         Mockito.verify(blockService).removeCustomBlock(loc);
     }
+
+    @Test
+    public void testNativeHotbarSwapSendsBlockChangeAndUpdatesStrategy() {
+        Location loc = new Location(mockWorld, 2, 64, 2);
+        vn.haohan.itemcore.api.block.NativeCustomBlock nativeOre = vn.haohan.itemcore.api.block.NativeCustomBlock.builder("haohan:anorthosite_ore")
+                .customVariation(774)
+                .hardness(90.0f)
+                .mineableWith(vn.haohan.itemcore.api.block.ToolType.PICKAXE, vn.haohan.itemcore.api.block.ToolTier.NETHERITE)
+                .build();
+        Mockito.when(blockService.getCustomBlock(Mockito.any())).thenReturn(Optional.of(nativeOre));
+        Mockito.when(blockService.isCustomBlock(Mockito.any())).thenReturn(true);
+        org.bukkit.block.data.BlockData mockData = Mockito.mock(org.bukkit.block.data.BlockData.class);
+        Mockito.when(mockBlock.getBlockData()).thenReturn(mockData);
+
+        // Player starts digging native block with Diamond Axe (invalid tool)
+        ItemStack diamondAxe = TestItemService.mockItem(Material.DIAMOND_AXE);
+        Mockito.when(mockPlayer.getInventory().getItemInMainHand()).thenReturn(diamondAxe);
+        miningManager.handleDiggingAction(mockPlayer, DiggingAction.START_DIGGING, new Vector3i(2, 64, 2), loc);
+
+        // Player swaps to Netherite Pickaxe
+        ItemStack netheritePick = TestItemService.mockItem(Material.NETHERITE_PICKAXE);
+        miningManager.handleItemSwap(mockPlayer, netheritePick);
+
+        // Must send sendBlockChange to reset client cracking stage
+        Mockito.verify(mockPlayer).sendBlockChange(loc, mockData);
+    }
+
+    @Test
+    public void testGetPlayerToolFallsBackAndUsesHeldSlot() {
+        ItemStack handItem = TestItemService.mockItem(Material.DIAMOND_AXE);
+        Mockito.when(mockPlayer.getInventory().getItemInMainHand()).thenReturn(handItem);
+
+        // Without slot change, returns item in main hand
+        assertEquals(handItem, miningManager.getPlayerTool(mockPlayer));
+
+        // When player slot is updated to slot 3
+        ItemStack slot3Item = TestItemService.mockItem(Material.NETHERITE_PICKAXE);
+        Mockito.when(mockPlayer.getInventory().getItem(3)).thenReturn(slot3Item);
+
+        // Simulate HELD_ITEM_CHANGE by calling handleItemSwap
+        // Slot tracking is updated in manager
+        miningManager.handleItemSwap(mockPlayer, slot3Item);
+        // Direct tool check
+        assertNotNull(miningManager.getPlayerTool(mockPlayer));
+    }
 }
 

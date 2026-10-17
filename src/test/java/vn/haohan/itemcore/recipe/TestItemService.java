@@ -46,6 +46,13 @@ public class TestItemService implements ItemService {
             return mockItem(newMat, currentAmount[0]);
         });
 
+        final Map<org.bukkit.enchantments.Enchantment, Integer> enchantments = new java.util.HashMap<>();
+        Mockito.when(stack.getEnchantments()).thenReturn(enchantments);
+        Mockito.doAnswer(i -> {
+            enchantments.put(i.getArgument(0), i.getArgument(1));
+            return null;
+        }).when(stack).addUnsafeEnchantment(Mockito.any(), Mockito.anyInt());
+
         Mockito.when(stack.clone()).thenAnswer(invocation -> mockItem(currentMat[0], currentAmount[0]));
 
         return stack;

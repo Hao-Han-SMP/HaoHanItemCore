@@ -17,30 +17,50 @@ import vn.haohan.itemcore.api.block.ToolTier;
 import vn.haohan.itemcore.api.block.ToolType;
 import vn.haohan.itemcore.internal.block.mining.AlternativeMiningStrategy;
 import vn.haohan.itemcore.internal.block.mining.NativeMiningStrategy;
+import vn.haohan.itemcore.recipe.TestItemService;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class MiningSpeedStrategyTest {
 
     @Test
-    @DisplayName("NativeMiningStrategy calculates correct attribute multiplier from seconds hardness")
-    void testAttributeFactorCalculation() {
-        // Vanilla NoteBlock base break time = 0.8 seconds with base tool
-        // If target hardness = 1.6s, attribute factor should be 0.8 / 1.6 = 0.5
-        float hardness = 1.6f;
-        double factor = NativeMiningStrategy.calculateAttributeFactor(0.8f, hardness);
-        assertEquals(0.5, factor, 0.001);
+    @DisplayName("NativeMiningStrategy calculates client NoteBlock break time correctly per tool")
+    void testClientNoteBlockBreakTime() {
+        // Hand / null: 4.0s
+        assertEquals(4.0f, NativeMiningStrategy.getClientNoteBlockBreakTime(null), 0.001f);
 
-        // If target hardness = 0.4s (faster break), attribute factor should be 0.8 / 0.4 = 2.0
-        factor = NativeMiningStrategy.calculateAttributeFactor(0.8f, 0.4f);
+        // Pickaxe / Shovel: not preferred for wood NoteBlock -> 4.0s
+        org.bukkit.inventory.ItemStack diamondPick = TestItemService.mockItem(org.bukkit.Material.DIAMOND_PICKAXE);
+        assertEquals(4.0f, NativeMiningStrategy.getClientNoteBlockBreakTime(diamondPick), 0.001f);
+
+        // Diamond Axe: base multiplier 8.0 -> 1.2 / 8.0 = 0.15s
+        org.bukkit.inventory.ItemStack diamondAxe = TestItemService.mockItem(org.bukkit.Material.DIAMOND_AXE);
+        assertEquals(0.15f, NativeMiningStrategy.getClientNoteBlockBreakTime(diamondAxe), 0.001f);
+
+        // Wooden Axe: base multiplier 2.0 -> 1.2 / 2.0 = 0.6s
+        org.bukkit.inventory.ItemStack woodenAxe = TestItemService.mockItem(org.bukkit.Material.WOODEN_AXE);
+        assertEquals(0.6f, NativeMiningStrategy.getClientNoteBlockBreakTime(woodenAxe), 0.001f);
+    }
+
+    @Test
+    @DisplayName("NativeMiningStrategy calculates correct attribute multiplier from client break time and target hardness")
+    void testAttributeFactorCalculation() {
+        // When client break time = 4.0s (e.g. hand or pickaxe on NoteBlock)
+        // If target hardness = 2.0s, attribute factor should be 4.0 / 2.0 = 2.0
+        float targetHardness = 2.0f;
+        double factor = NativeMiningStrategy.calculateAttributeFactor(4.0f, targetHardness);
         assertEquals(2.0, factor, 0.001);
 
+        // If target hardness = 8.0s, attribute factor should be 4.0 / 8.0 = 0.5
+        factor = NativeMiningStrategy.calculateAttributeFactor(4.0f, 8.0f);
+        assertEquals(0.5, factor, 0.001);
+
         // Instant break (hardness == 0.0) -> high factor (100.0)
-        double instantFactor = NativeMiningStrategy.calculateAttributeFactor(0.8f, 0.0f);
+        double instantFactor = NativeMiningStrategy.calculateAttributeFactor(4.0f, 0.0f);
         assertEquals(100.0, instantFactor, 0.001);
 
         // Unbreakable block (hardness < 0.0) -> heavy reduction factor (0.01)
-        double unbreakableFactor = NativeMiningStrategy.calculateAttributeFactor(0.8f, -1.0f);
+        double unbreakableFactor = NativeMiningStrategy.calculateAttributeFactor(4.0f, -1.0f);
         assertEquals(0.01, unbreakableFactor, 0.001);
     }
 
@@ -65,13 +85,13 @@ class MiningSpeedStrategyTest {
         // 1. Break time must be -1.0f
         assertEquals(-1.0f, strategy.getBreakTimeSeconds(mockPlayer, null, unbreakableDef), 0.001f);
 
-        // 2. Digging unbreakable block must apply -0.99 penalty (not instant break)
+        // 2. Digging unbreakable block must apply -1.0 penalty (100% speed reduction)
         strategy.onStartDigging(mockPlayer, mockBlock, unbreakableDef, null);
 
         ArgumentCaptor<AttributeModifier> modifierCaptor = ArgumentCaptor.forClass(AttributeModifier.class);
         Mockito.verify(mockAttr).addTransientModifier(modifierCaptor.capture());
         AttributeModifier captured = modifierCaptor.getValue();
-        assertEquals(-0.99, captured.getAmount(), 0.001);
+        assertEquals(-1.0, captured.getAmount(), 0.001);
         assertEquals(AttributeModifier.Operation.MULTIPLY_SCALAR_1, captured.getOperation());
     }
 
@@ -111,17 +131,19 @@ class MiningSpeedStrategyTest {
                 .hardness(1.6f)
                 .build();
 
-        // 1. onStartDigging with effective tool
+        // 1. onStartDigging with effective tool (hand mining a block with no tool requirement, hardness 1.6s)
+        // Client NoteBlock break time with hand = 4.0s. Target hardness = 1.6s.
+        // Factor = 4.0 / 1.6 = 2.5 -> modifier amount = 2.5 - 1.0 = 1.5
         strategy.onStartDigging(mockPlayer, mockBlock, def, null);
 
         // Should first clean previous modifier
         Mockito.verify(mockAttr, Mockito.atLeastOnce()).removeModifier(Mockito.any(NamespacedKey.class));
 
-        // Should add transient modifier with factor - 1.0 (0.5 - 1.0 = -0.5)
+        // Should add transient modifier with factor - 1.0 (2.5 - 1.0 = 1.5)
         ArgumentCaptor<AttributeModifier> modifierCaptor = ArgumentCaptor.forClass(AttributeModifier.class);
         Mockito.verify(mockAttr).addTransientModifier(modifierCaptor.capture());
         AttributeModifier captured = modifierCaptor.getValue();
-        assertEquals(-0.5, captured.getAmount(), 0.001);
+        assertEquals(1.5, captured.getAmount(), 0.001);
         assertEquals(AttributeModifier.Operation.MULTIPLY_SCALAR_1, captured.getOperation());
 
         // 2. onStopDigging
@@ -155,8 +177,8 @@ class MiningSpeedStrategyTest {
         ArgumentCaptor<AttributeModifier> modifierCaptor = ArgumentCaptor.forClass(AttributeModifier.class);
         Mockito.verify(mockAttr).addTransientModifier(modifierCaptor.capture());
         AttributeModifier captured = modifierCaptor.getValue();
-        // Should heavily penalize speed (-0.99)
-        assertEquals(-0.99, captured.getAmount(), 0.001);
+        // Should completely penalize speed (-1.0 -> 0.0 speed)
+        assertEquals(-1.0, captured.getAmount(), 0.001);
         assertEquals(AttributeModifier.Operation.MULTIPLY_SCALAR_1, captured.getOperation());
     }
 
@@ -192,4 +214,43 @@ class MiningSpeedStrategyTest {
                 .build();
         assertEquals(-1.0f, strategy.getBreakTimeSeconds(null, null, unbreakable), 0.001f);
     }
+
+    @Test
+    @DisplayName("MiningSpeedCalculator calculateSpeedMultiplier calculates base tool tier and efficiency enchantments")
+    void testCalculateSpeedMultiplierWithToolAndEfficiency() {
+        CustomBlockDefinition oreDef = CustomBlockDefinition.builder("custom:tin_ore")
+                .hardness(3.0f)
+                .mineableWith(ToolType.PICKAXE, ToolTier.STONE)
+                .build();
+
+        // 1. Diamond Pickaxe without enchantment -> 8.0 base multiplier
+        org.bukkit.inventory.ItemStack diamondPick = TestItemService.mockItem(org.bukkit.Material.DIAMOND_PICKAXE);
+        float diamondSpeed = vn.haohan.itemcore.internal.block.MiningSpeedCalculator.calculateSpeedMultiplier(null, diamondPick, oreDef);
+        assertEquals(8.0f, diamondSpeed, 0.001f);
+
+        // 2. Netherite Pickaxe without enchantment -> 9.0 base multiplier
+        org.bukkit.inventory.ItemStack netheritePick = TestItemService.mockItem(org.bukkit.Material.NETHERITE_PICKAXE);
+        float netheriteSpeed = vn.haohan.itemcore.internal.block.MiningSpeedCalculator.calculateSpeedMultiplier(null, netheritePick, oreDef);
+        assertEquals(9.0f, netheriteSpeed, 0.001f);
+    }
+
+    @Test
+    @DisplayName("NativeMiningStrategy calculates higher attribute factor for higher tool speeds and tiers")
+    void testNativeMiningStrategyScalesWithToolTiersAndSpeed() {
+        // Target hardness = 3.0s, NoteBlock client break time for pickaxe = 4.0s
+        float hardness = 3.0f;
+        float clientBreakTime = 4.0f;
+
+        // Diamond tool speed = 8.0 -> factor = (4.0 / 3.0) * (8.0 / 1.5) = 1.3333 * 5.3333 = 7.1111
+        double diamondFactor = NativeMiningStrategy.calculateAttributeFactor(clientBreakTime, hardness, 8.0f, true);
+        assertEquals((4.0 / 3.0) * (8.0 / 1.5), diamondFactor, 0.001);
+
+        // Netherite Eff 5 speed = 35.0 -> factor = (4.0 / 3.0) * (35.0 / 1.5) = 31.1111
+        double netheriteEff5Factor = NativeMiningStrategy.calculateAttributeFactor(clientBreakTime, hardness, 35.0f, true);
+        assertEquals((4.0 / 3.0) * (35.0 / 1.5), netheriteEff5Factor, 0.001);
+
+        // Ratio of factors must equal ratio of speeds (35.0 / 8.0 = 4.375x faster)
+        assertEquals(35.0 / 8.0, netheriteEff5Factor / diamondFactor, 0.001);
+    }
 }
+

@@ -51,11 +51,20 @@ public final class MiningSpeedCalculator {
             return 1.0f;
         }
 
+        float speedMultiplier = calculateSpeedMultiplier(player, tool, definition);
+        return speedMultiplier / baseTicks;
+    }
+
+    /**
+     * Calculates the speed multiplier including tool tier, custom tool mining_speed,
+     * efficiency enchantment, mining efficiency attribute, potion effects, water, and on-ground state.
+     */
+    public static float calculateSpeedMultiplier(Player player, ItemStack tool, CustomBlockDefinition definition) {
         float speedMultiplier = 1.0f;
 
         // Tool multipliers (tier base speed, custom mining_speed, efficiency enchantments/attributes)
         // only apply if the block has preferred tools configured and tool is valid.
-        if (definition.hasPreferredTools() && tool != null && tool.getType() != null && tool.getType() != Material.AIR) {
+        if (definition != null && definition.hasPreferredTools() && tool != null && tool.getType() != null && tool.getType() != Material.AIR) {
             // 1. Base Tool Speed: Custom mining_speed overrides or sets base multiplier; otherwise ToolTier
             Float customSpeed = null;
             try {
@@ -158,7 +167,7 @@ public final class MiningSpeedCalculator {
             } catch (Throwable ignored) {}
         }
 
-        return speedMultiplier / baseTicks;
+        return speedMultiplier;
     }
 
     private static int getEfficiencyLevel(ItemStack tool) {

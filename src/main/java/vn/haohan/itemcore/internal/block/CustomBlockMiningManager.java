@@ -54,6 +54,8 @@ public class CustomBlockMiningManager implements PacketListener {
     private final ConcurrentHashMap<UUID, BlockMiningSession> sessions = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<UUID, Long> consecutiveCooldowns = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<UUID, Long> lastToolWarningTimes = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<UUID, Location> activeMiningLocations = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<UUID, Integer> playerHeldSlots = new ConcurrentHashMap<>();
     private AnimationObserver animationObserver;
 
     public CustomBlockMiningManager(
@@ -117,12 +119,16 @@ public class CustomBlockMiningManager implements PacketListener {
         }
         if (playerUuid != null) {
             lastToolWarningTimes.remove(playerUuid);
+            activeMiningLocations.remove(playerUuid);
+            playerHeldSlots.remove(playerUuid);
         }
     }
 
     public void clearAllSessions() {
         consecutiveCooldowns.clear();
         lastToolWarningTimes.clear();
+        activeMiningLocations.clear();
+        playerHeldSlots.clear();
         for (BlockMiningSession session : sessions.values()) {
             sendBreakAnimation(session.getPlayer(), session.getBlockLocation(), -1);
             if (overlayRenderer != null && session.getCrackEntityId() != -1) {
@@ -137,6 +143,18 @@ public class CustomBlockMiningManager implements PacketListener {
                 }
             } catch (Throwable ignored) {}
         }
+    }
+
+    public ItemStack getPlayerTool(Player player) {
+        if (player == null) return null;
+        Integer currentSlot = playerHeldSlots.get(player.getUniqueId());
+        if (currentSlot != null && currentSlot >= 0 && currentSlot <= 8) {
+            try {
+                ItemStack item = player.getInventory().getItem(currentSlot);
+                if (item != null) return item;
+            } catch (Throwable ignored) {}
+        }
+        return player.getInventory().getItemInMainHand();
     }
 
     @Override
@@ -155,6 +173,44 @@ public class CustomBlockMiningManager implements PacketListener {
             if (blockPos == null) return;
 
             Location loc = new Location(player.getWorld(), blockPos.getX(), blockPos.getY(), blockPos.getZ());
+            Block block = loc.getBlock();
+
+            // Reject at packet layer if digging custom block with ineffective tool or unbreakable block
+            if (player.getGameMode() != GameMode.CREATIVE && customBlockService.isCustomBlock(block)) {
+                Optional<CustomBlockDefinition> optDef = customBlockService.getCustomBlock(block);
+                if (optDef.isPresent()) {
+                    CustomBlockDefinition def = optDef.get();
+                    ItemStack tool = getPlayerTool(player);
+                    boolean ineffective = def.isUnbreakable() || !def.isEffectiveTool(tool);
+
+                    if (ineffective && (packet.getAction() == DiggingAction.START_DIGGING || packet.getAction() == DiggingAction.FINISHED_DIGGING)) {
+                        event.setCancelled(true);
+
+                        if (packet.getSequence() >= 0) {
+                            NoteBlockEventListener.acknowledgeBlockChange(player, packet.getSequence());
+                        }
+
+                        try {
+                            player.sendBlockChange(loc, block.getBlockData());
+                        } catch (Throwable ignored) {}
+
+                        long now = System.currentTimeMillis();
+                        Long lastWarn = lastToolWarningTimes.get(player.getUniqueId());
+                        if (lastWarn == null || now - lastWarn >= 1500L) {
+                            lastToolWarningTimes.put(player.getUniqueId(), now);
+                            sendToolRequirementWarning(player, def);
+                        }
+
+                        if (def.isNative() || def.isVanillaOverwrite()) {
+                            if (nativeStrategy != null) {
+                                nativeStrategy.onStartDigging(player, block, def, tool);
+                            }
+                        }
+                        return;
+                    }
+                }
+            }
+
             handleDiggingAction(player, packet.getAction(), blockPos, loc);
         } else if (event.getPacketType() == PacketType.Play.Client.PLAYER_BLOCK_PLACEMENT) {
             Object rawPlayer = event.getPlayer();
@@ -177,6 +233,7 @@ public class CustomBlockMiningManager implements PacketListener {
                     new com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientHeldItemChange(event);
             int newSlot = packet.getSlot();
             if (newSlot >= 0 && newSlot <= 8) {
+                playerHeldSlots.put(player.getUniqueId(), newSlot);
                 ItemStack newTool = player.getInventory().getItem(newSlot);
                 handleItemSwap(player, newTool);
             }
@@ -190,6 +247,25 @@ public class CustomBlockMiningManager implements PacketListener {
      */
     public void handleItemSwap(Player player, ItemStack newTool) {
         if (player == null) return;
+
+        Location activeLoc = activeMiningLocations.get(player.getUniqueId());
+        if (activeLoc != null && activeLoc.getWorld() != null && activeLoc.getWorld().equals(player.getWorld())) {
+            Block block = activeLoc.getBlock();
+            Optional<CustomBlockDefinition> optDef = customBlockService.getCustomBlock(block);
+            if (optDef.isPresent()) {
+                CustomBlockDefinition def = optDef.get();
+                if (def.isNative() || def.isVanillaOverwrite()) {
+                    try {
+                        player.sendBlockChange(activeLoc, block.getBlockData());
+                    } catch (Throwable ignored) {}
+
+                    if (nativeStrategy != null) {
+                        nativeStrategy.onStartDigging(player, block, def, newTool);
+                    }
+                }
+            }
+        }
+
         BlockMiningSession session = sessions.get(player.getUniqueId());
         if (session == null) return;
 
@@ -232,7 +308,8 @@ public class CustomBlockMiningManager implements PacketListener {
                 return; // Let standard Bukkit BlockBreakEvent handle creative breaking
             }
 
-            ItemStack tool = player.getInventory().getItemInMainHand();
+            ItemStack tool = getPlayerTool(player);
+            activeMiningLocations.put(player.getUniqueId(), loc);
 
             if (def.isNative() || def.isVanillaOverwrite()) {
                 if (!def.isEffectiveTool(tool)) {
@@ -294,6 +371,7 @@ public class CustomBlockMiningManager implements PacketListener {
             }
 
         } else if (action == DiggingAction.CANCELLED_DIGGING) {
+            activeMiningLocations.remove(player.getUniqueId());
             Block block = loc.getBlock();
             Optional<CustomBlockDefinition> optDef = customBlockService.getCustomBlock(block);
             if (optDef.isPresent()) {
@@ -306,6 +384,8 @@ public class CustomBlockMiningManager implements PacketListener {
                 }
             }
             cancelSession(player.getUniqueId());
+        } else if (action == DiggingAction.FINISHED_DIGGING) {
+            activeMiningLocations.remove(player.getUniqueId());
         }
     }
 
