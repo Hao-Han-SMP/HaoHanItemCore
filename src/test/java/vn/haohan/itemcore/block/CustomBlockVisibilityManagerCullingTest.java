@@ -71,7 +71,7 @@ class CustomBlockVisibilityManagerCullingTest {
 
         visibilityManager = new CustomBlockVisibilityManager(
                 storage, registry, idManager, renderer, cullingService, cullingConfig, Logger.getLogger("TestLogger"));
-        visibilityManager.setViewDistanceChunks(2); // 5x5 chunk area
+        visibilityManager.setViewDistanceChunks(3); // 7x7 chunk area
 
         registry.register(CustomBlockDefinition.builder("test:block")
                 .model(new CustomBlockModel(null))
@@ -105,41 +105,65 @@ class CustomBlockVisibilityManagerCullingTest {
     }
 
     @Test
-    @DisplayName("Frustum Culling: block ahead spawns, block behind outside near zone does not spawn")
-    void testFrustumCullingDirectional() {
-        // Looking South (+Z): yaw=0, pitch=0
+    @DisplayName("Omnidirectional Visibility: blocks behind the player also spawn (no frustum culling)")
+    void testOmnidirectionalVisibilityWithinRadius() {
+        // Player looking South (+Z): yaw=0, pitch=0
         Location playerLoc = new Location(mockWorld, 0.5, 64, 0.5, 0f, 0f);
-        Player player = createMockPlayer(UUID.randomUUID(), "PlayerFrustum", playerLoc);
+        Player player = createMockPlayer(UUID.randomUUID(), "PlayerOmni", playerLoc);
 
-        // Block in front: (0, 64, 15) -> angle 0 deg
+        // Block in front: (0, 64, 15)
         storage.set(worldUid, 0, 64, 15, "test:block");
-        // Block behind: (0, 64, -15) -> angle 180 deg (behind)
+        // Block directly behind: (0, 64, -15)
         storage.set(worldUid, 0, 64, -15, "test:block");
 
         visibilityManager.initPlayer(player, playerLoc);
 
-        assertEquals(1, renderer.spawns.get(), "Only block within view frustum must spawn");
+        assertEquals(2, renderer.spawns.get(), "Both blocks in front and behind within spherical radius must spawn");
     }
 
     @Test
-    @DisplayName("Camera rotation: rotating towards previously culled block causes it to spawn")
-    void testRotationTriggersCullingUpdate() {
-        // Looking South (+Z, yaw=0)
+    @DisplayName("Intra-chunk rotation: rotation does not trigger culling re-evaluation or spawn packets")
+    void testIntraChunkRotationDoesNotTriggerUpdate() {
         Location startLoc = new Location(mockWorld, 0.5, 64, 0.5, 0f, 0f);
         Player player = createMockPlayer(UUID.randomUUID(), "PlayerRotator", startLoc);
 
-        // Block behind player (+Z is front, -Z is behind)
-        storage.set(worldUid, 0, 64, -15, "test:block");
-
+        storage.set(worldUid, 0, 64, 15, "test:block");
         visibilityManager.initPlayer(player, startLoc);
-        assertEquals(0, renderer.spawns.get(), "Block behind should not spawn initially");
+        assertEquals(1, renderer.spawns.get());
 
-        // Player turns around 180 degrees (looking North: yaw=180)
+        // Player rotates 180 degrees in place (same chunk)
         Location rotatedLoc = new Location(mockWorld, 0.5, 64, 0.5, 180f, 0f);
         Mockito.when(player.getLocation()).thenReturn(rotatedLoc);
 
-        visibilityManager.handlePlayerMove(player, startLoc, rotatedLoc);
+        boolean evaluated = visibilityManager.handlePlayerMove(player, startLoc, rotatedLoc);
 
-        assertEquals(1, renderer.spawns.get(), "Block now in front must spawn after rotation");
+        assertFalse(evaluated, "Intra-chunk rotation must immediately return false");
+        assertEquals(1, renderer.spawns.get(), "No new spawn packets should be dispatched");
+        assertEquals(0, renderer.destroys.get(), "No destroy packets should be dispatched");
+    }
+
+    @Test
+    @DisplayName("Hysteresis Retention: block remains visible within hysteresis margin when re-evaluated")
+    void testHysteresisRetention() {
+        // Chunk 0, 0
+        Location loc1 = new Location(mockWorld, 0.5, 64, 0.5);
+        Player player = createMockPlayer(UUID.randomUUID(), "PlayerHysteresis", loc1);
+
+        // Block at (0, 64, 30) -> distance 29.5m (within 32m radius)
+        storage.set(worldUid, 0, 64, 30, "test:block");
+
+        visibilityManager.initPlayer(player, loc1);
+        assertEquals(1, renderer.spawns.get());
+
+        // Player moves across chunk boundary to chunk (1, 0): X=16.5
+        // Distance to block (0, 64, 30): sqrt(16^2 + 29.5^2) = sqrt(256 + 870.25) = sqrt(1126.25) ~ 33.56m
+        // 33.56m > 32m (spherical radius), but <= 36m (hysteresis margin)
+        Location loc2 = new Location(mockWorld, 16.5, 64, 0.5);
+        Mockito.when(player.getLocation()).thenReturn(loc2);
+
+        boolean evaluated = visibilityManager.handlePlayerMove(player, loc1, loc2);
+        assertTrue(evaluated);
+
+        assertEquals(0, renderer.destroys.get(), "Block within hysteresis threshold (36m) must NOT be destroyed");
     }
 }

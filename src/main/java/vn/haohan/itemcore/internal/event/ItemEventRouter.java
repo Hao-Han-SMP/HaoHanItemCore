@@ -95,12 +95,14 @@ public final class ItemEventRouter implements Listener {
 
         if (!definition.isUsable() && (event.getAction() == org.bukkit.event.block.Action.RIGHT_CLICK_AIR
                 || event.getAction() == org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK)) {
-            event.setUseItemInHand(org.bukkit.event.Event.Result.DENY);
-            event.setCancelled(true);
-            org.bukkit.entity.Player player = event.getPlayer();
-            player.updateInventory();
-            org.bukkit.Bukkit.getScheduler().runTask(plugin, player::updateInventory);
-            return;
+            if (definition.getType() != ItemType.BLOCK && !definition.getProperties().containsKey("custom_block_id")) {
+                event.setUseItemInHand(org.bukkit.event.Event.Result.DENY);
+                event.setCancelled(true);
+                org.bukkit.entity.Player player = event.getPlayer();
+                player.updateInventory();
+                org.bukkit.Bukkit.getScheduler().runTask(plugin, player::updateInventory);
+                return;
+            }
         }
 
         if (!definition.hasBehavior())

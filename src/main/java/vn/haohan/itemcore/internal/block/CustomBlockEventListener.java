@@ -337,6 +337,20 @@ public final class CustomBlockEventListener implements Listener {
 
             // Support placing custom blocks or regular blocks against custom block
             handlePlacementAgainstCustomBlock(event, clicked);
+            return;
+        }
+
+        // Support placing non-block Material or Barrier custom blocks against any regular block
+        ItemStack heldItem = event.getItem();
+        if (heldItem != null && !heldItem.getType().isAir() && (!heldItem.getType().isBlock() || heldItem.getType() == Material.BARRIER) && heldItem.hasItemMeta()) {
+            PersistentDataContainer pdc = heldItem.getItemMeta().getPersistentDataContainer();
+            if (pdc.has(itemIdKey, PersistentDataType.STRING)) {
+                String heldId = pdc.get(itemIdKey, PersistentDataType.STRING);
+                String cbId = heldId != null ? resolveCustomBlockId(heldId) : null;
+                if (cbId != null) {
+                    placeCustomBlockFromInteract(event, clicked, heldItem, cbId);
+                }
+            }
         }
     }
 
@@ -373,6 +387,11 @@ public final class CustomBlockEventListener implements Listener {
             return;
         }
 
+        placeCustomBlockFromInteract(event, clicked, item, customBlockId);
+    }
+
+    private void placeCustomBlockFromInteract(PlayerInteractEvent event, Block clicked, ItemStack item, String customBlockId) {
+        Material itemType = item.getType();
         Player player = event.getPlayer();
         BlockFace face = event.getBlockFace();
         Block target = clicked.isReplaceable() ? clicked : clicked.getRelative(face);
@@ -380,8 +399,8 @@ public final class CustomBlockEventListener implements Listener {
         if (!target.isReplaceable() && !target.isEmpty()) return;
         if (target.getY() < target.getWorld().getMinHeight() || target.getY() >= target.getWorld().getMaxHeight()) return;
 
-        // Check if player bounding box collides with target
-        org.bukkit.util.BoundingBox targetBox = org.bukkit.util.BoundingBox.of(target);
+        // Check if player bounding box collides with target (use small inset to avoid boundary precision issues)
+        org.bukkit.util.BoundingBox targetBox = org.bukkit.util.BoundingBox.of(target).expand(-0.05);
         if (player.getBoundingBox().overlaps(targetBox)) {
             return;
         }
@@ -397,17 +416,19 @@ public final class CustomBlockEventListener implements Listener {
 
         if (customBlockId != null) {
             Optional<CustomBlockDefinition> optPlacingDef = customBlockService.getRegistry().get(customBlockId);
-            if (optPlacingDef.isPresent() && optPlacingDef.get().isNative()) {
-                customBlockService.placeCustomBlock(target.getLocation(), customBlockId);
-            } else {
-                // Suppress barrier sound packet to avoid double sound
-                if (soundPacketListener != null) {
-                    soundPacketListener.markRecentPlacement(target.getLocation());
-                }
+            if (!customBlockService.isCustomBlock(target)) {
+                if (optPlacingDef.isPresent() && optPlacingDef.get().isNative()) {
+                    customBlockService.placeCustomBlock(target.getLocation(), customBlockId);
+                } else {
+                    // Suppress barrier sound packet to avoid double sound
+                    if (soundPacketListener != null) {
+                        soundPacketListener.markRecentPlacement(target.getLocation());
+                    }
 
-                // Mutate block to Barrier and register custom block
-                target.setType(Material.BARRIER, false);
-                customBlockService.placeCustomBlock(target.getLocation(), customBlockId);
+                    // Mutate block to Barrier and register custom block
+                    target.setType(Material.BARRIER, false);
+                    customBlockService.placeCustomBlock(target.getLocation(), customBlockId);
+                }
             }
 
             // Play custom block place sound

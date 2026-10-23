@@ -17,11 +17,3 @@ custom-blocks:
     spherical-radius: 32
     # Khoảng cách đệm despawn chống rung giật biên (blocks)
     hysteresis-margin: 4
-    # Lọc 1-Face bề mặt (chỉ hiện khối có ít nhất 1 mặt tiếp xúc không khí)
-    surface-culling: true
-    # Lọc theo góc nhìn POV (Frustum Culling)
-    frustum-culling: true
-    # Góc đệm an toàn mở rộng FOV chống pop-in ở rìa màn hình (độ)
-    frustum-margin-degrees: 20.0
-    # Ngưỡng xoay góc camera (yaw/pitch) kích hoạt tính lại Frustum (độ)
-    frustum-angle-threshold: 15.0
