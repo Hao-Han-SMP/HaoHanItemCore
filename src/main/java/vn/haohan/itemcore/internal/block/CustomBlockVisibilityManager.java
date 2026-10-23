@@ -473,7 +473,8 @@ public final class CustomBlockVisibilityManager {
     }
 
     private Set<Long> calculateChunksInRadius(int centerX, int centerZ, int radius) {
-        Set<Long> set = new HashSet<>((radius * 2 + 1) * (radius * 2 + 1));
+        int capacity = (radius * 2 + 1) * (radius * 2 + 1);
+        Set<Long> set = ConcurrentHashMap.newKeySet(capacity);
         for (int dx = -radius; dx <= radius; dx++) {
             for (int dz = -radius; dz <= radius; dz++) {
                 set.add(CustomBlockStorage.packChunkKey(centerX + dx, centerZ + dz));
