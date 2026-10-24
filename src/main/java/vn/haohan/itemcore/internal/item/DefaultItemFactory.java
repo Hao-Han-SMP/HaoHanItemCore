@@ -319,7 +319,15 @@ public final class DefaultItemFactory implements ItemFactory {
     private static boolean applyUniqueUUID(ItemMeta meta, ItemDefinition definition, Plugin plugin) {
         NamespacedKey uuidKey = plugin != null ? new NamespacedKey(plugin, "uuid") : new NamespacedKey("haohanitemcore", "uuid");
         PersistentDataContainer pdc = meta.getPersistentDataContainer();
-        if (definition.getMaxStackSize() == 1) {
+        boolean shouldHaveUUID = false;
+        Object uniqueProp = definition.getProperties().get("unique_uuid");
+        if (uniqueProp instanceof Boolean b) {
+            shouldHaveUUID = b;
+        } else if (definition.getProperties().get("unique") instanceof Boolean b) {
+            shouldHaveUUID = b;
+        }
+
+        if (shouldHaveUUID) {
             if (!pdc.has(uuidKey, org.bukkit.persistence.PersistentDataType.STRING)) {
                 pdc.set(uuidKey, org.bukkit.persistence.PersistentDataType.STRING,
                         java.util.UUID.randomUUID().toString());

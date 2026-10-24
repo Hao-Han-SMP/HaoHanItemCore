@@ -9,6 +9,7 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.RecipeChoice;
+import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.plugin.Plugin;
 
 import java.util.ArrayList;
@@ -234,6 +235,14 @@ public final class BukkitRecipeAdapter {
             // Custom item → ExactChoice
             if (itemRegistry.exists(item.id())) {
                 ItemStack example = itemFactory.create(item.id());
+                ItemMeta meta = example.getItemMeta();
+                if (meta != null) {
+                    NamespacedKey uuidKey = plugin != null ? new NamespacedKey(plugin, "uuid") : new NamespacedKey("haohanitemcore", "uuid");
+                    if (meta.getPersistentDataContainer().has(uuidKey, org.bukkit.persistence.PersistentDataType.STRING)) {
+                        meta.getPersistentDataContainer().remove(uuidKey);
+                        example.setItemMeta(meta);
+                    }
+                }
                 return new RecipeChoice.ExactChoice(example);
             }
 
