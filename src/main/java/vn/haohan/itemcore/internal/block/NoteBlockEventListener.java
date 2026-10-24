@@ -235,6 +235,12 @@ public final class NoteBlockEventListener implements Listener {
     public void onHitWood(BlockDamageEvent event) {
         Optional<NativeCustomBlock> optDef = getNativeCustomBlock(event.getBlock());
         if (optDef.isEmpty()) return;
+
+        try {
+            event.getPlayer().stopSound(org.bukkit.Sound.BLOCK_WOOD_HIT, org.bukkit.SoundCategory.BLOCKS);
+            event.getPlayer().stopSound("minecraft:block.wood.hit", org.bukkit.SoundCategory.BLOCKS);
+        } catch (Throwable ignored) {}
+
         CustomBlockSoundGroup soundGroup = optDef.get().getSoundGroup();
         if (soundGroup != null && soundGroup.getHitSound() != null) {
             soundGroup.getHitSound().play(event.getBlock().getLocation().toCenterLocation());

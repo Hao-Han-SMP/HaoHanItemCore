@@ -51,10 +51,31 @@ public class CustomBlockMiningManager implements PacketListener {
     private final Plugin plugin;
     private final NativeMiningStrategy nativeStrategy;
     private final Logger logger;
+    private CustomBlockSoundPacketListener soundPacketListener;
     private final ConcurrentHashMap<UUID, BlockMiningSession> sessions = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<UUID, Long> consecutiveCooldowns = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<UUID, Long> lastToolWarningTimes = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<UUID, Location> activeMiningLocations = new ConcurrentHashMap<>();
+    private static class NativeMiningTracker {
+        private final Player player;
+        private final Location location;
+        private final CustomBlockDefinition definition;
+        private int ticks;
+
+        NativeMiningTracker(Player player, Location location, CustomBlockDefinition definition) {
+            this.player = player;
+            this.location = location;
+            this.definition = definition;
+            this.ticks = 0;
+        }
+
+        public Player getPlayer() { return player; }
+        public Location getLocation() { return location; }
+        public CustomBlockDefinition getDefinition() { return definition; }
+        public int incrementTicks() { return ++ticks; }
+    }
+
+    private final ConcurrentHashMap<UUID, NativeMiningTracker> activeNativeMiningTrackers = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<UUID, Integer> playerHeldSlots = new ConcurrentHashMap<>();
     private AnimationObserver animationObserver;
 
@@ -92,6 +113,10 @@ public class CustomBlockMiningManager implements PacketListener {
         this.animationObserver = observer;
     }
 
+    public void setSoundPacketListener(CustomBlockSoundPacketListener soundPacketListener) {
+        this.soundPacketListener = soundPacketListener;
+    }
+
     public boolean hasActiveSession(UUID playerUuid) {
         BlockMiningSession session = sessions.get(playerUuid);
         return session != null && session.getDefinition().isEffectiveTool(session.getPlayer().getInventory().getItemInMainHand());
@@ -100,6 +125,7 @@ public class CustomBlockMiningManager implements PacketListener {
     public void cancelSession(UUID playerUuid) {
         consecutiveCooldowns.remove(playerUuid);
         AdjacentNoteBlockUpdateHelper.clearPlayer(playerUuid);
+        activeNativeMiningTrackers.remove(playerUuid);
         BlockMiningSession session = sessions.remove(playerUuid);
         Player player = null;
         if (session != null) {
@@ -128,6 +154,7 @@ public class CustomBlockMiningManager implements PacketListener {
         consecutiveCooldowns.clear();
         lastToolWarningTimes.clear();
         activeMiningLocations.clear();
+        activeNativeMiningTrackers.clear();
         playerHeldSlots.clear();
         for (BlockMiningSession session : sessions.values()) {
             sendBreakAnimation(session.getPlayer(), session.getBlockLocation(), -1);
@@ -312,6 +339,7 @@ public class CustomBlockMiningManager implements PacketListener {
             activeMiningLocations.put(player.getUniqueId(), loc);
 
             if (def.isNative() || def.isVanillaOverwrite()) {
+                activeNativeMiningTrackers.put(player.getUniqueId(), new NativeMiningTracker(player, loc, def));
                 if (!def.isEffectiveTool(tool)) {
                     long now = System.currentTimeMillis();
                     Long lastWarn = lastToolWarningTimes.get(player.getUniqueId());
@@ -372,6 +400,7 @@ public class CustomBlockMiningManager implements PacketListener {
 
         } else if (action == DiggingAction.CANCELLED_DIGGING) {
             activeMiningLocations.remove(player.getUniqueId());
+            activeNativeMiningTrackers.remove(player.getUniqueId());
             Block block = loc.getBlock();
             Optional<CustomBlockDefinition> optDef = customBlockService.getCustomBlock(block);
             if (optDef.isPresent()) {
@@ -386,7 +415,50 @@ public class CustomBlockMiningManager implements PacketListener {
             cancelSession(player.getUniqueId());
         } else if (action == DiggingAction.FINISHED_DIGGING) {
             activeMiningLocations.remove(player.getUniqueId());
+            activeNativeMiningTrackers.remove(player.getUniqueId());
+
+            Block block = loc.getBlock();
+            Optional<CustomBlockDefinition> optDef = customBlockService.getCustomBlock(block);
+            if (optDef.isPresent()) {
+                CustomBlockDefinition def = optDef.get();
+                if (def.isNative()) {
+                    // Instantly silence client-side predicted wood break sounds at packet reception
+                    silenceWoodBreakSound(player);
+
+                    if (soundPacketListener != null) {
+                        String breakSoundKey = (def.getSoundGroup() != null && def.getSoundGroup().getBreakSound() != null)
+                                ? def.getSoundGroup().getBreakSound().soundKey()
+                                : null;
+                        soundPacketListener.markRecentBreak(loc, breakSoundKey);
+                        if (plugin != null) {
+                            try {
+                                Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                                    soundPacketListener.clearRecentBreak(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
+                                }, 5L);
+                            } catch (Throwable ignored) {}
+                        }
+                    }
+                }
+            }
         }
+    }
+
+    private void silenceWoodBreakSound(Player player) {
+        if (player == null || !player.isOnline()) return;
+        try {
+            player.stopSound(org.bukkit.Sound.BLOCK_WOOD_BREAK, org.bukkit.SoundCategory.BLOCKS);
+        } catch (Throwable ignored) {}
+        try {
+            player.stopSound("minecraft:block.wood.break", org.bukkit.SoundCategory.BLOCKS);
+        } catch (Throwable ignored) {}
+        try {
+            player.stopSound(org.bukkit.Sound.BLOCK_NOTE_BLOCK_BASEDRUM, org.bukkit.SoundCategory.RECORDS);
+            player.stopSound(org.bukkit.Sound.BLOCK_NOTE_BLOCK_BASS, org.bukkit.SoundCategory.RECORDS);
+            player.stopSound(org.bukkit.Sound.BLOCK_NOTE_BLOCK_HARP, org.bukkit.SoundCategory.RECORDS);
+            player.stopSound(org.bukkit.Sound.BLOCK_NOTE_BLOCK_PLING, org.bukkit.SoundCategory.RECORDS);
+            player.stopSound(org.bukkit.Sound.BLOCK_NOTE_BLOCK_SNARE, org.bukkit.SoundCategory.RECORDS);
+            player.stopSound(org.bukkit.Sound.BLOCK_NOTE_BLOCK_HAT, org.bukkit.SoundCategory.RECORDS);
+        } catch (Throwable ignored) {}
     }
 
     /**
@@ -470,6 +542,52 @@ public class CustomBlockMiningManager implements PacketListener {
                 // Record consecutive mining delay for continuous mining next blocks (5 ticks = 250ms)
                 consecutiveCooldowns.put(player.getUniqueId(), System.currentTimeMillis() + (CONSECUTIVE_MINING_DELAY_TICKS * 50L));
                 breakCustomBlock(player, loc, def);
+            }
+        }
+
+        // Tick active mining for Native and VanillaOverwrite custom blocks (sound handling)
+        Iterator<Map.Entry<UUID, NativeMiningTracker>> nativeIt = activeNativeMiningTrackers.entrySet().iterator();
+        while (nativeIt.hasNext()) {
+            Map.Entry<UUID, NativeMiningTracker> entry = nativeIt.next();
+            UUID uuid = entry.getKey();
+            NativeMiningTracker tracker = entry.getValue();
+            Player player = tracker.getPlayer();
+            Location loc = tracker.getLocation();
+
+            if (player == null || !player.isOnline() || loc == null || loc.getWorld() == null
+                    || !player.getWorld().equals(loc.getWorld())
+                    || player.getLocation().distanceSquared(loc) > 36.0) {
+                nativeIt.remove();
+                activeMiningLocations.remove(uuid);
+                continue;
+            }
+
+            Block block = loc.getBlock();
+            Optional<CustomBlockDefinition> optDef = customBlockService.getCustomBlock(block);
+            if (optDef.isEmpty()) {
+                nativeIt.remove();
+                activeMiningLocations.remove(uuid);
+                continue;
+            }
+
+            CustomBlockDefinition def = tracker.getDefinition();
+            ItemStack tool = getPlayerTool(player);
+            if (def.isUnbreakable() || !def.isEffectiveTool(tool)) {
+                continue;
+            }
+
+            int currentTicks = tracker.incrementTicks();
+
+            // Play mining hit sound every 4 ticks (~0.2s like vanilla mining) and silence vanilla wood hit
+            if (currentTicks % 4 == 0) { 
+                try {
+                    player.stopSound(org.bukkit.Sound.BLOCK_WOOD_HIT, org.bukkit.SoundCategory.BLOCKS);
+                    player.stopSound("minecraft:block.wood.hit", org.bukkit.SoundCategory.BLOCKS);
+                } catch (Throwable ignored) {}
+
+                if (def.getSoundGroup() != null && def.getSoundGroup().getHitSound() != null) {
+                    def.getSoundGroup().getHitSound().play(loc.clone().add(0.5, 0.5, 0.5));
+                }
             }
         }
     }

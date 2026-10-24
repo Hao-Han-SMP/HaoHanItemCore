@@ -40,10 +40,12 @@ public record CustomBlockSound(String soundKey, float volume, float pitch) {
             // First check if it matches a Bukkit Sound enum directly
             String rawEnumName = soundKey.toUpperCase(Locale.ROOT).replace("MINECRAFT:", "").replace(".", "_");
             try {
-                Sound sound = Sound.valueOf(rawEnumName);
-                loc.getWorld().playSound(loc, sound, volume, pitch);
-                return;
-            } catch (IllegalArgumentException ignored) {}
+                if (org.bukkit.Bukkit.getServer() != null) {
+                    Sound sound = Sound.valueOf(rawEnumName);
+                    loc.getWorld().playSound(loc, sound, org.bukkit.SoundCategory.BLOCKS, volume, pitch);
+                    return;
+                }
+            } catch (Throwable ignored) {}
 
             // Otherwise, play via adventure key / custom string sound
             loc.getWorld().playSound(loc, soundKey, org.bukkit.SoundCategory.BLOCKS, volume, pitch);
@@ -60,10 +62,12 @@ public record CustomBlockSound(String soundKey, float volume, float pitch) {
         try {
             String rawEnumName = soundKey.toUpperCase(Locale.ROOT).replace("MINECRAFT:", "").replace(".", "_");
             try {
-                Sound sound = Sound.valueOf(rawEnumName);
-                player.playSound(loc, sound, volume, pitch);
-                return;
-            } catch (IllegalArgumentException ignored) {}
+                if (org.bukkit.Bukkit.getServer() != null) {
+                    Sound sound = Sound.valueOf(rawEnumName);
+                    player.playSound(loc, sound, volume, pitch);
+                    return;
+                }
+            } catch (Throwable ignored) {}
 
             player.playSound(loc, soundKey, org.bukkit.SoundCategory.BLOCKS, volume, pitch);
         } catch (Throwable ignored) {}

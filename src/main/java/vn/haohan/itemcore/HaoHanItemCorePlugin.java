@@ -143,6 +143,7 @@ public final class HaoHanItemCorePlugin extends JavaPlugin {
         vn.haohan.itemcore.internal.block.BlockBreakOverlayRenderer breakOverlayRenderer = new vn.haohan.itemcore.internal.block.BlockBreakOverlayRenderer(log);
         customBlockMiningManager = new vn.haohan.itemcore.internal.block.CustomBlockMiningManager(
                 customBlockService, virtualEntityIdManager, breakOverlayRenderer, nativeMiningStrategy, this);
+        customBlockMiningManager.setSoundPacketListener(soundPacketListener);
         customBlockService.setMiningManager(customBlockMiningManager);
         vn.haohan.itemcore.internal.block.CustomBlockPacketListener chunkPacketListener =
                 new vn.haohan.itemcore.internal.block.CustomBlockPacketListener(customBlockVisibilityManager, log);

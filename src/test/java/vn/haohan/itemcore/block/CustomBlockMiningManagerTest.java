@@ -106,6 +106,44 @@ public class CustomBlockMiningManagerTest {
     }
 
     @Test
+    public void testNativeBlockMiningTicksPlayHitSoundAndStopWoodHit() {
+        Location loc = new Location(mockWorld, 1, 64, 1);
+        ItemStack pickaxe = TestItemService.mockItem(Material.DIAMOND_PICKAXE);
+        Mockito.when(mockPlayer.getInventory().getItemInMainHand()).thenReturn(pickaxe);
+
+        vn.haohan.itemcore.api.block.CustomBlockSoundGroup soundGroup =
+                vn.haohan.itemcore.api.block.CustomBlockSoundGroup.builder()
+                        .hitSound("minecraft:block.iron.hit", 1.0f, 1.0f)
+                        .build();
+
+        vn.haohan.itemcore.api.block.NativeCustomBlock nativeBlock =
+                vn.haohan.itemcore.api.block.NativeCustomBlock.builder("custom:native_ore")
+                        .customVariation(5)
+                        .soundGroup(soundGroup)
+                        .build();
+
+        Mockito.when(blockService.getCustomBlock(Mockito.any())).thenReturn(Optional.of(nativeBlock));
+        Mockito.when(blockService.isCustomBlock(Mockito.any())).thenReturn(true);
+
+        // Start digging native block
+        miningManager.handleDiggingAction(mockPlayer, DiggingAction.START_DIGGING, new Vector3i(1, 64, 1), loc);
+
+        // Tick 1, 2, 3
+        miningManager.tick();
+        miningManager.tick();
+        miningManager.tick();
+
+        // Tick 4: should trigger hit sound and stop wood hit
+        miningManager.tick();
+
+        Mockito.verify(mockPlayer, Mockito.atLeastOnce()).stopSound(org.bukkit.Sound.BLOCK_WOOD_HIT, org.bukkit.SoundCategory.BLOCKS);
+        Mockito.verify(mockWorld, Mockito.atLeastOnce()).playSound(Mockito.any(Location.class), Mockito.eq("minecraft:block.iron.hit"), Mockito.eq(org.bukkit.SoundCategory.BLOCKS), Mockito.eq(1.0f), Mockito.eq(1.0f));
+
+        // Stop digging
+        miningManager.handleDiggingAction(mockPlayer, DiggingAction.CANCELLED_DIGGING, new Vector3i(1, 64, 1), loc);
+    }
+
+    @Test
     public void testMiningProgressAndCompletion() {
         Location loc = new Location(mockWorld, 1, 64, 1);
         // 0.1s hardness = 2 ticks with 1.0 speed hand (0.5 progress per tick)

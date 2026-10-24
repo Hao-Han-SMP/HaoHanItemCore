@@ -210,6 +210,46 @@ public final class CustomBlockEventListener implements Listener {
             customBlockService.removeCustomBlock(loc);
         }
 
+        // Suppress vanilla block break sound/particles and play custom break sound for Native blocks
+        if (def.isNative()) {
+            String breakSoundKey = (def.getSoundGroup() != null && def.getSoundGroup().getBreakSound() != null)
+                    ? def.getSoundGroup().getBreakSound().soundKey()
+                    : null;
+            if (soundPacketListener != null) {
+                soundPacketListener.markRecentBreak(loc, breakSoundKey);
+                try {
+                    org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                        soundPacketListener.clearRecentBreak(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
+                    }, 5L);
+                } catch (Throwable ignored) {}
+            }
+
+            stopWoodBreakSounds(event.getPlayer());
+            try {
+                org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    stopWoodBreakSounds(event.getPlayer());
+                }, 1L);
+            } catch (Throwable ignored) {}
+
+            if (def.getSoundGroup() != null && def.getSoundGroup().getBreakSound() != null) {
+                Location soundLoc = loc.clone().add(0.5, 0.5, 0.5);
+                // Play to surrounding players in the world
+                def.getSoundGroup().getBreakSound().play(soundLoc);
+                // Also explicitly play directly to the breaking player to guarantee priority delivery
+                def.getSoundGroup().getBreakSound().play(event.getPlayer(), soundLoc);
+            }
+
+            if (def.getModel() != null && def.getModel().getBlockData() != null && loc.getWorld() != null) {
+                try {
+                    loc.getWorld().spawnParticle(
+                            org.bukkit.Particle.BLOCK,
+                            loc.clone().add(0.5, 0.5, 0.5),
+                            20, 0.3, 0.3, 0.3,
+                            def.getModel().getBlockData());
+                } catch (Throwable ignored) {}
+            }
+        }
+
         if (!useVanillaDrops) {
             dropCustomBlockItem(loc, def, event.getPlayer(), tool);
         }
@@ -554,5 +594,26 @@ public final class CustomBlockEventListener implements Listener {
     public void onChunkUnload(ChunkUnloadEvent event) {
         visibilityManager.handleChunkUnload(event.getChunk());
         storage.unloadChunk(event.getChunk());
+    }
+
+    private void stopWoodBreakSounds(Player player) {
+        if (player == null || !player.isOnline()) return;
+        try {
+            player.stopSound(org.bukkit.Sound.BLOCK_WOOD_BREAK, org.bukkit.SoundCategory.BLOCKS);
+        } catch (Throwable ignored) {}
+        try {
+            player.stopSound("minecraft:block.wood.break", org.bukkit.SoundCategory.BLOCKS);
+        } catch (Throwable ignored) {}
+        try {
+            player.stopSound(org.bukkit.Sound.BLOCK_NOTE_BLOCK_BASEDRUM, org.bukkit.SoundCategory.RECORDS);
+            player.stopSound(org.bukkit.Sound.BLOCK_NOTE_BLOCK_BASS, org.bukkit.SoundCategory.RECORDS);
+            player.stopSound(org.bukkit.Sound.BLOCK_NOTE_BLOCK_HARP, org.bukkit.SoundCategory.RECORDS);
+            player.stopSound(org.bukkit.Sound.BLOCK_NOTE_BLOCK_PLING, org.bukkit.SoundCategory.RECORDS);
+            player.stopSound(org.bukkit.Sound.BLOCK_NOTE_BLOCK_SNARE, org.bukkit.SoundCategory.RECORDS);
+            player.stopSound(org.bukkit.Sound.BLOCK_NOTE_BLOCK_HAT, org.bukkit.SoundCategory.RECORDS);
+        } catch (Throwable ignored) {}
+        try {
+            player.stopSound(org.bukkit.SoundCategory.RECORDS);
+        } catch (Throwable ignored) {}
     }
 }
