@@ -42,6 +42,8 @@ import java.util.stream.Collectors;
  */
 public final class ItemCoreCommand implements BasicCommand {
 
+    private static final String PERM_ADMIN = "haohanitemcore.admin";
+
     private final ItemRegistry itemRegistry;
     private final ItemService itemService;
     private final RecipeRegistry recipeRegistry;
@@ -66,6 +68,10 @@ public final class ItemCoreCommand implements BasicCommand {
     @Override
     public void execute(CommandSourceStack source, String[] args) {
         CommandSender sender = source.getSender();
+        if (!sender.hasPermission(PERM_ADMIN)) {
+            sender.sendMessage(Component.text("No permission!", NamedTextColor.RED));
+            return;
+        }
         if (args.length == 0) {
             sendHelp(sender);
             return;
@@ -182,7 +188,7 @@ public final class ItemCoreCommand implements BasicCommand {
     }
 
     private boolean handleGive(CommandSender sender, String[] args) {
-        if (!sender.hasPermission("baseengine.admin")) {
+        if (!sender.hasPermission(PERM_ADMIN)) {
             sender.sendMessage(Component.text("No permission!", NamedTextColor.RED));
             return true;
         }
@@ -271,7 +277,7 @@ public final class ItemCoreCommand implements BasicCommand {
     }
 
     private boolean handleReload(CommandSender sender) {
-        if (!sender.hasPermission("baseengine.admin")) {
+        if (!sender.hasPermission(PERM_ADMIN)) {
             sender.sendMessage(Component.text("No permission!", NamedTextColor.RED));
             return true;
         }
@@ -355,13 +361,11 @@ public final class ItemCoreCommand implements BasicCommand {
     @Override
     public Collection<String> suggest(CommandSourceStack source, String[] args) {
         CommandSender sender = source.getSender();
-        boolean isAdmin = sender.hasPermission("baseengine.admin");
-
-        List<String> subCommands = new ArrayList<>(List.of("items", "item", "recipes", "recipe", "search", "browse"));
-        if (isAdmin) {
-            subCommands.add("give");
-            subCommands.add("reload");
+        if (!sender.hasPermission(PERM_ADMIN)) {
+            return List.of();
         }
+
+        List<String> subCommands = List.of("items", "item", "give", "recipes", "recipe", "reload", "search", "browse");
 
         if (args.length == 0) {
             return subCommands;
@@ -375,18 +379,18 @@ public final class ItemCoreCommand implements BasicCommand {
             return switch (args[0].toLowerCase()) {
                 case "item" -> filterSuggestions(getAllItemIds(), args[1]);
                 case "recipe" -> filterSuggestions(getAllRecipeIds(), args[1]);
-                case "give" -> isAdmin ? filterSuggestions(getPlayerTargets(), args[1]) : List.of();
+                case "give" -> filterSuggestions(getPlayerTargets(), args[1]);
                 case "search" -> filterSuggestions(getAllIds(), args[1]);
                 default -> List.of();
             };
         }
 
         if (args.length == 3 && args[0].equalsIgnoreCase("give")) {
-            return isAdmin ? filterSuggestions(getAllItemIds(), args[2]) : List.of();
+            return filterSuggestions(getAllItemIds(), args[2]);
         }
 
         if (args.length == 4 && args[0].equalsIgnoreCase("give")) {
-            return isAdmin ? filterSuggestions(List.of("1", "16", "32", "64"), args[3]) : List.of();
+            return filterSuggestions(List.of("1", "16", "32", "64"), args[3]);
         }
 
         return List.of();

@@ -154,14 +154,14 @@ result:
 
 | Command | Mô tả | Permission |
 |---|---|---|
-| `/im items` | Liệt kê tất cả custom items | `baseengine.use` |
-| `/im item <id>` | Xem chi tiết item | `baseengine.use` |
-| `/im give <player> <id> [amount]` | Cho player item | `baseengine.admin` |
-| `/im recipes` | Liệt kê recipes | `baseengine.use` |
-| `/im recipe <id>` | Xem recipe GUI | `baseengine.use` |
-| `/im search <keyword>` | Tìm kiếm | `baseengine.use` |
-| `/im browse` | Mở Item Browser GUI | `baseengine.use` |
-| `/im reload` | Reload config | `baseengine.admin` |
+| `/im items` | Liệt kê tất cả custom items | `haohanitemcore.admin` |
+| `/im item <id>` | Xem chi tiết item | `haohanitemcore.admin` |
+| `/im give <player> <id> [amount]` | Cho player item | `haohanitemcore.admin` |
+| `/im recipes` | Liệt kê recipes | `haohanitemcore.admin` |
+| `/im recipe <id>` | Xem recipe GUI | `haohanitemcore.admin` |
+| `/im search <keyword>` | Tìm kiếm | `haohanitemcore.admin` |
+| `/im browse` | Mở Item Browser GUI | `haohanitemcore.admin` |
+| `/im reload` | Reload config | `haohanitemcore.admin` |
 
 **Aliases:** `/im` = `/itemcore` = `/haohanitemcore`
 
@@ -171,8 +171,7 @@ result:
 
 | Permission | Mô tả | Mặc định |
 |---|---|---|
-| `baseengine.use` | Commands cơ bản | `true` |
-| `baseengine.admin` | Commands admin (give, reload) | `op` |
+| `haohanitemcore.admin` | Toàn bộ lệnh `/im` | `op` |
 
 ---
 

@@ -7,14 +7,9 @@ author: HaoHan
 website: https://github.com/Hao-Han-SMP/HaoHanItemCore
 
 permissions:
-  haohanitemcore.use:
-    description: Allows basic HaoHanItemCore commands (items, item, recipes, recipe, search, browse)
-    default: true
   haohanitemcore.admin:
-    description: Allows admin HaoHanItemCore commands (give, reload)
+    description: Allows using all /im (HaoHanItemCore) commands
     default: op
-    children:
-      haohanitemcore.use: true
 
 dependencies:
   server:
